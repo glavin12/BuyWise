@@ -1,0 +1,1 @@
+"""Financial assistant agent construction."""
