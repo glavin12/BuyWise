@@ -1,23 +1,21 @@
 """
-LangChain agent service — creates and runs the AI agent with tools.
+LangChain agent service.
 
-ponytail: uses langgraph-prebuilt create_react_agent, the modern replacement
-for the deprecated langchain.agents.create_tool_calling_agent.
+The agent receives LangChain message objects only. Persistence stays in the
+repository/service layers.
 """
 
-import logging
-import uuid
+from collections.abc import Sequence
+from dataclasses import dataclass, field
+from typing import Any
 
+from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
 from langchain_groq import ChatGroq
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, ToolMessage
 from langgraph.prebuilt import create_react_agent
 
 from ai_service.core.config import get_settings
+from ai_service.schemas.chat import ToolCallInfo
 from ai_service.tools import all_tools
-from ai_service.services.conversation_service import conversation_service
-from ai_service.schemas.chat import ChatResponse, ToolCallInfo
-
-logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = """You are BuyWise AI, a smart and friendly personal finance assistant.
 
@@ -35,26 +33,30 @@ Rules:
 - When asked about goals or savings goals, use get_financial_goals.
 - When asked about profile, salary, or preferences, use get_user_profile.
 - When calculations are needed, use the calculator tool.
-- Format currency amounts in Indian Rupees (₹) with proper formatting.
-- Be helpful and proactive — suggest insights when appropriate.
+- Format currency amounts in Indian Rupees (INR) with proper formatting.
+- Be helpful and proactive; suggest insights when appropriate.
 """
 
-
-# ponytail: single agent instance, no per-request rebuild
 _agent = None
+
+
+@dataclass
+class ToolExchange:
+    """One assistant tool-call turn plus its tool result messages, in order."""
+
+    ai_message: AIMessage
+    tool_messages: list[ToolMessage] = field(default_factory=list)
 
 
 def _get_agent():
     global _agent
     if _agent is None:
         settings = get_settings()
-
-        llm = ChatGoogleGenerativeAI(
+        llm = ChatGroq(
             model=settings.MODEL_NAME,
-            google_api_key=settings.GOOGLE_API_KEY,
+            api_key=settings.GROQ_API_KEY,
             temperature=settings.TEMPERATURE,
         )
-
         _agent = create_react_agent(
             model=llm,
             tools=all_tools,
@@ -63,85 +65,62 @@ def _get_agent():
     return _agent
 
 
-async def run_agent(message: str, conversation_id: str | None = None) -> ChatResponse:
-    """
-    Run the AI agent with a user message.
-
-    1. Generate conversation_id if not provided
-    2. Save user message to conversation store
-    3. Load recent history for context
-    4. Run agent
-    5. Save assistant response
-    6. Return structured response
-    """
-    # Generate conversation ID if needed
-    if not conversation_id:
-        conversation_id = str(uuid.uuid4())
-
-    # Save user message
-    conversation_service.add_message(conversation_id, "user", message)
-
-    # Load recent conversation history for context
-    settings = get_settings()
-    recent_messages = conversation_service.get_messages(
-        conversation_id, limit=settings.MAX_CONVERSATION_HISTORY
-    )
-
-    # Build message list for the agent (exclude current message, it goes last)
-    messages = []
-    for msg in recent_messages[:-1]:
-        if msg.role == "user":
-            messages.append(HumanMessage(content=msg.content))
-        elif msg.role == "assistant":
-            messages.append(AIMessage(content=msg.content))
-
-    # Add current user message
-    messages.append(HumanMessage(content=message))
-
-    # Run the agent
+async def invoke_agent(messages: Sequence[BaseMessage]) -> dict[str, Any]:
     agent = _get_agent()
-    try:
-        result = await agent.ainvoke({"messages": messages})
-    except Exception as e:
-        logger.error(f"Agent execution failed: {e}")
-        error_response = "I'm sorry, I encountered an error processing your request. Please try again."
-        conversation_service.add_message(conversation_id, "assistant", error_response)
-        return ChatResponse(
-            response=error_response,
-            conversation_id=conversation_id,
-            tool_calls=[],
-        )
+    return await agent.ainvoke({"messages": list(messages)})
 
-    # Extract the final AI response from the message list
+
+def extract_agent_output(
+    result: dict[str, Any],
+    input_count: int,
+) -> tuple[AIMessage, list[ToolExchange], list[ToolCallInfo]]:
+    """Parse this turn's production out of the agent result.
+
+    ``result["messages"]`` is the full state (history + this turn's messages).
+    ``input_count`` is how many messages we passed in, so everything after that
+    index is what the agent produced this invocation.
+    """
     result_messages = result.get("messages", [])
-    ai_response = "I couldn't generate a response."
-    tool_calls = []
+    if len(result_messages) > input_count:
+        new_messages = result_messages[input_count:]
+    else:
+        new_messages = result_messages
 
-    for msg in result_messages:
-        if isinstance(msg, AIMessage):
-            # The last AIMessage with text content is the final response
-            if msg.content and isinstance(msg.content, str):
-                ai_response = msg.content
+    exchanges: list[ToolExchange] = []
+    final_ai: AIMessage | None = None
+    current_ai: AIMessage | None = None
+    current_tools: list[ToolMessage] = []
 
-            # Extract tool calls if present
-            if hasattr(msg, "tool_calls") and msg.tool_calls:
-                for tc in msg.tool_calls:
-                    tool_calls.append(ToolCallInfo(
-                        tool_name=tc["name"],
-                        tool_input=tc.get("args", {}),
-                        tool_output="",  # output comes from ToolMessage
-                    ))
+    for msg in new_messages:
+        if isinstance(msg, ToolMessage):
+            current_tools.append(msg)
+        elif isinstance(msg, AIMessage):
+            if msg.tool_calls:
+                if current_ai is not None:
+                    exchanges.append(
+                        ToolExchange(ai_message=current_ai, tool_messages=current_tools)
+                    )
+                current_ai = msg
+                current_tools = []
+            else:
+                final_ai = msg
 
-        elif isinstance(msg, ToolMessage):
-            # Match tool output to the last tool call
-            if tool_calls and not tool_calls[-1].tool_output:
-                tool_calls[-1].tool_output = str(msg.content)
+    if current_ai is not None:
+        exchanges.append(ToolExchange(ai_message=current_ai, tool_messages=current_tools))
 
-    # Save assistant response
-    conversation_service.add_message(conversation_id, "assistant", ai_response)
+    if final_ai is None:
+        final_ai = AIMessage(content="I couldn't generate a response.")
 
-    return ChatResponse(
-        response=ai_response,
-        conversation_id=conversation_id,
-        tool_calls=tool_calls,
-    )
+    tool_calls: list[ToolCallInfo] = []
+    for exchange in exchanges:
+        outputs = {tm.tool_call_id: tm.content for tm in exchange.tool_messages}
+        for tool_call in exchange.ai_message.tool_calls:
+            tool_calls.append(
+                ToolCallInfo(
+                    tool_name=tool_call.get("name", ""),
+                    tool_input=tool_call.get("args", {}),
+                    tool_output=str(outputs.get(tool_call.get("id"), "")),
+                )
+            )
+
+    return final_ai, exchanges, tool_calls

@@ -1,7 +1,7 @@
 """
-BuyWise AI Service — FastAPI Application
+BuyWise AI Service - FastAPI Application
 
-Phase 1: AI chat with mock tools, in-memory conversation storage.
+Phase 1: AI chat with mock tools and PostgreSQL conversation storage.
 """
 
 import logging
@@ -10,6 +10,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from ai_service.db.session import dispose_engine
 from ai_service.routers import chat, conversations, health
 
 # Configure logging
@@ -25,6 +26,7 @@ async def lifespan(app: FastAPI):
     """Startup and shutdown events."""
     logger.info("BuyWise AI Service starting up...")
     yield
+    await dispose_engine()
     logger.info("BuyWise AI Service shutting down...")
 
 
@@ -35,7 +37,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS — ponytail: allow all origins in dev, tighten in prod
+# CORS: allow all origins in dev, tighten in prod.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

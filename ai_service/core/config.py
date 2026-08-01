@@ -17,6 +17,10 @@ class Settings(BaseSettings):
     # Conversation
     MAX_CONVERSATION_HISTORY: int = 20  # ponytail: last N messages sent to agent, raise if context feels short
 
+    # Database
+    DATABASE_URL: str = ""
+    SUPABASE_DATABASE_URL: str = ""
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
 
 
