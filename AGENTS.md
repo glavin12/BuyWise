@@ -8,243 +8,136 @@ BuyWise is an AI-first personal finance platform.
 
 The AI is not just a chatbot. Its primary responsibility is to understand the user's financial situation, retrieve relevant information, use tools when necessary, and provide accurate financial assistance.
 
-The project will be built incrementally. Every feature should have a working foundation before additional intelligence is added.
+The project is built incrementally. Every feature must have a working foundation before additional intelligence is added.
 
 ---
 
-# Current Development Goal
+# Current State (what is already built)
 
-Build a reliable conversational AI service with short-term conversation memory and tool calling.
+**Phase 1 — AI Chat Foundation is DONE, including persistent conversation memory.**
 
-The current focus is **not** prediction, machine learning, or advanced memory systems.
+Shipped and verified against Supabase:
 
-The objective is to create a stable architecture that future features can build upon.
+- FastAPI service (`ai_service/`) with layered architecture
+- LangChain `create_react_agent` agent with a system prompt and mock financial tools
+- PostgreSQL (Supabase) persistence for `conversations` and `messages`
+- **Persistent conversation memory**: prior messages reload into the agent on every request and survive a backend restart
+- Tool-call round-tripping: assistant `tool_calls` and tool results are persisted and rebuilt on reload
+- Exactly-once sends via client `idempotency_key`
+- User-scoped access control at the repository layer (no RLS reliance)
+- Soft deletes, message status tracking, token usage columns
 
----
-
-# Development Roadmap
-
-## Phase 1 — AI Chat Foundation
-
-Implement:
-
-* FastAPI AI service
-* LangChain agent
-* Basic chat endpoint
-* Conversation management
-* Message persistence
-* Short-term conversation memory
-* Basic tool calling
-
-The agent should be able to:
-
-* Receive user messages
-* Load recent conversation history
-* Call tools when required
-* Generate responses
-* Save conversation history
+Do not re-build any of this. Extend it.
 
 ---
 
-## Phase 2 — Persistent Memory
+# Architecture
 
-After short-term memory is stable:
+Strict layered architecture. Data flows in one direction only:
 
-Implement:
+```
+Routes → Services → Repositories → SQLAlchemy → Postgres
+```
 
-* User facts
-* Financial memory
-* Memory extraction
-* Memory manager
+- **Routes** (`ai_service/routers/`) — HTTP layer only. Parse/validate via Pydantic schemas, map exceptions to HTTP status codes, call services.
+- **Services** (`ai_service/services/`) — business logic and orchestration. Own the chat flow, conversation lifecycle, and the agent interaction.
+- **Repositories** (`ai_service/repositories/`) — ALL database access. Own every query; enforce `user_id` scoping.
+- **Models** (`ai_service/models/`) — SQLAlchemy ORM classes.
+- **Utils** (`ai_service/utils/`) — pure conversion helpers (e.g. DB rows → LangChain messages).
 
-The AI should remember information such as:
+## Non-negotiable rules
 
-* Salary
-* Savings goals
-* Preferred bank
-* Currency
-* Financial preferences
-
-This information should be stored as structured data rather than relying on conversation history.
-
----
-
-## Phase 3 — Financial Intelligence
-
-Expand the AI with financial understanding.
-
-Examples:
-
-* Spending summaries
-* Budget analysis
-* Goal tracking
-* Cash flow analysis
-* Financial insights
-
-The AI should retrieve financial information through tools instead of generating assumptions.
+1. **The AI never touches the database.** The agent only receives a list of LangChain messages and tool outputs. It never executes SQL and never accesses repositories directly.
+2. **The repository layer is the security boundary.** Every repository method that reads or writes a conversation or message filters by `user_id`. **Do not rely on Supabase RLS** — the service connects via its own SQLAlchemy session (superuser), so RLS policies are bypassed. If you remove a `user_id` filter, you have broken access control.
+3. **The system prompt is generated fresh from code** (`SYSTEM_PROMPT` in `ai_service/services/agent_service.py`). Never load or store a system prompt row in the database — a prompt fix must apply to every conversation immediately.
+4. **Tool rows pair with their assistant row.** A `role='tool'` message must immediately follow the `role='assistant'` row whose `tool_calls` declared its `tool_call_id`. `db_messages_to_langchain` asserts this on every load.
+5. **Exactly-once sends.** Same `idempotency_key` in the same conversation → the prior result is replayed, never reprocessed. Enforced by the partial unique index + savepoint catch, not check-then-insert.
+6. **Conventions:** async SQLAlchemy everywhere; Python type hints; `from __future__ import annotations`; `logger = logging.getLogger(__name__)`; **do not add code comments unless asked**; use existing patterns from neighboring files.
 
 ---
 
-## Phase 4 — Advanced Intelligence
+# Chat Request Lifecycle
 
-Future improvements include:
+`POST /api/v1/chat` → `ChatService.send_message` (`ai_service/services/chat_service.py`):
 
-* Conversation summaries
-* Behavioral learning
-* Spending prediction
-* Personalized financial coaching
-* Semantic memory
-* Forecasting
+1. **Idempotency check** — if `idempotency_key` is provided and a prior send exists, return the replayed result (no agent call, no new rows). Otherwise a fresh key is generated.
+2. **Resolve conversation** — no `conversation_id` → create one for `user_id`. Existing → `ConversationRepository.get(id, user_id)`; `None` → 404.
+3. **Persist user message** (`status='completed'`, with the idempotency key).
+4. **Load recent context** — `get_recent_messages(conversation_id, user_id, limit)` where `limit = settings.MAX_CONVERSATION_HISTORY` (default 20). Converted to LangChain messages; the system prompt is prepended by the agent internally.
+5. **Invoke agent** with `[system] + recent messages`.
+6. **Persist the turn atomically** — intermediate assistant(`tool_calls`) rows → their tool rows → final assistant text row, in order, all in one commit (`save_assistant_turn`).
+7. On agent failure, persist a single `status='failed'` assistant row with error details in `metadata` and return the apology message (200, retryable with a fresh key).
+8. **Touch the conversation** — `message_count += N`, `last_message_at = now()`.
 
-These features will only be implemented after the previous phases are stable.
-
----
-
-# Architecture Principles
-
-The AI should only be responsible for:
-
-* Understanding user intent
-* Selecting tools
-* Reasoning over retrieved information
-* Producing responses
-
-The AI should **not**:
-
-* Execute SQL
-* Access the database directly
-* Implement business logic
-
-Business logic belongs to the FastAPI service layer.
+See `docs/ARCHITECTURE.md` for the full data-flow detail.
 
 ---
 
-# Memory Philosophy
+# Documentation Index
 
-Current implementation:
+Read the relevant doc before changing that area. `AGENTS.md` is the entry point; the docs below carry the deep detail.
 
-* Short-term conversation memory
-
-Future implementation:
-
-* Persistent user facts
-* Financial memory
-* Memory retrieval
-* Behavioral memory
-
-Memory should be retrieved deliberately instead of sending entire conversations to the model.
+| When you are… | Read |
+|---|---|
+| Changing the agent, message conversion, or chat flow | `docs/ARCHITECTURE.md` |
+| Touching any table, column, index, or migration | `docs/DATABASE.md` |
+| Changing any endpoint or request/response schema | `docs/API.md` |
+| Wondering *why* a design choice was made | `docs/DESIGN_DECISIONS.md` |
 
 ---
 
-# Tool Philosophy
+# Development Commands
 
-The AI communicates only through tools.
+Uses `uv` for dependency management. The virtualenv is `.venv`.
 
-Tools interact with the FastAPI service layer.
+```bash
+# Run the API (hot reload)
+uv run uvicorn ai_service.main:app --reload
 
-The service layer is responsible for:
+# Install a dependency (keeps uv.lock + requirements.txt in sync)
+uv add <package>
 
-* Validation
-* Business rules
-* Database operations
+# Migrations
+uv run alembic upgrade head      # apply all pending migrations
+uv run alembic downgrade -1      # roll back one revision
+uv run alembic current           # show the DB's current revision
+uv run alembic heads             # show the latest revision
+uv run alembic revision -m "description"   # scaffold a new revision
 
-The AI should never access the database directly.
+# Verify code compiles
+uv run python -m compileall ai_service
+```
 
----
+Migrations target Supabase via `DATABASE_URL` (see `ai_service/db/session.py`). New migrations must be reversible and must backfill existing rows.
 
-# Immediate Objective
-
-The current milestone is:
-
-1. Create conversation endpoints.
-2. Store messages.
-3. Load recent conversation history.
-4. Connect the LangChain agent.
-5. Return AI responses.
-6. Persist assistant responses.
-
-Once this workflow is reliable, the project can move on to persistent memory and financial intelligence.
+There is no automated test suite yet — add one before Phase 2 ships. Verification today is manual smoke tests (multi-turn chat, tool reload, idempotency replay).
 
 ---
 
-# Long-Term Vision
+# Tools
 
-BuyWise aims to evolve from a personal finance tracker into an intelligent financial assistant.
+Phase 1 tools are **mock implementations** returning hardcoded data (`ai_service/tools/`). They validate the AI workflow; they will be replaced by FastAPI/Go service calls in a later phase. All tools are registered in `ai_service/tools/__init__.py` — add new tools to the `all_tools` list there.
 
-Future intelligence will be built on top of a reliable foundation rather than being implemented from the beginning.
-
-The priority is correctness, maintainability, and modular architecture over rapid feature development.
-
-## Phase 1 Tools (Mock Implementation)
-
-The initial tools should return hardcoded or mock data. Their purpose is to validate the complete AI workflow before integrating the Go/FastAPI backend.
-
-Implement the following tools:
-
-### Conversation Tools
-
-* `get_recent_messages()`
-
-  * Returns the recent conversation history.
-
-### Financial Overview
-
-* `get_dashboard()`
-
-  * Returns a mock dashboard containing:
-
-    * Current balance
-    * Total spending
-    * Monthly income
-    * Savings
-
-### Transaction Tools
-
-* `get_recent_transactions()`
-
-  * Returns a mock list of recent transactions.
-
-* `add_transaction()`
-
-  * Simulates adding a transaction.
-
-### Budget Tools
-
-* `get_budget_status()`
-
-  * Returns remaining monthly budget.
-
-### Goal Tools
-
-* `get_financial_goals()`
-
-  * Returns active financial goals.
-
-### User Profile
-
-* `get_user_profile()`
-
-  * Returns mock user information such as:
-
-    * Salary
-    * Preferred currency
-    * Salary date
-
-### General Utility
-
-* `calculator()`
-
-  * Performs basic mathematical calculations.
+Available: `get_dashboard`, `get_recent_transactions`, `add_transaction`, `get_budget_status`, `get_financial_goals`, `get_user_profile`, `calculator`.
 
 ---
 
-These tools should **not** connect to a real database during Phase 1.
+# Roadmap
 
-Their only responsibility is to verify that:
+- **Phase 1 — AI Chat Foundation (DONE):** FastAPI service, agent, chat endpoint, conversation management, message persistence, short-term memory, tool calling, hardened schema, idempotency, access control.
+- **Phase 2 — Persistent Memory:** user facts, financial memory, memory extraction, memory manager. Stored as structured data, not conversation history.
+- **Phase 3 — Financial Intelligence:** spending summaries, budget analysis, goal tracking, cash flow, insights — via tools, never assumptions.
+- **Phase 4 — Advanced Intelligence:** conversation summaries, behavioral learning, spending prediction, personalized coaching, semantic memory, forecasting.
 
-1. The AI selects the correct tool.
-2. The tool returns the expected structured output.
-3. The AI correctly interprets the result.
-4. The final response is generated successfully.
+## Out of scope (do not touch until its phase)
 
-Once the complete tool-calling pipeline is stable, the mock implementations will be replaced with FastAPI service calls backed by the production database.
+Vector search / embeddings / RAG · conversation summarization · user facts / financial profile extraction · any "memory manager" abstraction. Also **not** in scope: having the AI execute SQL, access the database, or implement business logic.
+
+---
+
+# Definition of Done (for Phase 1 feature work)
+
+1. A multi-turn conversation, including a mock-tool turn, survives a full backend restart — a new message after restart reflects earlier context.
+2. Reloading a conversation that used a tool does not throw a `tool_call_id`-pairing error from the model API.
+3. Sending the same request twice with the same `idempotency_key` does not create a duplicate message.
+4. All schema changes exist via reversible Alembic migrations, with existing rows backfilled.
