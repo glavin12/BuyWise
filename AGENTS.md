@@ -19,12 +19,14 @@ The project is built incrementally. Every feature must have a working foundation
 Shipped and verified against Supabase:
 
 - FastAPI service (`ai_service/`) with layered architecture
+- **Supabase Auth integration** (`ai_service/auth/`): Supabase is the sole authenticator; the backend only verifies Supabase-issued access JWTs (ES256/RS256 via JWKS) and derives the authenticated user as `CurrentUser`. No `user_id` is ever trusted from a request body/path/query.
+- Development-only token helper `POST /api/v1/dev/token` (relays Supabase password grant) — registered only when `ENVIRONMENT=development`.
 - LangChain `create_react_agent` agent with a system prompt and mock financial tools
 - PostgreSQL (Supabase) persistence for `conversations` and `messages`
 - **Persistent conversation memory**: prior messages reload into the agent on every request and survive a backend restart
 - Tool-call round-tripping: assistant `tool_calls` and tool results are persisted and rebuilt on reload
 - Exactly-once sends via client `idempotency_key`
-- User-scoped access control at the repository layer (no RLS reliance)
+- User-scoped access control at the repository layer (no RLS reliance), now backed by a verified JWT identity
 - Soft deletes, message status tracking, token usage columns
 
 Do not re-build any of this. Extend it.
@@ -49,10 +51,12 @@ Routes → Services → Repositories → SQLAlchemy → Postgres
 
 1. **The AI never touches the database.** The agent only receives a list of LangChain messages and tool outputs. It never executes SQL and never accesses repositories directly.
 2. **The repository layer is the security boundary.** Every repository method that reads or writes a conversation or message filters by `user_id`. **Do not rely on Supabase RLS** — the service connects via its own SQLAlchemy session (superuser), so RLS policies are bypassed. If you remove a `user_id` filter, you have broken access control.
+3. **The authenticated `user_id` comes only from the verified JWT.** `get_current_user` (`ai_service/auth/`) verifies the Supabase access token (ES256/RS256 via JWKS) and returns `CurrentUser`. Routers receive `current_user: CurrentUser = Depends(get_current_user)` and use `current_user.id`. **Never** accept a `user_id` from a request body, path, or query — adding one is a regression. The `auth/` module never touches the database or application tables; it only verifies tokens and returns the identity.
 3. **The system prompt is generated fresh from code** (`SYSTEM_PROMPT` in `ai_service/services/agent_service.py`). Never load or store a system prompt row in the database — a prompt fix must apply to every conversation immediately.
 4. **Tool rows pair with their assistant row.** A `role='tool'` message must immediately follow the `role='assistant'` row whose `tool_calls` declared its `tool_call_id`. `db_messages_to_langchain` asserts this on every load.
 5. **Exactly-once sends.** Same `idempotency_key` in the same conversation → the prior result is replayed, never reprocessed. Enforced by the partial unique index + savepoint catch, not check-then-insert.
 6. **Conventions:** async SQLAlchemy everywhere; Python type hints; `from __future__ import annotations`; `logger = logging.getLogger(__name__)`; **do not add code comments unless asked**; use existing patterns from neighboring files.
+7. **Development-only routes** (`ai_service/routers/dev.py`) are registered **only** when `ENVIRONMENT=development` (see `main.py`); in staging/production they return 404, not 401. The `ENVIRONMENT` flag never branches business logic, auth, DB queries, or AI behavior — it controls dev utilities only.
 
 ---
 
@@ -60,14 +64,15 @@ Routes → Services → Repositories → SQLAlchemy → Postgres
 
 `POST /api/v1/chat` → `ChatService.send_message` (`ai_service/services/chat_service.py`):
 
-1. **Idempotency check** — if `idempotency_key` is provided and a prior send exists, return the replayed result (no agent call, no new rows). Otherwise a fresh key is generated.
-2. **Resolve conversation** — no `conversation_id` → create one for `user_id`. Existing → `ConversationRepository.get(id, user_id)`; `None` → 404.
-3. **Persist user message** (`status='completed'`, with the idempotency key).
-4. **Load recent context** — `get_recent_messages(conversation_id, user_id, limit)` where `limit = settings.MAX_CONVERSATION_HISTORY` (default 20). Converted to LangChain messages; the system prompt is prepended by the agent internally.
-5. **Invoke agent** with `[system] + recent messages`.
-6. **Persist the turn atomically** — intermediate assistant(`tool_calls`) rows → their tool rows → final assistant text row, in order, all in one commit (`save_assistant_turn`).
-7. On agent failure, persist a single `status='failed'` assistant row with error details in `metadata` and return the apology message (200, retryable with a fresh key).
-8. **Touch the conversation** — `message_count += N`, `last_message_at = now()`.
+1. **Authenticate** — `get_current_user` verifies the Supabase JWT and yields `current_user.id`. This is the `user_id` used below; it is never read from the request.
+2. **Idempotency check** — if `idempotency_key` is provided and a prior send exists, return the replayed result (no agent call, no new rows). Otherwise a fresh key is generated.
+3. **Resolve conversation** — no `conversation_id` → create one for `user_id`. Existing → `ConversationRepository.get(id, user_id)`; `None` → 404.
+4. **Persist user message** (`status='completed'`, with the idempotency key).
+5. **Load recent context** — `get_recent_messages(conversation_id, user_id, limit)` where `limit = settings.MAX_CONVERSATION_HISTORY` (default 20). Converted to LangChain messages; the system prompt is prepended by the agent internally.
+6. **Invoke agent** with `[system] + recent messages`.
+7. **Persist the turn atomically** — intermediate assistant(`tool_calls`) rows → their tool rows → final assistant text row, in order, all in one commit (`save_assistant_turn`).
+8. On agent failure, persist a single `status='failed'` assistant row with error details in `metadata` and return the apology message (200, retryable with a fresh key).
+9. **Touch the conversation** — `message_count += N`, `last_message_at = now()`.
 
 See `docs/ARCHITECTURE.md` for the full data-flow detail.
 

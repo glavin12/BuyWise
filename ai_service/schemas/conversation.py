@@ -6,9 +6,12 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class ConversationCreate(BaseModel):
-    """Create a conversation for a user."""
+    """Create a conversation for a user.
 
-    user_id: UUID
+    The authenticated user is derived from the verified JWT (see
+    ``get_current_user``); this body carries no ``user_id``.
+    """
+
     title: str | None = None
 
 

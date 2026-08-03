@@ -11,10 +11,13 @@ def _empty_str_to_none(value: object) -> object:
 
 
 class ChatRequest(BaseModel):
-    """Incoming chat message from user."""
+    """Incoming chat message.
+
+    The authenticated user is derived from the verified JWT (see
+    ``get_current_user``); this body intentionally carries no ``user_id``.
+    """
 
     message: str = Field(..., min_length=1, description="The user's message")
-    user_id: UUID = Field(..., description="The authenticated user's ID.")
     conversation_id: UUID | None = Field(
         None, description="Conversation ID. Auto-generated if not provided."
     )
@@ -24,7 +27,7 @@ class ChatRequest(BaseModel):
         "this key already completed, its prior result is returned instead.",
     )
 
-    @field_validator("user_id", "conversation_id", "idempotency_key", mode="before")
+    @field_validator("conversation_id", "idempotency_key", mode="before")
     @classmethod
     def _normalize_blank_values(cls, value: object) -> object:
         return _empty_str_to_none(value)

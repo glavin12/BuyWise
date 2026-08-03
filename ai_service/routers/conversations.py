@@ -4,6 +4,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ai_service.auth import CurrentUser, get_current_user
 from ai_service.db.session import get_async_session
 from ai_service.schemas.conversation import (
     ConversationCreate,
@@ -23,20 +24,23 @@ router = APIRouter(prefix="/api/v1", tags=["conversations"])
 async def create_conversation(
     request: ConversationCreate,
     session: AsyncSession = Depends(get_async_session),
+    current_user: CurrentUser = Depends(get_current_user),
 ):
-    """Create a new conversation for a user."""
+    """Create a new conversation for the authenticated user."""
     service = ConversationService(session)
-    return await service.create_conversation(user_id=request.user_id)
+    return await service.create_conversation(user_id=current_user.id)
 
 
-@router.get("/users/{user_id}/conversations", response_model=list[ConversationRead])
-async def get_user_conversations(
-    user_id: UUID,
+@router.get("/conversations", response_model=list[ConversationRead])
+async def list_conversations(
+    cursor: datetime | None = None,
+    limit: int = Query(50, ge=1, le=200),
     session: AsyncSession = Depends(get_async_session),
+    current_user: CurrentUser = Depends(get_current_user),
 ):
-    """Get conversations for a user."""
+    """List conversations for the authenticated user (scoped by JWT identity)."""
     service = ConversationService(session)
-    return await service.list_for_user(user_id)
+    return await service.list_for_user(current_user.id, cursor=cursor, limit=limit)
 
 
 @router.get(
@@ -45,17 +49,17 @@ async def get_user_conversations(
 )
 async def get_conversation_messages(
     conversation_id: UUID,
-    user_id: UUID = Query(..., description="The authenticated user's ID."),
     cursor: datetime | None = None,
     limit: int = Query(100, ge=1, le=500),
     session: AsyncSession = Depends(get_async_session),
+    current_user: CurrentUser = Depends(get_current_user),
 ):
-    """Get all messages for a conversation (scoped to the user)."""
+    """Get all messages for a conversation (scoped to the authenticated user)."""
     service = ConversationService(session)
     try:
         messages = await service.get_full_history(
             conversation_id=conversation_id,
-            user_id=user_id,
+            user_id=current_user.id,
             cursor=cursor,
             limit=limit,
         )
@@ -70,12 +74,12 @@ async def get_conversation_messages(
 @router.delete("/conversations/{conversation_id}")
 async def delete_conversation(
     conversation_id: UUID,
-    user_id: UUID = Query(..., description="The authenticated user's ID."),
     session: AsyncSession = Depends(get_async_session),
+    current_user: CurrentUser = Depends(get_current_user),
 ):
     """Soft-delete a conversation and hide its message history."""
     service = ConversationService(session)
-    deleted = await service.soft_delete_conversation(conversation_id, user_id)
+    deleted = await service.soft_delete_conversation(conversation_id, current_user.id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Conversation not found")
     return {"status": "deleted", "conversation_id": conversation_id}
