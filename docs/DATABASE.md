@@ -68,10 +68,107 @@ Indexes: `ix_conversations_user_id`.
 
 ---
 
+## Financial tables
+
+The core financial schema (`profiles`, `categories`, `transactions`, `monthly_plans`) was created by the Supabase migration `20260728184215` ("create_buywise_core_schema") **outside** the Alembic chain. Alembic migration `202608050001` enhanced them and added `goals`. Models live in `ai_service/models/financial.py`.
+
+> **ID strategy note:** financial tables use DB-side `gen_random_uuid()` (v4) as their PK default — unlike `conversations`/`messages` which use app-layer UUIDv7. The repository layer relies on the DB default + flush/refresh to obtain the id.
+
+### `profiles` — one row per user (`id` = `auth.users.id`)
+
+| column | type | nullable | default | notes |
+|---|---|---|---|---|
+| `id` | `uuid` | NO | — | PK, FK → `auth.users(id) ON DELETE CASCADE` |
+| `full_name` | `text` | YES | — | |
+| `currency` | `text` | NO | `'INR'` | |
+| `income_type` | `text` | YES | — | `salaried` / `freelancer` / `business_owner` / `retired` / `other` |
+| `salary_day` | `integer` | YES | — | day of month income lands; nullable (freelancers etc.), CHECK 1–31 |
+| `timezone` | `text` | NO | `'Asia/Kolkata'` | |
+| `onboarding_complete` | `boolean` | NO | `false` | |
+| `savings_target_percent` | `integer` | YES | — | CHECK 0–100 |
+| `investment_style` | `text` | YES | — | `conservative` / `moderate` / `aggressive` |
+| `budget_alerts` | `boolean` | NO | `true` | |
+| `created_at` | `timestamptz` | NO | `now()` | |
+| `updated_at` | `timestamptz` | NO | `now()` | |
+
+### `categories` — shared lookup, hierarchical
+
+| column | type | nullable | default | notes |
+|---|---|---|---|---|
+| `id` | `uuid` | NO | `gen_random_uuid()` | PK |
+| `name` | `text` | NO | — | CHECK non-empty; `UNIQUE(name, type)` |
+| `type` | `text` | NO | — | `expense` / `income` |
+| `icon` | `text` | YES | — | |
+| `color` | `text` | YES | — | |
+| `parent_category_id` | `uuid` | YES | — | self-FK → `categories(id) ON DELETE SET NULL`; 1 level of nesting for MVP |
+| `is_system` | `boolean` | NO | `false` | built-in defaults vs user-created |
+| `created_at` | `timestamptz` | NO | `now()` | |
+
+### `transactions` — source of truth ledger
+
+| column | type | nullable | default | notes |
+|---|---|---|---|---|
+| `id` | `uuid` | NO | `gen_random_uuid()` | PK |
+| `profile_id` | `uuid` | NO | — | FK → `profiles(id) ON DELETE CASCADE`; indexed |
+| `category_id` | `uuid` | NO | — | FK → `categories(id) ON DELETE RESTRICT`; indexed |
+| `amount` | `numeric(14,2)` | NO | — | CHECK `>= 0`; sign is encoded in `type`, not the amount |
+| `type` | `text` | NO | — | `expense` / `income` |
+| `title` | `text` | NO | — | CHECK non-empty |
+| `merchant_name` | `text` | YES | — | |
+| `description` | `text` | YES | — | |
+| `payment_method` | `text` | YES | — | |
+| `source` | `text` | YES | — | future: `manual` / `voice` / `import` |
+| `is_recurring` | `boolean` | NO | `false` | subscription/regular-payment flag for forecasting |
+| `transaction_date` | `timestamptz` | NO | `now()` | indexed |
+| `created_at` | `timestamptz` | NO | `now()` | |
+| `updated_at` | `timestamptz` | NO | `now()` | |
+
+### `monthly_plans` — user's intention per month (only non-calculable inputs)
+
+| column | type | nullable | default | notes |
+|---|---|---|---|---|
+| `id` | `uuid` | NO | `gen_random_uuid()` | PK |
+| `profile_id` | `uuid` | NO | — | FK → `profiles(id) ON DELETE CASCADE`; indexed |
+| `month` | `integer` | NO | — | CHECK 1–12 |
+| `year` | `integer` | NO | — | CHECK 2020–2100 |
+| `expected_income` | `numeric(14,2)` | NO | `0` | CHECK `>= 0`; per-month to preserve income history |
+| `minimum_savings_goal` | `numeric(14,2)` | NO | `0` | CHECK `>= 0` |
+| `status` | `text` | NO | `'active'` | `active` / `completed` / `archived` |
+| `created_at` | `timestamptz` | NO | `now()` | |
+| `updated_at` | `timestamptz` | NO | `now()` | |
+
+- `UNIQUE(profile_id, month, year)` — one plan per month.
+- `ix_monthly_plans_active_profile` — **partial unique** `(profile_id) WHERE status = 'active'` — at most one active plan per user.
+- Derived values (total spent, remaining balance, achieved savings) are **never stored** — computed from `transactions`.
+
+### `goals` — dedicated goals table
+
+| column | type | nullable | default | notes |
+|---|---|---|---|---|
+| `id` | `uuid` | NO | `gen_random_uuid()` | PK |
+| `profile_id` | `uuid` | NO | — | FK → `profiles(id) ON DELETE CASCADE` |
+| `title` | `text` | NO | — | |
+| `description` | `text` | YES | — | |
+| `target_amount` | `numeric(14,2)` | NO | — | CHECK `> 0` |
+| `current_amount` | `numeric(14,2)` | NO | `0` | CHECK `>= 0`; live value, allocation history is a future table |
+| `goal_type` | `text` | YES | — | `emergency_fund` / `purchase` / `vacation` / `investment` / `debt_repayment` / `education` / `retirement` / `custom` |
+| `priority` | `text` | YES | — | free-form for now |
+| `target_date` | `date` | YES | — | |
+| `status` | `text` | NO | `'active'` | `active` / `completed` / `archived` |
+| `created_at` | `timestamptz` | NO | `now()` | |
+| `updated_at` | `timestamptz` | NO | `now()` | |
+
+Indexes: `ix_goals_profile`, `ix_goals_profile_status`.
+
+> **Future (not implemented):** `goal_allocations(id, goal_id, monthly_plan_id, amount, created_at)` to preserve monthly savings-allocation history; `goals.current_amount` becomes a denormalized SUM.
+
+---
+
 ## Access control (RLS)
 
 - Row-Level Security **is enabled** and the original policies exist, but **the service does not rely on them**: it connects via its own SQLAlchemy session as the DB superuser, which bypasses RLS.
 - The real security boundary is **`user_id` filtering in every repository read/write** (`docs/ARCHITECTURE.md`). Never add a repository method that omits the `user_id` filter.
+- Defense-in-depth policies exist for the financial tables (`202608050001`): owner-scoped `SELECT`/`INSERT`/`UPDATE` on `profiles`, `transactions`, `monthly_plans`, `goals` (+ `DELETE` on `goals`), and shared `SELECT` on `categories` for `authenticated`.
 
 ---
 
@@ -85,8 +182,12 @@ Location: `alembic/versions/`. Convention: `<YYYYMMDD>_<sequence>_<slug>`; alway
 | `202608020001` | make `conversations.user_id` nullable *(superseded — reverted in 202608020002)* |
 | `202608020002` | conversation hardening: `message_count`, `last_message_at`, `deleted_at`; `user_id` NOT NULL again; backfill |
 | `202608020003` | message hardening: `user_id`, `tool_call_id`, `tool_calls`, `status` + enum, `idempotency_key`, `metadata`, token columns, `deleted_at`; role enum + `tool`; FK → RESTRICT; index rebuild; backfill |
+| `202608050001` | financial schema: enrich `profiles`; hierarchical `categories`; `transactions.is_recurring`; `monthly_plans` cleanup (`planned_expenses`/`salary_date` dropped, `savings_goal` → `minimum_savings_goal`, `status` + checks + partial-unique active index); create `goals`; RLS policies |
+| `202608050002` | seed 20 default `categories` (13 expense, 7 income) with `is_system=true` |
 
-**Current head: `202608020003`.**
+> The core financial tables (`profiles`, `categories`, `transactions`, `monthly_plans`) were created by Supabase migration `20260728184215`, outside this Alembic chain. `202608050001` alters those tables in place, so its `downgrade()` restores the pre-enrichment shape.
+
+**Current head: `202608050002`.**
 
 Commands:
 

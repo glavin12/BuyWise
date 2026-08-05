@@ -42,8 +42,8 @@ ai_service/
 ├── routers/         HTTP endpoints (chat, conversations, health)
 ├── services/        chat flow, conversation lifecycle, agent
 ├── repositories/    all database access (user_id-scoped)
-├── tools/           mock financial tools
-└── utils/           DB rows → LangChain messages
+├── tools/           database-backed financial tools (AI-accessible)
+└── utils/           DB rows → LangChain messages, month/period helpers
 alembic/             reversible migrations
 docs/                architecture, database, API, design decisions
 ```
@@ -59,7 +59,7 @@ docs/                architecture, database, API, design decisions
 ## Core behavior
 
 - **Persistent memory** — prior messages reload into the agent every request and survive restarts.
-- **Tool calling** — assistant `tool_calls` + tool results persist and round-trip on reload (Phase 1 tools are mocks).
+- **Tool calling** — assistant `tool_calls` + tool results persist and round-trip on reload. Tools read the authenticated user + DB session from request context and return structured JSON only.
 - **Exactly-once sends** — the same `idempotency_key` replays the prior result, never duplicates.
 - **Access control** — every repository read/write filters by `user_id` (RLS is not relied on).
 - **Context cap** — the last `MAX_CONVERSATION_HISTORY` (20) messages feed the agent.

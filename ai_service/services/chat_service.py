@@ -7,6 +7,7 @@ from langchain_core.messages import AIMessage
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai_service.core.config import get_settings
+from ai_service.core.context import request_context
 from ai_service.models import generate_uuid7
 from ai_service.schemas.chat import ChatResponse
 from ai_service.services.agent_service import extract_agent_output, invoke_agent
@@ -22,6 +23,7 @@ class ChatService:
     """Orchestrates the persisted chat flow."""
 
     def __init__(self, session: AsyncSession):
+        self.session = session
         self.conversations = ConversationService(session)
 
     async def send_message(
@@ -67,7 +69,8 @@ class ChatService:
         )
 
         try:
-            result = await invoke_agent(recent)
+            with request_context(user_id, self.session):
+                result = await invoke_agent(recent)
             final_ai, tool_exchanges, tool_calls = extract_agent_output(
                 result, input_count=len(recent)
             )

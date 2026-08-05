@@ -21,7 +21,7 @@ Shipped and verified against Supabase:
 - FastAPI service (`ai_service/`) with layered architecture
 - **Supabase Auth integration** (`ai_service/auth/`): Supabase is the sole authenticator; the backend only verifies Supabase-issued access JWTs (ES256/RS256 via JWKS) and derives the authenticated user as `CurrentUser`. No `user_id` is ever trusted from a request body/path/query.
 - Development-only token helper `POST /api/v1/dev/token` (relays Supabase password grant) — registered only when `ENVIRONMENT=development`.
-- LangChain `create_react_agent` agent with a system prompt and mock financial tools
+- LangChain `create_react_agent` agent with a system prompt and database-backed financial tools
 - PostgreSQL (Supabase) persistence for `conversations` and `messages`
 - **Persistent conversation memory**: prior messages reload into the agent on every request and survive a backend restart
 - Tool-call round-tripping: assistant `tool_calls` and tool results are persisted and rebuilt on reload
@@ -121,7 +121,7 @@ There is no automated test suite yet — add one before Phase 2 ships. Verificat
 
 # Tools
 
-Phase 1 tools are **mock implementations** returning hardcoded data (`ai_service/tools/`). They validate the AI workflow; they will be replaced by FastAPI/Go service calls in a later phase. All tools are registered in `ai_service/tools/__init__.py` — add new tools to the `all_tools` list there.
+Phase 1 tools are **database-backed** and follow the same layered flow as the chat pipeline: `tool → service → repository → SQLAlchemy`. Each tool reads the authenticated `user_id` and DB session from the request context (`ai_service/core/context.py`, set by `ChatService.send_message`) and delegates to a service. Tools return **structured JSON only** — never advice, recommendations, or SQL. All tools are registered in `ai_service/tools/__init__.py` — add new tools to the `all_tools` list there.
 
 Available: `get_dashboard`, `get_recent_transactions`, `add_transaction`, `get_budget_status`, `get_financial_goals`, `get_user_profile`, `calculator`.
 

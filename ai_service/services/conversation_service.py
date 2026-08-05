@@ -230,6 +230,11 @@ class ConversationService:
                 break
         if final is None:
             return None
+        # Exactly-once applies to completed sends only. A failed turn (e.g. an
+        # agent error) must be retryable with the same key — replaying it would
+        # return the apology forever.
+        if final.status != MessageStatus.COMPLETED:
+            return None
 
         tool_calls: list[ToolCallInfo] = []
         for row in turn:

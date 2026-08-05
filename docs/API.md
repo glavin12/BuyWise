@@ -267,6 +267,81 @@ Soft-delete a conversation (sets `deleted_at`). Messages are hidden from reads b
 
 ---
 
+## `GET /api/v1/profile`
+
+Return the authenticated user's financial profile (used by the onboarding/settings UI). **Requires authentication.**
+
+### Response — `200 OK`
+
+```json
+{
+  "id": "00000000-0000-0000-0000-000000000001",
+  "full_name": "Rahul Sharma",
+  "currency": "INR",
+  "income_type": "salaried",
+  "salary_day": 28,
+  "timezone": "Asia/Kolkata",
+  "onboarding_complete": true,
+  "savings_target_percent": 20,
+  "investment_style": "moderate",
+  "budget_alerts": true,
+  "created_at": "2026-08-05T00:00:00Z",
+  "updated_at": "2026-08-05T00:00:00Z"
+}
+```
+
+`id` is derived from the verified JWT, never the request. `income_type` is one of `salaried | freelancer | business_owner | retired | other`; `investment_style` is `conservative | moderate | aggressive`.
+
+### Errors
+| status | when |
+|---|---|
+| `401` | missing/invalid/expired JWT |
+| `404` | user has no profile yet (before onboarding) |
+
+---
+
+## `POST /api/v1/profile`
+
+Create or update the authenticated user's profile. Called by the onboarding form (first sign-in) and the settings page. **Requires authentication.** This endpoint is **not** called by the AI — profile data is collected via the UI, the AI only reads it via the `get_profile` tool.
+
+### Request body (all optional — partial updates)
+
+```json
+{
+  "full_name": "Rahul Sharma",
+  "currency": "INR",
+  "income_type": "salaried",
+  "salary_day": 28,
+  "savings_target_percent": 20,
+  "investment_style": "moderate",
+  "budget_alerts": true,
+  "onboarding_complete": true
+}
+```
+
+| field | type | notes |
+|---|---|---|
+| `full_name` | string | |
+| `currency` | string | default `INR` |
+| `income_type` | enum | `salaried` / `freelancer` / `business_owner` / `retired` / `other` |
+| `salary_day` | int (1–31) | nullable — many users are freelancers/business owners |
+| `savings_target_percent` | int (0–100) | |
+| `investment_style` | enum | `conservative` / `moderate` / `aggressive` |
+| `budget_alerts` | bool | default `true` |
+| `onboarding_complete` | bool | set `true` when the form submits the full set |
+
+If no profile row exists yet, one is created with `id = auth.uid()`.
+
+### Response — `200 OK` (`ProfileRead`, same shape as GET)
+
+### Errors
+| status | when |
+|---|---|
+| `401` | missing/invalid/expired JWT |
+| `422` | no fields provided / invalid enum or range |
+
+---
+
 ## `GET /health`
 
 Public (no authentication).

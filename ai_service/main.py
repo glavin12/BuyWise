@@ -1,7 +1,7 @@
 """
 BuyWise AI Service - FastAPI Application
 
-Phase 1: AI chat with mock tools and PostgreSQL conversation storage.
+Phase 1: AI chat with database-backed financial tools and PostgreSQL storage.
 """
 
 import logging
@@ -14,7 +14,7 @@ from fastapi.responses import JSONResponse
 from ai_service.auth import AuthError
 from ai_service.core.config import get_settings
 from ai_service.db.session import dispose_engine
-from ai_service.routers import chat, conversations, health
+from ai_service.routers import chat, conversations, health, profile
 
 # Configure logging
 logging.basicConfig(
@@ -68,6 +68,7 @@ async def auth_error_handler(request: Request, exc: AuthError) -> JSONResponse:
 app.include_router(health.router)
 app.include_router(chat.router)
 app.include_router(conversations.router)
+app.include_router(profile.router)
 
 # Development-only utilities. Never registered outside the ``development``
 # environment, so these routes return 404 (not 401) in staging/production.

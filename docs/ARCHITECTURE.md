@@ -9,29 +9,54 @@ Deep-dive for anyone (human or agent) modifying the agent, chat flow, or message
 ```
 ai_service/
 ├── main.py                      FastAPI app, router registration, lifespan
-├── core/config.py               Pydantic Settings (env-driven)
+├── core/
+│   ├── config.py                Pydantic Settings (env-driven)
+│   └── context.py               request_context() — user_id + session contextvars for tools
 ├── db/
 │   ├── base.py                  DeclarativeBase
 │   └── session.py               async engine / session factory / get_async_session
 ├── models/
-│   └── conversation.py          Conversation, Message, MessageRole, MessageStatus, generate_uuid7
+│   ├── conversation.py          Conversation, Message, MessageRole, MessageStatus, generate_uuid7
+│   └── financial.py             Profile, Category, Transaction, MonthlyPlan, Goal
 ├── schemas/
 │   ├── chat.py                  ChatRequest, ChatResponse, ToolCallInfo
-│   └── conversation.py          ConversationCreate/Read, Message, ConversationHistory
+│   ├── conversation.py          ConversationCreate/Read, Message, ConversationHistory
+│   └── profile.py               ProfileRead, ProfileUpdate (UI onboarding/settings form)
 ├── repositories/
 │   ├── conversations.py         ConversationRepository (all user_id-scoped)
-│   └── messages.py              MessageRepository + MessageCreate dataclass
+│   ├── messages.py              MessageRepository + MessageCreate dataclass
+│   ├── profile_repository.py    ProfileRepository
+│   ├── category_repository.py   CategoryRepository (shared reference data)
+│   ├── transaction_repository.py TransactionRepository (ledger + analytical aggregates)
+│   ├── goal_repository.py       GoalRepository
+│   └── monthly_plan_repository.py MonthlyPlanRepository
 ├── routers/
 │   ├── health.py                GET /health
 │   ├── chat.py                  POST /api/v1/chat
-│   └── conversations.py         conversation CRUD + message history endpoints
+│   ├── conversations.py         conversation CRUD + message history endpoints
+│   └── profile.py               GET/POST /api/v1/profile (UI form, not AI)
 ├── services/
 │   ├── agent_service.py         LangChain agent, SYSTEM_PROMPT, extract_agent_output, ToolExchange
 │   ├── chat_service.py          ChatService.send_message (the chat orchestration)
-│   └── conversation_service.py  ConversationService (turn persistence, history, idempotent replay)
-├── tools/                       mock financial tools; all_tools registry
+│   ├── conversation_service.py  ConversationService (turn persistence, history, idempotent replay)
+│   ├── profile_service.py       ProfileService (read for AI; create/update for UI form)
+│   ├── dashboard_service.py     DashboardService (aggregates plan + ledger + goals + profile)
+│   ├── transaction_service.py   TransactionService (list, add, spending breakdown, income summary)
+│   ├── goal_service.py          GoalService (list, add, update progress)
+│   ├── monthly_plan_service.py  MonthlyPlanService (set plan, budget status)
+│   └── category_service.py      CategoryService (list categories)
+├── tools/                       database-backed tools; all_tools registry
+│   ├── profile.py               get_profile
+│   ├── dashboard.py             get_dashboard
+│   ├── spending.py              get_spending_breakdown, get_income_summary
+│   ├── transactions.py          get_recent_transactions, add_transaction
+│   ├── goals.py                 get_financial_goals, add_goal, update_goal_progress
+│   ├── plans.py                 get_budget_status, set_monthly_plan
+│   ├── categories.py            get_categories
+│   └── calculator.py            calculator (pure, no DB)
 └── utils/
-    └── langchain_messages.py    db_messages_to_langchain (DB rows → LangChain messages)
+    ├── langchain_messages.py    db_messages_to_langchain (DB rows → LangChain messages)
+    └── financial.py             month ranges, period resolution, money formatting
 ```
 
 Data flows one way: `Routes → Services → Repositories → SQLAlchemy → Postgres`.
@@ -80,6 +105,24 @@ ChatResponse {response, conversation_id, tool_calls[]}
   - `ToolMessage` → appended to the current exchange's `tool_messages`.
   - `AIMessage` without `tool_calls` → the **final** assistant message (carries `usage_metadata` for tokens).
   - Builds the response `tool_calls` list from the exchanges.
+
+## Tool execution context
+
+Tools are async `@tool` functions that must know *which user* and *which DB session*
+to operate on. They never receive these as arguments (that would let the LLM
+invent them). Instead `ChatService.send_message` wraps the agent invocation in
+`request_context(user_id, session)` (`core/context.py`):
+
+```python
+with request_context(user_id, self.session):
+    result = await invoke_agent(recent)
+```
+
+Each tool then calls `get_current_user_id()` / `get_db_session()` to obtain the
+authenticated identity and the live session, constructs the service it needs,
+and delegates. Tools return **structured JSON only** — no advice, no SQL, no
+repository access. Business logic lives in the service layer, matching the
+router→service→repository rule.
 
 ### `ToolExchange`
 
