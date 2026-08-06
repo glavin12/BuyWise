@@ -111,3 +111,13 @@ Rationale behind the non-obvious choices. Read this when you're about to change 
 **Why:** `metadata` is a reserved name in SQLAlchemy's Declarative API (it's the `MetaData` on the base class), so a Python attribute of that name cannot be declared. The DB column name stays per spec; only the attribute is renamed.
 
 **Consequence:** Raw SQL and ORM code refer to the column differently — ORM code must use `message_metadata`.
+
+---
+
+## 12. Hybrid Context Strategy — base context + tools, never preload everything
+
+**Decision:** The Context Manager injects a lightweight base context (profile + current date) as a `SystemMessage` before every agent invocation. Expensive data (transactions, budgets, goals, spending analytics) is never preloaded — it is retrieved by the agent through tools only when needed.
+
+**Why:** Preloading every piece of user data before every request is wasteful and burns tokens on data the agent may never need. Starting with zero context means the agent has no awareness of the user (name, currency, timezone) and must call tools just to say hello. The hybrid approach — inspired by how Claude Code loads CLAUDE.md — gives the agent immediate awareness of the user while letting it progressively discover deeper data through tools.
+
+**Consequence:** Adding a new piece of data to base context requires a loader implementing the `ContextLoader` ABC and a corresponding field on `FinancialContext`. Telling the agent "always call tool X for this" instead of preloading it is a design choice, not an omission.

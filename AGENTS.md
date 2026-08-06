@@ -24,6 +24,7 @@ Shipped and verified against Supabase:
 - LangChain `create_react_agent` agent with a system prompt and database-backed financial tools
 - PostgreSQL (Supabase) persistence for `conversations` and `messages`
 - **Persistent conversation memory**: prior messages reload into the agent on every request and survive a backend restart
+- **Context Manager** (`ai_service/context/`): hybrid context strategy — lightweight base context (profile + current date) injected as a SystemMessage before every agent invocation; expensive data retrieved via tools only
 - Tool-call round-tripping: assistant `tool_calls` and tool results are persisted and rebuilt on reload
 - Exactly-once sends via client `idempotency_key`
 - User-scoped access control at the repository layer (no RLS reliance), now backed by a verified JWT identity
@@ -68,11 +69,12 @@ Routes → Services → Repositories → SQLAlchemy → Postgres
 2. **Idempotency check** — if `idempotency_key` is provided and a prior send exists, return the replayed result (no agent call, no new rows). Otherwise a fresh key is generated.
 3. **Resolve conversation** — no `conversation_id` → create one for `user_id`. Existing → `ConversationRepository.get(id, user_id)`; `None` → 404.
 4. **Persist user message** (`status='completed'`, with the idempotency key).
-5. **Load recent context** — `get_recent_messages(conversation_id, user_id, limit)` where `limit = settings.MAX_CONVERSATION_HISTORY` (default 20). Converted to LangChain messages; the system prompt is prepended by the agent internally.
-6. **Invoke agent** with `[system] + recent messages`.
-7. **Persist the turn atomically** — intermediate assistant(`tool_calls`) rows → their tool rows → final assistant text row, in order, all in one commit (`save_assistant_turn`).
-8. On agent failure, persist a single `status='failed'` assistant row with error details in `metadata` and return the apology message (200, retryable with a fresh key).
-9. **Touch the conversation** — `message_count += N`, `last_message_at = now()`.
+5. **Build base context** — `ContextManager.build_context(user_id, conversation_id)` assembles profile + current date into a `FinancialContext`, rendered as a `SystemMessage`.
+6. **Load recent context** — `get_recent_messages(conversation_id, user_id, limit)` where `limit = settings.MAX_CONVERSATION_HISTORY` (default 20). Converted to LangChain messages.
+7. **Invoke agent** with `[context SystemMessage] + recent messages`.
+8. **Persist the turn atomically** — intermediate assistant(`tool_calls`) rows → their tool rows → final assistant text row, in order, all in one commit (`save_assistant_turn`).
+9. On agent failure, persist a single `status='failed'` assistant row with error details in `metadata` and return the apology message (200, retryable with a fresh key).
+10. **Touch the conversation** — `message_count += N`, `last_message_at = now()`.
 
 See `docs/ARCHITECTURE.md` for the full data-flow detail.
 
@@ -85,6 +87,7 @@ Read the relevant doc before changing that area. `AGENTS.md` is the entry point;
 | When you are… | Read |
 |---|---|
 | Changing the agent, message conversion, or chat flow | `docs/ARCHITECTURE.md` |
+| Changing the context manager, adding loaders, or modifying base context | `docs/CONTEXT_MANAGER.md` |
 | Touching any table, column, index, or migration | `docs/DATABASE.md` |
 | Changing any endpoint or request/response schema | `docs/API.md` |
 | Wondering *why* a design choice was made | `docs/DESIGN_DECISIONS.md` |

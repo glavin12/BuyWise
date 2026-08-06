@@ -12,6 +12,15 @@ ai_service/
 ├── core/
 │   ├── config.py                Pydantic Settings (env-driven)
 │   └── context.py               request_context() — user_id + session contextvars for tools
+├── context/
+│   ├── __init__.py               Public exports
+│   ├── models.py                 FinancialContext, ContextModule, ContextSession
+│   ├── base_context.py           ContextLoader ABC
+│   ├── manager.py                ContextManager — builds FinancialContext per request
+│   └── loaders/
+│       ├── __init__.py
+│       ├── profile_loader.py     Reads Profile → base context
+│       └── time_loader.py        Current UTC date → base context
 ├── db/
 │   ├── base.py                  DeclarativeBase
 │   └── session.py               async engine / session factory / get_async_session
@@ -76,14 +85,16 @@ ChatService.send_message                     services/chat_service.py
       2. Resolve conversation:
            - no conversation_id → ConversationService.create_conversation(user_id)
            - else ConversationRepository.get(conversation_id, user_id) → None means 404
-      3. ConversationService.save_user_message(...)  → role=user, status=completed
-      4. ConversationService.get_recent_messages(conversation_id, user_id, MAX_CONVERSATION_HISTORY)
-         → DB rows → db_messages_to_langchain → list[BaseMessage]
-      5. agent_service.invoke_agent(recent)  → agent injects SYSTEM_PROMPT internally
-      6. extract_agent_output(result, input_count=len(recent))
-         → (final AIMessage, list[ToolExchange], list[ToolCallInfo])
-      7. ConversationService.save_assistant_turn(...)  → one atomic commit
-      8. On any exception: save_assistant_turn(error=...) → one status='failed' assistant row
+3. ConversationService.save_user_message(...)  → role=user, status=completed
+       4. ContextManager.build_context(user_id, conversation_id)  → FinancialContext → SystemMessage
+       5. ConversationService.get_recent_messages(conversation_id, user_id, MAX_CONVERSATION_HISTORY)
+          → DB rows → db_messages_to_langchain → list[BaseMessage]
+       6. all_messages = context_messages + recent
+       7. agent_service.invoke_agent(all_messages)  → agent injects SYSTEM_PROMPT internally
+       8. extract_agent_output(result, input_count=len(all_messages))
+          → (final AIMessage, list[ToolExchange], list[ToolCallInfo])
+       9. ConversationService.save_assistant_turn(...)  → one atomic commit
+      10. On any exception: save_assistant_turn(error=...) → one status='failed' assistant row
       │
       ▼
 ChatResponse {response, conversation_id, tool_calls[]}
@@ -91,7 +102,7 @@ ChatResponse {response, conversation_id, tool_calls[]}
 
 ### Why `input_count` slicing
 
-`result["messages"]` from `create_react_agent` is the *full* state: the history we passed in **plus** this turn's generated messages. Everything after index `input_count` is what this invocation produced, so only that tail gets persisted.
+`result["messages"]` from `create_react_agent` is the *full* state: the history we passed in **plus** this turn's generated messages. Everything after index `input_count` is what this invocation produced, so only that tail gets persisted. `input_count` is `len(all_messages)` — the context SystemMessage counts as input and is excluded from persistence.
 
 ---
 
@@ -106,6 +117,25 @@ ChatResponse {response, conversation_id, tool_calls[]}
   - `AIMessage` without `tool_calls` → the **final** assistant message (carries `usage_metadata` for tokens).
   - Builds the response `tool_calls` list from the exchanges.
 
+## Context Manager (`ai_service/context/`)
+
+The Context Manager assembles a lightweight base context (profile + current UTC date)
+before every agent invocation. It sits between ChatService and the agent — never
+inside the agent loop.
+
+- **`ContextManager.build_context(user_id, conversation_id)`** — runs all registered loaders,
+  returns a frozen `FinancialContext`.
+- **`FinancialContext.to_langchain_messages()`** — renders context as `[SystemMessage]` to prepend
+  to conversation history.
+- **`ContextLoader` ABC** — single-method contract: `async def load(user_id, session) -> ContextModule`.
+  Each loader resolves its own service dependencies; the manager imports no financial code.
+
+The static `SYSTEM_PROMPT` in `create_react_agent` is unaffected. Base context arrives as a
+separate `SystemMessage` in the messages list, keeping agent instructions and user data
+in distinct layers.
+
+See `docs/CONTEXT_MANAGER.md` for the full design and extension guide.
+
 ## Tool execution context
 
 Tools are async `@tool` functions that must know *which user* and *which DB session*
@@ -115,7 +145,7 @@ invent them). Instead `ChatService.send_message` wraps the agent invocation in
 
 ```python
 with request_context(user_id, self.session):
-    result = await invoke_agent(recent)
+    result = await invoke_agent(all_messages)
 ```
 
 Each tool then calls `get_current_user_id()` / `get_db_session()` to obtain the
