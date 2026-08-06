@@ -6,6 +6,7 @@ import uuid
 from langchain_core.messages import AIMessage
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ai_service.context import ContextManager
 from ai_service.core.config import get_settings
 from ai_service.core.context import request_context
 from ai_service.models import generate_uuid7
@@ -25,6 +26,7 @@ class ChatService:
     def __init__(self, session: AsyncSession):
         self.session = session
         self.conversations = ConversationService(session)
+        self.context_mgr = ContextManager(session)
 
     async def send_message(
         self,
@@ -68,11 +70,15 @@ class ChatService:
             limit=settings.MAX_CONVERSATION_HISTORY,
         )
 
+        ctx = await self.context_mgr.build_context(user_id, conversation_id)
+        context_messages = ctx.to_langchain_messages()
+        all_messages = context_messages + recent
+
         try:
             with request_context(user_id, self.session):
-                result = await invoke_agent(recent)
+                result = await invoke_agent(all_messages)
             final_ai, tool_exchanges, tool_calls = extract_agent_output(
-                result, input_count=len(recent)
+                result, input_count=len(all_messages)
             )
             await self.conversations.save_assistant_turn(
                 conversation_id=conversation_id,
