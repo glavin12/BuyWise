@@ -62,6 +62,11 @@ class ChatService:
             content=message,
             idempotency_key=idempotency_key,
         )
+        await self.conversations.ensure_title(
+            conversation_id=conversation_id,
+            user_id=user_id,
+            content=message,
+        )
 
         settings = get_settings()
         recent = await self.conversations.get_recent_messages(

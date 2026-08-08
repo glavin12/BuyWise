@@ -73,6 +73,11 @@ authentication of its own.
   injected via `Depends(get_current_user)`. It is never read from the body/path/query.
 - All conversation reads/writes are scoped by that `user_id` at the repository
   layer — the security boundary (see AGENTS.md).
+- **Rate limiting:** protected and public API endpoints are rate-limited using a
+  hashed `X-User-ID`, hashed bearer token, or IP fallback. Exceeding the limit returns
+  `429 Too Many Requests` with
+  `Retry-After` and `X-RateLimit-*` headers. See `docs/ARCHITECTURE.md#rate-limiting`
+  for tier details. `/health/live` is intentionally exempt for liveness checks.
 
 ---
 
@@ -130,6 +135,7 @@ Authorization: Bearer <supabase_access_token>
 | `401` | missing/invalid/expired JWT |
 | `404` | `conversation_id` not found for that user (or belongs to another user) |
 | `422` | schema validation failure (e.g. empty `message`) |
+| `429` | rate limit exceeded (20 req/min per user) |
 
 On an agent failure the endpoint still returns `200` with an apology message and the assistant turn is persisted as `status='failed'`; retry with a **fresh** `idempotency_key` for a new attempt.
 
@@ -345,6 +351,15 @@ If no profile row exists yet, one is created with `id = auth.uid()`.
 ## `GET /health`
 
 Public (no authentication).
+
+```json
+{ "status": "ok", "service": "buywise-ai" }
+```
+
+## `GET /health/live`
+
+Public and intentionally exempt from rate limiting. Use this only for process
+orchestrator liveness checks.
 
 ```json
 { "status": "ok", "service": "buywise-ai" }

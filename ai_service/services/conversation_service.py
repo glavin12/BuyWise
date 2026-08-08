@@ -35,6 +35,25 @@ class ConversationService:
         await self.session.commit()
         return conversation
 
+    async def ensure_title(
+        self,
+        conversation_id: uuid.UUID,
+        user_id: uuid.UUID,
+        content: str,
+    ) -> None:
+        """Derive a title from the first user message if none exists yet.
+
+        The title is set exactly once, from the first message of the
+        conversation, so it stays recognizable in the conversation list.
+        """
+        conversation = await self.conversations.get(conversation_id, user_id)
+        if conversation is None or conversation.title:
+            return
+        title = _derive_title(content)
+        if title:
+            await self.conversations.set_title(conversation_id, user_id, title)
+            await self.session.commit()
+
     async def get_conversation(
         self,
         conversation_id: uuid.UUID,
@@ -264,3 +283,13 @@ def _as_text(content: object) -> str:
     if isinstance(content, str):
         return content
     return str(content)
+
+
+def _derive_title(content: str, max_chars: int = 60) -> str:
+    """Collapse whitespace and truncate a message into a conversation title."""
+    normalized = " ".join(content.split())
+    if not normalized:
+        return ""
+    if len(normalized) <= max_chars:
+        return normalized
+    return normalized[: max_chars - 1].rstrip() + "…"

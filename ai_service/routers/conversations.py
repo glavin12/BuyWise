@@ -1,10 +1,12 @@
 from datetime import datetime
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai_service.auth import CurrentUser, get_current_user
+from ai_service.core.config import get_settings
+from ai_service.core.rate_limit import limiter
 from ai_service.db.session import get_async_session
 from ai_service.schemas.conversation import (
     ConversationCreate,
@@ -18,11 +20,15 @@ from ai_service.services.conversation_service import (
 )
 
 router = APIRouter(prefix="/api/v1", tags=["conversations"])
+settings = get_settings()
 
 
 @router.post("/conversations", response_model=ConversationRead)
+@limiter.limit(settings.CONVERSATIONS_RATE_LIMIT)
 async def create_conversation(
-    request: ConversationCreate,
+    request: Request,
+    response: Response,
+    body: ConversationCreate,
     session: AsyncSession = Depends(get_async_session),
     current_user: CurrentUser = Depends(get_current_user),
 ):
@@ -32,7 +38,10 @@ async def create_conversation(
 
 
 @router.get("/conversations", response_model=list[ConversationRead])
+@limiter.limit(settings.CONVERSATIONS_RATE_LIMIT)
 async def list_conversations(
+    request: Request,
+    response: Response,
     cursor: datetime | None = None,
     limit: int = Query(50, ge=1, le=200),
     session: AsyncSession = Depends(get_async_session),
@@ -47,7 +56,10 @@ async def list_conversations(
     "/conversations/{conversation_id}/messages",
     response_model=ConversationHistory,
 )
+@limiter.limit(settings.CONVERSATIONS_RATE_LIMIT)
 async def get_conversation_messages(
+    request: Request,
+    response: Response,
     conversation_id: UUID,
     cursor: datetime | None = None,
     limit: int = Query(100, ge=1, le=500),
@@ -72,7 +84,10 @@ async def get_conversation_messages(
 
 
 @router.delete("/conversations/{conversation_id}")
+@limiter.limit(settings.CONVERSATIONS_RATE_LIMIT)
 async def delete_conversation(
+    request: Request,
+    response: Response,
     conversation_id: UUID,
     session: AsyncSession = Depends(get_async_session),
     current_user: CurrentUser = Depends(get_current_user),

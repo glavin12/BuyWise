@@ -73,6 +73,27 @@ class ConversationRepository:
         )
         return bool(result.rowcount)
 
+    async def set_title(
+        self,
+        conversation_id: uuid.UUID,
+        user_id: uuid.UUID,
+        title: str,
+    ) -> Conversation | None:
+        """Set the conversation title if it is currently unset (user-scoped)."""
+        result = await self.session.execute(
+            update(Conversation)
+            .where(
+                Conversation.id == conversation_id,
+                Conversation.user_id == user_id,
+                Conversation.title.is_(None),
+                Conversation.deleted_at.is_(None),
+            )
+            .values(title=title)
+            .returning(Conversation)
+        )
+        row = result.first()
+        return row[0] if row else None
+
     async def touch(self, conversation_id: uuid.UUID, increment: int = 1) -> None:
         await self.session.execute(
             update(Conversation)

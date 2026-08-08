@@ -16,10 +16,11 @@ import urllib.error
 import urllib.request
 from uuid import UUID
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request, Response
 from pydantic import BaseModel, Field
 
 from ai_service.core.config import get_settings
+from ai_service.core.rate_limit import limiter
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +47,12 @@ class DevTokenResponse(BaseModel):
 
 
 @router.post("/token", response_model=DevTokenResponse)
-async def dev_token(request: DevTokenRequest) -> DevTokenResponse:
+@limiter.limit(get_settings().DEV_RATE_LIMIT)
+async def dev_token(
+    request: Request,
+    response: Response,
+    body: DevTokenRequest,
+) -> DevTokenResponse:
     """Relay email/password to Supabase Auth and return the issued JWT.
 
     This endpoint performs NO authentication of its own. It forwards the
@@ -59,7 +65,7 @@ async def dev_token(request: DevTokenRequest) -> DevTokenResponse:
         raise RuntimeError("SUPABASE_URL and SUPABASE_ANON_KEY must be configured for /dev/token.")
 
     url = SUPABASE_TOKEN_URL_TEMPLATE.format(base=settings.SUPABASE_URL.rstrip("/"))
-    payload = json.dumps({"email": request.email, "password": request.password}).encode("utf-8")
+    payload = json.dumps({"email": body.email, "password": body.password}).encode("utf-8")
     headers = {
         "apikey": settings.SUPABASE_ANON_KEY,
         "Content-Type": "application/json",
@@ -70,7 +76,7 @@ async def dev_token(request: DevTokenRequest) -> DevTokenResponse:
             urllib.request.Request(url, data=payload, headers=headers, method="POST"),
             timeout=15,
         ) as resp:
-            body = json.loads(resp.read().decode("utf-8"))
+            body_data = json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
         detail = _safe_error_detail(exc)
         logger.warning("Supabase password grant failed: %s", detail)
@@ -79,11 +85,11 @@ async def dev_token(request: DevTokenRequest) -> DevTokenResponse:
         raise RuntimeError(f"Could not reach Supabase Auth: {exc.reason}") from exc
 
     return DevTokenResponse(
-        access_token=body["access_token"],
-        token_type=body.get("token_type", "bearer"),
-        expires_in=int(body.get("expires_in", 0)),
-        user_id=UUID(body["user"]["id"]),
-        email=body["user"].get("email", str(request.email)),
+        access_token=body_data["access_token"],
+        token_type=body_data.get("token_type", "bearer"),
+        expires_in=int(body_data.get("expires_in", 0)),
+        user_id=UUID(body_data["user"]["id"]),
+        email=body_data["user"].get("email", str(body.email)),
     )
 
 

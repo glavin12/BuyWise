@@ -10,11 +10,14 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from ai_service.auth import AuthError
 from ai_service.core.config import get_settings
+from ai_service.core.rate_limit import limiter
 from ai_service.db.session import dispose_engine
-from ai_service.routers import chat, conversations, health, profile
+from ai_service.routers import chat, conversations, financial, health, profile
 
 # Configure logging
 logging.basicConfig(
@@ -47,16 +50,17 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset"],
 )
+
+app.state.limiter = limiter
+
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 
 @app.exception_handler(AuthError)
 async def auth_error_handler(request: Request, exc: AuthError) -> JSONResponse:
-    """Map every :class:`AuthError` to a 401 with a Bearer challenge.
-
-    All auth failures (missing header, invalid token, expired token) surface
-    here, keeping routers free of HTTP concerns.
-    """
+    """Map every auth failure to a 401 with a Bearer challenge."""
     return JSONResponse(
         status_code=401,
         content={"detail": exc.detail},
@@ -69,6 +73,7 @@ app.include_router(health.router)
 app.include_router(chat.router)
 app.include_router(conversations.router)
 app.include_router(profile.router)
+app.include_router(financial.router)
 
 # Development-only utilities. Never registered outside the ``development``
 # environment, so these routes return 404 (not 401) in staging/production.

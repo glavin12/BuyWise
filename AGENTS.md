@@ -27,6 +27,7 @@ Shipped and verified against Supabase:
 - **Context Manager** (`ai_service/context/`): hybrid context strategy — lightweight base context (profile + current date) injected as a SystemMessage before every agent invocation; expensive data retrieved via tools only
 - Tool-call round-tripping: assistant `tool_calls` and tool results are persisted and rebuilt on reload
 - Exactly-once sends via client `idempotency_key`
+- **In-memory rate limiting** (`ai_service/core/rate_limit.py`): per-endpoint tiered limits, keyed by hashed `X-User-ID`, hashed bearer token, or IP. `slowapi` in-memory backend — swappable to Redis with one config change.
 - User-scoped access control at the repository layer (no RLS reliance), now backed by a verified JWT identity
 - Soft deletes, message status tracking, token usage columns
 
@@ -58,6 +59,7 @@ Routes → Services → Repositories → SQLAlchemy → Postgres
 5. **Exactly-once sends.** Same `idempotency_key` in the same conversation → the prior result is replayed, never reprocessed. Enforced by the partial unique index + savepoint catch, not check-then-insert.
 6. **Conventions:** async SQLAlchemy everywhere; Python type hints; `from __future__ import annotations`; `logger = logging.getLogger(__name__)`; **do not add code comments unless asked**; use existing patterns from neighboring files.
 7. **Development-only routes** (`ai_service/routers/dev.py`) are registered **only** when `ENVIRONMENT=development` (see `main.py`); in staging/production they return 404, not 401. The `ENVIRONMENT` flag never branches business logic, auth, DB queries, or AI behavior — it controls dev utilities only.
+8. **Rate limiting is applied at the route layer.** Every protected or public API endpoint carries a `@limiter.limit(...)` decorator (`ai_service/core/rate_limit.py`), except intentionally unrestricted probes such as `/health/live`. Each limited endpoint explicitly accepts `request: Request` and `response: Response`; the latter is required when SlowAPI injects rate-limit headers. The key function uses hashed `X-User-ID`, then a hashed bearer token, then IP. The limiter is app-scoped (`app.state.limiter`). Do not bypass rate limits in development — use `RATE_LIMIT_ENABLED=false` in `.env` to disable globally.
 
 ---
 

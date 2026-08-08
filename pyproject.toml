@@ -13,6 +13,7 @@ dependencies = [
     "langchain-groq>=1.1.3",
     "langgraph>=1.2.10",
     "pydantic-settings>=2.14.2",
+    "slowapi>=0.1.9",
     "pyjwt[crypto]>=2.13.0",
     "python-dotenv>=1.2.2",
     "sqlalchemy>=2.0.51",

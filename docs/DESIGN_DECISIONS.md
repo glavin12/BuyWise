@@ -121,3 +121,13 @@ Rationale behind the non-obvious choices. Read this when you're about to change 
 **Why:** Preloading every piece of user data before every request is wasteful and burns tokens on data the agent may never need. Starting with zero context means the agent has no awareness of the user (name, currency, timezone) and must call tools just to say hello. The hybrid approach — inspired by how Claude Code loads CLAUDE.md — gives the agent immediate awareness of the user while letting it progressively discover deeper data through tools.
 
 **Consequence:** Adding a new piece of data to base context requires a loader implementing the `ContextLoader` ABC and a corresponding field on `FinancialContext`. Telling the agent "always call tool X for this" instead of preloading it is a design choice, not an omission.
+
+---
+
+## 13. In-memory rate limiting with `slowapi`, not Redis
+
+**Decision:** Rate limiting uses `slowapi` with its in-memory backend, keyed by JWT hash for authenticated endpoints and IP for public ones. Redis is deferred to Phase 2.
+
+**Why:** Rate limiting is a production must-have — the Groq LLM is a direct cost vector and every endpoint needs abuse protection. But adding Redis for rate limiting alone is premature at Phase 1. `slowapi`'s in-memory backend covers the need today; migrating to Redis is a one-line config change (`Limiter(storage_uri="redis://...")`) when Redis arrives in Phase 2 for memory extraction queues and cross-request session storage.
+
+**Consequence:** Rate limits are per-process (not distributed across workers), and counters reset on restart. The `RATE_LIMIT_ENABLED=false` env toggle disables all limiting for testing.

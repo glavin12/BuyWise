@@ -37,6 +37,17 @@ class Settings(BaseSettings):
     SUPABASE_JWT_ALGORITHMS: str = "ES256,RS256"  # asymmetric algs only; PyJWKClient selects key by kid
     JWKS_CACHE_TTL_SECONDS: int = 300  # keep <= Supabase's 10-min edge cache
 
+    # Rate Limiting (in-memory, per-user via JWT hash / per-IP fallback)
+    # Set RATE_LIMIT_ENABLED=false to disable all rate limiting (e.g. testing).
+    # Rate strings follow slowapi syntax: "N/period" (period = second|minute|hour|day).
+    RATE_LIMIT_ENABLED: bool = True
+    CHAT_RATE_LIMIT: str = "20/minute"
+    CONVERSATIONS_RATE_LIMIT: str = "60/minute"
+    PROFILE_RATE_LIMIT: str = "30/minute"
+    FINANCIAL_RATE_LIMIT: str = "60/minute"
+    HEALTH_RATE_LIMIT: str = "60/minute"
+    DEV_RATE_LIMIT: str = "10/minute"
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
 
     @property

@@ -11,7 +11,8 @@ ai_service/
 ├── main.py                      FastAPI app, router registration, lifespan
 ├── core/
 │   ├── config.py                Pydantic Settings (env-driven)
-│   └── context.py               request_context() — user_id + session contextvars for tools
+│   ├── context.py               request_context() — user_id + session contextvars for tools
+│   └── rate_limit.py            Limiter singleton + JWT-hash key function (per-user limits)
 ├── context/
 │   ├── __init__.py               Public exports
 │   ├── models.py                 FinancialContext, ContextModule, ContextSession
@@ -69,6 +70,30 @@ ai_service/
 ```
 
 Data flows one way: `Routes → Services → Repositories → SQLAlchemy → Postgres`.
+
+---
+
+## Rate Limiting (`core/rate_limit.py`)
+
+Rate limiting is applied at the route layer via `slowapi` with an in-memory backend (swappable to Redis). Every protected or public API endpoint carries a `@limiter.limit(...)` decorator; intentionally unrestricted probes such as `/health/live` do not.
+
+**Key function** (`_get_rate_limit_key`): uses a SHA-256 hash of `X-User-ID` when supplied, then a SHA-256 hash of the bearer token, and finally `get_remote_address` (IP). These values are throttling keys only; authorization still comes exclusively from the verified JWT.
+
+Because headers are enabled, every limited endpoint explicitly accepts both `request: Request` and `response: Response`. The route decorator stays above `@limiter.limit(...)` so FastAPI registers SlowAPI's wrapped endpoint.
+
+**Tiered limits** (configured via env, defaults):
+| Tier | Limit | Applies to |
+|---|---|---|
+| Chat | `20/minute` | `POST /api/v1/chat` |
+| Financial | `60/minute` | `/dashboard`, `/goals`, `/transactions` |
+| Conversations | `60/minute` | `/conversations/*` (CRUD + messages) |
+| Profile | `30/minute` | `/profile` (GET + POST) |
+| Health | `60/minute` | `/health` (IP-based) |
+| Dev | `10/minute` | `/api/v1/dev/token` |
+
+`/health/live` is intentionally exempt for process/orchestrator liveness checks.
+
+**429 response** includes `Retry-After` header and `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset` headers (exposed via CORS). Disable globally with `RATE_LIMIT_ENABLED=false`.
 
 ---
 
