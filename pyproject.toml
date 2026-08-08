@@ -1,0 +1,22 @@
+[project]
+name = "buy-wise"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "alembic>=1.18.5",
+    "asyncpg>=0.31.0",
+    "fastapi>=0.141.1",
+    "langchain>=1.3.14",
+    "langchain-google-genai>=4.3.2",
+    "langchain-groq>=1.1.3",
+    "langgraph>=1.2.10",
+    "pydantic-settings>=2.14.2",
+    "slowapi>=0.1.9",
+    "pyjwt[crypto]>=2.13.0",
+    "python-dotenv>=1.2.2",
+    "sqlalchemy>=2.0.51",
+    "uuid-utils>=0.17.0",
+    "uvicorn[standard]>=0.52.0",
+]
