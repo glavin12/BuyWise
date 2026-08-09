@@ -1,0 +1,79 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: #F4F4F5;
+  --color-secondary: #A1A1AA;
+  --color-accent: #10B981;
+  --color-accent-hover: #059669;
+  --color-surface: #0A0A0A;
+  --color-surface-hover: #18181B;
+  --color-border: #27272A;
+  --color-muted: #71717A;
+  --color-success: #22C55E;
+  --color-error: #EF4444;
+  --color-warning: #F59E0B;
+  --color-input: #0A0A0A;
+  --font-sans: var(--font-ibm-plex);
+  --font-heading: var(--font-ibm-plex);
+}
+
+:root {
+  --background: #000000;
+  --foreground: #F4F4F5;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans, "IBM Plex Sans", sans-serif);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading, "IBM Plex Sans", sans-serif);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+}
+
+@layer utilities {
+  .glass {
+    @apply bg-surface/80 backdrop-blur-md border border-border/50 shadow-sm;
+  }
+
+  .glass-strong {
+    @apply bg-surface/90 backdrop-blur-lg border border-border shadow-md;
+  }
+
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out forwards;
+}
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.7; }
+}
+
+.animate-pulse-soft {
+  animation: pulse-soft 1.5s ease-in-out infinite;
+}

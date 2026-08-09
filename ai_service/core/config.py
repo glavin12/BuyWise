@@ -13,8 +13,8 @@ class Settings(BaseSettings):
 
     # Groq
     GROQ_API_KEY: str = ""
-    MODEL_NAME: str = "llama-3.3-70b-versatile"
-    TEMPERATURE: float = 0.7
+    MODEL_NAME: str = "openai/gpt-oss-120b"
+    TEMPERATURE: float = 0.3
 
     # Server
     HOST: str = "0.0.0.0"
