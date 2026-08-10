@@ -2,207 +2,235 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date
 
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from ai_service.models import Category, Transaction
+from ai_service.models import Category, Payee, Transaction
 
 
 @dataclass
 class CategorySpend:
-    """Aggregated spending/income for one category in a period."""
-
     category: Category
-    amount: float
+    amount: int
     transaction_count: int
 
 
 class TransactionRepository:
-    """Database access for transactions, including analytical aggregates.
-
-    Every read/write is scoped by ``profile_id`` (= auth user id). The ledger is
-    the source of truth: spending, income, and balance are computed here, never
-    stored.
-    """
+    """User-scoped ledger queries and integer-only financial aggregates."""
 
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def create(
-        self,
-        profile_id: uuid.UUID,
-        category_id: uuid.UUID,
-        amount: float,
-        type: str,
-        title: str,
-        merchant_name: str | None = None,
-        description: str | None = None,
-        payment_method: str | None = None,
-        source: str | None = None,
-        is_recurring: bool = False,
-        transaction_date: datetime | None = None,
-    ) -> Transaction:
-        transaction = Transaction(
-            profile_id=profile_id,
-            category_id=category_id,
-            amount=amount,
-            type=type,
-            title=title,
-            merchant_name=merchant_name,
-            description=description,
-            payment_method=payment_method,
-            source=source,
-            is_recurring=is_recurring,
-            transaction_date=transaction_date,
-        )
+    async def create(self, user_id: uuid.UUID, **fields) -> Transaction:
+        transaction = Transaction(user_id=user_id, **fields)
         self.session.add(transaction)
         await self.session.flush()
+        await self.session.refresh(transaction)
         return transaction
+
+    async def get(self, user_id: uuid.UUID, transaction_id: uuid.UUID) -> Transaction | None:
+        return await self.session.scalar(
+            select(Transaction)
+            .options(
+                selectinload(Transaction.account),
+                selectinload(Transaction.category),
+                selectinload(Transaction.payee),
+            )
+            .where(Transaction.user_id == user_id, Transaction.id == transaction_id)
+        )
 
     async def list(
         self,
-        profile_id: uuid.UUID,
+        user_id: uuid.UUID,
         *,
         limit: int = 20,
         offset: int = 0,
-        type: str | None = None,
+        account_id: uuid.UUID | None = None,
         category_id: uuid.UUID | None = None,
-        merchant_name: str | None = None,
-        start: datetime | None = None,
-        end: datetime | None = None,
+        payee_id: uuid.UUID | None = None,
+        transaction_type: str | None = None,
+        cleared_status: str | None = None,
+        date_from: date | None = None,
+        date_to: date | None = None,
     ) -> list[Transaction]:
         stmt = (
             select(Transaction)
-            .options(selectinload(Transaction.category))
-            .where(Transaction.profile_id == profile_id)
+            .options(
+                selectinload(Transaction.account),
+                selectinload(Transaction.category),
+                selectinload(Transaction.payee),
+            )
+            .where(Transaction.user_id == user_id)
         )
-        if type is not None:
-            stmt = stmt.where(Transaction.type == type)
+        if account_id is not None:
+            stmt = stmt.where(Transaction.account_id == account_id)
         if category_id is not None:
             stmt = stmt.where(Transaction.category_id == category_id)
-        if merchant_name is not None:
-            stmt = stmt.where(
-                func.lower(Transaction.merchant_name) == merchant_name.strip().lower()
-            )
-        if start is not None:
-            stmt = stmt.where(Transaction.transaction_date >= start)
-        if end is not None:
-            stmt = stmt.where(Transaction.transaction_date < end)
-        stmt = (
+        if payee_id is not None:
+            stmt = stmt.where(Transaction.payee_id == payee_id)
+        if transaction_type is not None:
+            stmt = stmt.where(Transaction.transaction_type == transaction_type)
+        if cleared_status is not None:
+            stmt = stmt.where(Transaction.cleared_status == cleared_status)
+        if date_from is not None:
+            stmt = stmt.where(Transaction.transaction_date >= date_from)
+        if date_to is not None:
+            stmt = stmt.where(Transaction.transaction_date <= date_to)
+        result = await self.session.scalars(
             stmt.order_by(Transaction.transaction_date.desc(), Transaction.id.desc())
             .offset(offset)
             .limit(limit)
         )
-        result = await self.session.scalars(stmt)
         return list(result)
+
+    async def count(self, user_id: uuid.UUID, **filters) -> int:
+        stmt = select(func.count()).select_from(Transaction).where(Transaction.user_id == user_id)
+        for field, value in filters.items():
+            if value is None:
+                continue
+            if field == "date_from":
+                stmt = stmt.where(Transaction.transaction_date >= value)
+            elif field == "date_to":
+                stmt = stmt.where(Transaction.transaction_date <= value)
+            else:
+                stmt = stmt.where(getattr(Transaction, field) == value)
+        return int(await self.session.scalar(stmt) or 0)
+
+    async def update(self, user_id: uuid.UUID, transaction_id: uuid.UUID, **fields) -> Transaction | None:
+        transaction = await self.get(user_id, transaction_id)
+        if transaction is None:
+            return None
+        for field, value in fields.items():
+            setattr(transaction, field, value)
+        await self.session.flush()
+        await self.session.refresh(transaction)
+        return await self.get(user_id, transaction_id)
+
+    async def delete(self, user_id: uuid.UUID, transaction_id: uuid.UUID) -> bool:
+        transaction = await self.get(user_id, transaction_id)
+        if transaction is None:
+            return False
+        await self.session.delete(transaction)
+        await self.session.flush()
+        return True
+
+    async def sum_total(
+        self,
+        user_id: uuid.UUID,
+        *,
+        transaction_type: str,
+        start: date,
+        end: date,
+    ) -> int:
+        stmt = select(func.coalesce(func.sum(Transaction.amount), 0)).where(
+            Transaction.user_id == user_id,
+            Transaction.transaction_type == transaction_type,
+            Transaction.transaction_date >= start,
+            Transaction.transaction_date < end,
+            Transaction.parent_transaction_id.is_(None),
+        )
+        return int(await self.session.scalar(stmt) or 0)
 
     async def sum_by_category(
         self,
-        profile_id: uuid.UUID,
+        user_id: uuid.UUID,
         *,
-        type: str,
-        start: datetime,
-        end: datetime,
+        transaction_type: str,
+        start: date,
+        end: date,
     ) -> list[CategorySpend]:
-        """Aggregate amount + count per category for a period, largest first."""
         stmt = (
             select(Category, func.sum(Transaction.amount), func.count(Transaction.id))
             .join(Transaction, Transaction.category_id == Category.id)
             .where(
-                Transaction.profile_id == profile_id,
-                Transaction.type == type,
+                Transaction.user_id == user_id,
+                Category.user_id == user_id,
+                Transaction.transaction_type == transaction_type,
                 Transaction.transaction_date >= start,
                 Transaction.transaction_date < end,
+                Transaction.parent_transaction_id.is_(None),
             )
             .group_by(Category.id)
             .order_by(func.sum(Transaction.amount).desc())
         )
         result = await self.session.execute(stmt)
         return [
-            CategorySpend(category=cat, amount=float(amount or 0), transaction_count=count)
-            for cat, amount, count in result.all()
+            CategorySpend(category=category, amount=int(amount or 0), transaction_count=int(count))
+            for category, amount, count in result.all()
         ]
 
-    async def sum_total(
-        self,
-        profile_id: uuid.UUID,
-        *,
-        type: str,
-        start: datetime,
-        end: datetime,
-    ) -> float:
+    async def get_balance(self, user_id: uuid.UUID, account_id: uuid.UUID) -> int:
+        signed_amount = case(
+            (Transaction.transaction_type.in_(("income", "starting_balance")), Transaction.amount),
+            (Transaction.transaction_type == "expense", -Transaction.amount),
+            (
+                Transaction.transaction_type == "transfer",
+                case((Transaction.transfer_direction == "in", Transaction.amount), else_=-Transaction.amount),
+            ),
+            else_=0,
+        )
+        stmt = select(func.coalesce(func.sum(signed_amount), 0)).where(
+            Transaction.user_id == user_id,
+            Transaction.account_id == account_id,
+            Transaction.parent_transaction_id.is_(None),
+        )
+        return int(await self.session.scalar(stmt) or 0)
+
+    async def sum_transfer_out(self, user_id: uuid.UUID, *, start: date, end: date) -> int:
         stmt = select(func.coalesce(func.sum(Transaction.amount), 0)).where(
-            Transaction.profile_id == profile_id,
-            Transaction.type == type,
+            Transaction.user_id == user_id,
+            Transaction.transaction_type == "transfer",
+            Transaction.transfer_direction == "out",
             Transaction.transaction_date >= start,
             Transaction.transaction_date < end,
+            Transaction.parent_transaction_id.is_(None),
         )
-        return float(await self.session.scalar(stmt) or 0)
+        return int(await self.session.scalar(stmt) or 0)
 
-    async def split_recurring(
-        self,
-        profile_id: uuid.UUID,
-        *,
-        type: str,
-        start: datetime,
-        end: datetime,
-    ) -> tuple[float, float]:
-        """Return ``(recurring_total, one_time_total)`` for a period."""
-        stmt = (
-            select(
-                func.coalesce(
-                    func.sum(Transaction.amount).filter(Transaction.is_recurring.is_(True)), 0
-                ),
-                func.coalesce(
-                    func.sum(Transaction.amount).filter(Transaction.is_recurring.is_(False)), 0
-                ),
-            )
-            .where(
-                Transaction.profile_id == profile_id,
-                Transaction.type == type,
-                Transaction.transaction_date >= start,
-                Transaction.transaction_date < end,
+    async def get_transfer_group(
+        self, user_id: uuid.UUID, transfer_group_id: uuid.UUID
+    ) -> list[Transaction]:
+        result = await self.session.scalars(
+            select(Transaction).where(
+                Transaction.user_id == user_id,
+                Transaction.transfer_group_id == transfer_group_id,
             )
         )
-        result = await self.session.execute(stmt)
-        row = result.one()
-        return float(row[0] or 0), float(row[1] or 0)
+        return list(result)
 
-    async def top_merchants(
+    async def top_payees(
         self,
-        profile_id: uuid.UUID,
+        user_id: uuid.UUID,
         *,
-        start: datetime,
-        end: datetime,
+        start: date,
+        end: date,
         limit: int = 5,
     ) -> list[dict]:
-        """Top expense merchants by total amount for a period."""
         stmt = (
-            select(
-                Transaction.merchant_name,
-                func.sum(Transaction.amount),
-                func.count(Transaction.id),
-            )
+            select(Payee, func.sum(Transaction.amount), func.count(Transaction.id))
+            .join(Transaction, Transaction.payee_id == Payee.id)
             .where(
-                Transaction.profile_id == profile_id,
-                Transaction.type == "expense",
-                Transaction.merchant_name.isnot(None),
+                Transaction.user_id == user_id,
+                Payee.user_id == user_id,
+                Transaction.transaction_type == "expense",
                 Transaction.transaction_date >= start,
                 Transaction.transaction_date < end,
+                Transaction.parent_transaction_id.is_(None),
             )
-            .group_by(Transaction.merchant_name)
+            .group_by(Payee.id)
             .order_by(func.sum(Transaction.amount).desc())
             .limit(limit)
         )
         result = await self.session.execute(stmt)
         return [
             {
-                "merchant_name": name,
-                "total": float(total or 0),
-                "transaction_count": count,
+                "payee_id": str(payee.id),
+                "payee": payee.name,
+                "total": int(total or 0),
+                "transaction_count": int(count),
             }
-            for name, total, count in result.all()
+            for payee, total, count in result.all()
         ]

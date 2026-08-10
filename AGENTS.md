@@ -1,153 +1,180 @@
-# AGENTS.md
+# BuyWise Backend
 
-# BuyWise AI Service
+This file describes the current backend and is the operating reference for coding agents.
 
-## Overview
+## Purpose
 
-BuyWise is an AI-first personal finance platform.
+BuyWise is an AI-first personal finance service with a manual expense tracker foundation. The backend provides:
 
-The AI is not just a chatbot. Its primary responsibility is to understand the user's financial situation, retrieve relevant information, use tools when necessary, and provide accurate financial assistance.
+- Supabase JWT-authenticated chat with persistent conversations.
+- User-owned accounts, categories, payees, transactions, budgets, and goals.
+- Integer minor-unit ledger arithmetic and account balance calculation.
+- HTTP APIs for manual financial CRUD, transfers, analytics, dashboard data, profiles, goals, and conversations.
+- LangChain tools that read and write the same financial services as the HTTP API.
 
-The project is built incrementally. Every feature must have a working foundation before additional intelligence is added.
+## Stack
 
----
+- Python 3.11 or newer.
+- FastAPI, Uvicorn, Pydantic v2, and `pydantic-settings`.
+- Async SQLAlchemy 2.0 with `asyncpg` and Alembic.
+- PostgreSQL hosted by Supabase.
+- Supabase JWKS JWT verification using PyJWT.
+- LangChain, LangGraph, `langchain-groq`, and `create_react_agent`.
+- `slowapi` for process-local rate limiting.
+- `uv` for dependency management.
+- pytest, pytest-asyncio, httpx, and aiosqlite for automated tests.
 
-# Current State (what is already built)
+## Layout And Flow
 
-**Phase 1 — AI Chat Foundation is DONE, including persistent conversation memory.**
-
-Shipped and verified against Supabase:
-
-- FastAPI service (`ai_service/`) with layered architecture
-- **Supabase Auth integration** (`ai_service/auth/`): Supabase is the sole authenticator; the backend only verifies Supabase-issued access JWTs (ES256/RS256 via JWKS) and derives the authenticated user as `CurrentUser`. No `user_id` is ever trusted from a request body/path/query.
-- Development-only token helper `POST /api/v1/dev/token` (relays Supabase password grant) — registered only when `ENVIRONMENT=development`.
-- LangChain `create_react_agent` agent with a system prompt and database-backed financial tools
-- PostgreSQL (Supabase) persistence for `conversations` and `messages`
-- **Persistent conversation memory**: prior messages reload into the agent on every request and survive a backend restart
-- **Context Manager** (`ai_service/context/`): hybrid context strategy — lightweight base context (profile + current date) injected as a SystemMessage before every agent invocation; expensive data retrieved via tools only
-- Tool-call round-tripping: assistant `tool_calls` and tool results are persisted and rebuilt on reload
-- Exactly-once sends via client `idempotency_key`
-- **In-memory rate limiting** (`ai_service/core/rate_limit.py`): per-endpoint tiered limits, keyed by hashed `X-User-ID`, hashed bearer token, or IP. `slowapi` in-memory backend — swappable to Redis with one config change.
-- User-scoped access control at the repository layer (no RLS reliance), now backed by a verified JWT identity
-- Soft deletes, message status tracking, token usage columns
-
-Do not re-build any of this. Extend it.
-
----
-
-# Architecture
-
-Strict layered architecture. Data flows in one direction only:
-
+```text
+ai_service/
+├── main.py                 FastAPI app, middleware, lifespan, router registration
+├── auth/                   Supabase JWT verification and CurrentUser dependency
+├── core/                   Settings, request context, and rate limiting
+├── context/                Profile and time context assembled before chat
+├── db/                     Declarative base and async sessions
+├── models/                 SQLAlchemy ORM models
+├── schemas/                Pydantic API schemas
+├── routers/                HTTP endpoint handlers
+├── services/               Business logic and orchestration
+├── repositories/           SQLAlchemy queries and ownership filtering
+├── tools/                  LangChain tools available to the agent
+└── utils/                  Message conversion and financial helpers
+alembic/versions/           Clean baseline and post-baseline data migrations
+docs/                       Architecture, API, database, context, and decisions
 ```
-Routes → Services → Repositories → SQLAlchemy → Postgres
+
+Normal application flow is:
+
+```text
+Routes or tools -> Services -> Repositories -> SQLAlchemy -> PostgreSQL
 ```
 
-- **Routes** (`ai_service/routers/`) — HTTP layer only. Parse/validate via Pydantic schemas, map exceptions to HTTP status codes, call services.
-- **Services** (`ai_service/services/`) — business logic and orchestration. Own the chat flow, conversation lifecycle, and the agent interaction.
-- **Repositories** (`ai_service/repositories/`) — ALL database access. Own every query; enforce `user_id` scoping.
-- **Models** (`ai_service/models/`) — SQLAlchemy ORM classes.
-- **Utils** (`ai_service/utils/`) — pure conversion helpers (e.g. DB rows → LangChain messages).
+Routes and tools do not execute SQL. Repositories own database queries. AI tools receive the authenticated owner and active session through `request_context()` context variables, not LLM-visible arguments.
 
-## Non-negotiable rules
+## Authentication And Ownership
 
-1. **The AI never touches the database.** The agent only receives a list of LangChain messages and tool outputs. It never executes SQL and never accesses repositories directly.
-2. **The repository layer is the security boundary.** Every repository method that reads or writes a conversation or message filters by `user_id`. **Do not rely on Supabase RLS** — the service connects via its own SQLAlchemy session (superuser), so RLS policies are bypassed. If you remove a `user_id` filter, you have broken access control.
-3. **The authenticated `user_id` comes only from the verified JWT.** `get_current_user` (`ai_service/auth/`) verifies the Supabase access token (ES256/RS256 via JWKS) and returns `CurrentUser`. Routers receive `current_user: CurrentUser = Depends(get_current_user)` and use `current_user.id`. **Never** accept a `user_id` from a request body, path, or query — adding one is a regression. The `auth/` module never touches the database or application tables; it only verifies tokens and returns the identity.
-3. **The system prompt is generated fresh from code** (`SYSTEM_PROMPT` in `ai_service/services/agent_service.py`). Never load or store a system prompt row in the database — a prompt fix must apply to every conversation immediately.
-4. **Tool rows pair with their assistant row.** A `role='tool'` message must immediately follow the `role='assistant'` row whose `tool_calls` declared its `tool_call_id`. `db_messages_to_langchain` asserts this on every load.
-5. **Exactly-once sends.** Same `idempotency_key` in the same conversation → the prior result is replayed, never reprocessed. Enforced by the partial unique index + savepoint catch, not check-then-insert.
-6. **Conventions:** async SQLAlchemy everywhere; Python type hints; `from __future__ import annotations`; `logger = logging.getLogger(__name__)`; **do not add code comments unless asked**; use existing patterns from neighboring files.
-7. **Development-only routes** (`ai_service/routers/dev.py`) are registered **only** when `ENVIRONMENT=development` (see `main.py`); in staging/production they return 404, not 401. The `ENVIRONMENT` flag never branches business logic, auth, DB queries, or AI behavior — it controls dev utilities only.
-8. **Rate limiting is applied at the route layer.** Every protected or public API endpoint carries a `@limiter.limit(...)` decorator (`ai_service/core/rate_limit.py`), except intentionally unrestricted probes such as `/health/live`. Each limited endpoint explicitly accepts `request: Request` and `response: Response`; the latter is required when SlowAPI injects rate-limit headers. The key function uses hashed `X-User-ID`, then a hashed bearer token, then IP. The limiter is app-scoped (`app.state.limiter`). Do not bypass rate limits in development — use `RATE_LIMIT_ENABLED=false` in `.env` to disable globally.
+- Protected routes require `Authorization: Bearer <supabase_access_token>`.
+- `ai_service/auth/` validates signature, issuer, audience, expiry, and required claims against Supabase JWKS.
+- The verified JWT `sub` becomes `CurrentUser.id`; request bodies, paths, and query strings never supply `user_id`.
+- Every owner-scoped repository method filters by the authenticated `user_id`.
+- `profiles.id` is the authenticated user ID. Accounts, categories, payees, transactions, budget entries, and goals use `user_id`.
+- Category, account, and payee references are ownership-validated in services before writes.
+- RLS is enabled for defense in depth. The application still relies on repository ownership filters because its SQLAlchemy connection is not an end-user RLS session.
 
----
+Authentication failures return HTTP 401 with `WWW-Authenticate: Bearer`.
 
-# Chat Request Lifecycle
+## Money And Ledger Rules
 
-`POST /api/v1/chat` → `ChatService.send_message` (`ai_service/services/chat_service.py`):
+- Persisted amounts are non-negative `BIGINT` minor units. INR `10.50` is stored as `1050`.
+- `amount_to_minor()` uses decimal rounding, not binary float arithmetic.
+- API financial responses expose integer fields plus `display_*` values for presentation.
+- AI tools accept normal display amounts and convert them before calling services.
+- Expense and income analytics exclude `transfer`, `starting_balance`, and split child rows.
+- Account balances add income and starting balances, subtract expenses, and apply transfer direction (`in` or `out`).
+- A transfer is two atomic `transaction_type='transfer'` rows with one `transfer_group_id`; `transfer_direction` distinguishes the sides.
+- Non-transfer expenses and income require a category. Starting balances and transfers do not.
+- Transaction dates are calendar `DATE` values. Period helpers return `[start, end)` date ranges and support `this_month` and `last_month`.
 
-1. **Authenticate** — `get_current_user` verifies the Supabase JWT and yields `current_user.id`. This is the `user_id` used below; it is never read from the request.
-2. **Idempotency check** — if `idempotency_key` is provided and a prior send exists, return the replayed result (no agent call, no new rows). Otherwise a fresh key is generated.
-3. **Resolve conversation** — no `conversation_id` → create one for `user_id`. Existing → `ConversationRepository.get(id, user_id)`; `None` → 404.
-4. **Persist user message** (`status='completed'`, with the idempotency key).
-5. **Build base context** — `ContextManager.build_context(user_id, conversation_id)` assembles profile + current date into a `FinancialContext`, rendered as a `SystemMessage`.
-6. **Load recent context** — `get_recent_messages(conversation_id, user_id, limit)` where `limit = settings.MAX_CONVERSATION_HISTORY` (default 20). Converted to LangChain messages.
-7. **Invoke agent** with `[context SystemMessage] + recent messages`.
-8. **Persist the turn atomically** — intermediate assistant(`tool_calls`) rows → their tool rows → final assistant text row, in order, all in one commit (`save_assistant_turn`).
-9. On agent failure, persist a single `status='failed'` assistant row with error details in `metadata` and return the apology message (200, retryable with a fresh key).
-10. **Touch the conversation** — `message_count += N`, `last_message_at = now()`.
+## Profile Initialization
 
-See `docs/ARCHITECTURE.md` for the full data-flow detail.
+Creating a profile seeds 20 user-owned default categories and creates one active `Cash` account using the profile currency. Category defaults are not global system rows.
 
----
+## HTTP API
 
-# Documentation Index
+All routes are registered in `ai_service/main.py` and use the `/api/v1/` prefix.
 
-Read the relevant doc before changing that area. `AGENTS.md` is the entry point; the docs below carry the deep detail.
+Public routes:
 
-| When you are… | Read |
-|---|---|
-| Changing the agent, message conversion, or chat flow | `docs/ARCHITECTURE.md` |
-| Changing the context manager, adding loaders, or modifying base context | `docs/CONTEXT_MANAGER.md` |
-| Touching any table, column, index, or migration | `docs/DATABASE.md` |
-| Changing any endpoint or request/response schema | `docs/API.md` |
-| Wondering *why* a design choice was made | `docs/DESIGN_DECISIONS.md` |
+- `GET /health`
+- `GET /health/live`
 
----
+Protected chat and account routes:
 
-# Development Commands
+- `POST /api/v1/chat`
+- `POST /api/v1/conversations`
+- `GET /api/v1/conversations`
+- `GET /api/v1/conversations/{conversation_id}/messages`
+- `DELETE /api/v1/conversations/{conversation_id}`
+- `GET /api/v1/profile`
+- `POST /api/v1/profile`
+- `GET /api/v1/dashboard`
+- `GET /api/v1/goals`
+- `POST /api/v1/goals`
+- `PATCH /api/v1/goals/{goal_id}`
+- `POST|GET /api/v1/accounts`
+- `GET|PATCH|DELETE /api/v1/accounts/{account_id}`
+- `POST|GET /api/v1/categories`
+- `GET|PATCH|DELETE /api/v1/categories/{category_id}`
+- `POST|GET /api/v1/payees`
+- `GET|PATCH|DELETE /api/v1/payees/{payee_id}`
+- `POST|GET /api/v1/transactions`
+- `GET|PATCH|DELETE /api/v1/transactions/{transaction_id}`
+- `POST /api/v1/transfers`
+- `DELETE /api/v1/transfers/{transfer_group_id}`
+- `POST /api/v1/budgets`
+- `GET /api/v1/budgets/{YYYY-MM}`
+- `GET /api/v1/budgets/id/{budget_id}`
+- `PATCH|DELETE /api/v1/budgets/{budget_id}`
+- `GET /api/v1/analytics/monthly`
+- `GET /api/v1/analytics/categories`
+- `GET /api/v1/analytics/comparison`
 
-Uses `uv` for dependency management. The virtualenv is `.venv`.
+The development-only `POST /api/v1/dev/token` helper is registered only when `ENVIRONMENT=development`.
+
+## Chat And AI Tools
+
+`ChatService` persists the user message, builds lightweight profile/time context, reloads capped history, invokes the ReAct agent, and persists tool calls, tool results, and the final assistant message atomically. Idempotency is enforced by the messages partial unique index.
+
+Registered financial tools are:
+
+- `get_dashboard`
+- `get_accounts`
+- `get_profile`
+- `get_recent_transactions`
+- `add_transaction`
+- `get_spending_breakdown`
+- `get_income_summary`
+- `get_budget_status`
+- `set_category_budget`
+- `get_financial_goals`
+- `add_goal`
+- `update_goal_progress`
+- `get_categories`
+- `calculator`
+
+The system prompt is `SYSTEM_PROMPT` in `ai_service/services/agent_service.py`. It must describe the current tool names and ledger semantics.
+
+## Database And Migrations
+
+The repository now contains a clean rebuild:
+
+- `001_baseline.py` drops no existing data itself but creates the complete application schema on a fresh database.
+- The old seven migrations are deleted from the repository history.
+
+The baseline creates `profiles`, `conversations`, `messages`, `accounts`, `categories`, `payees`, `transactions`, `budget_entries`, and `goals`, plus indexes, constraints, enums, and RLS policies. It is intentionally destructive when used as a reset strategy. Do not apply it to a database containing data that must be preserved.
+
+The current Alembic head is `001`.
+
+## Development Commands
 
 ```bash
-# Run the API (hot reload)
+uv sync --dev
+uv run alembic heads
+uv run alembic upgrade head
 uv run uvicorn ai_service.main:app --reload
-
-# Install a dependency (keeps uv.lock + requirements.txt in sync)
-uv add <package>
-
-# Migrations
-uv run alembic upgrade head      # apply all pending migrations
-uv run alembic downgrade -1      # roll back one revision
-uv run alembic current           # show the DB's current revision
-uv run alembic heads             # show the latest revision
-uv run alembic revision -m "description"   # scaffold a new revision
-
-# Verify code compiles
-uv run python -m compileall ai_service
+uv run python -m compileall ai_service alembic
+uv run pytest tests/ -v
 ```
 
-Migrations target Supabase via `DATABASE_URL` (see `ai_service/db/session.py`). New migrations must be reversible and must backfill existing rows.
+Use `DATABASE_URL` or `SUPABASE_DATABASE_URL`; PostgreSQL URLs are normalized to `postgresql+asyncpg://`. The interactive API docs are at `http://localhost:8000/docs`.
 
-There is no automated test suite yet — add one before Phase 2 ships. Verification today is manual smoke tests (multi-turn chat, tool reload, idempotency replay).
+## Documentation
 
----
+- `docs/ARCHITECTURE.md`: application layers, services, repositories, chat, and invariants.
+- `docs/API.md`: authentication, endpoints, filters, and request/response contracts.
+- `docs/DATABASE.md`: tables, constraints, ownership, indexes, RLS, and migrations.
+- `docs/CONTEXT_MANAGER.md`: base context and loader contract.
+- `docs/DESIGN_DECISIONS.md`: rationale for minor units, user-owned categories, transfers, and the rebuild.
 
-# Tools
-
-Phase 1 tools are **database-backed** and follow the same layered flow as the chat pipeline: `tool → service → repository → SQLAlchemy`. Each tool reads the authenticated `user_id` and DB session from the request context (`ai_service/core/context.py`, set by `ChatService.send_message`) and delegates to a service. Tools return **structured JSON only** — never advice, recommendations, or SQL. All tools are registered in `ai_service/tools/__init__.py` — add new tools to the `all_tools` list there.
-
-Available: `get_dashboard`, `get_recent_transactions`, `add_transaction`, `get_budget_status`, `get_financial_goals`, `get_user_profile`, `calculator`.
-
----
-
-# Roadmap
-
-- **Phase 1 — AI Chat Foundation (DONE):** FastAPI service, agent, chat endpoint, conversation management, message persistence, short-term memory, tool calling, hardened schema, idempotency, access control.
-- **Phase 2 — Persistent Memory:** user facts, financial memory, memory extraction, memory manager. Stored as structured data, not conversation history.
-- **Phase 3 — Financial Intelligence:** spending summaries, budget analysis, goal tracking, cash flow, insights — via tools, never assumptions.
-- **Phase 4 — Advanced Intelligence:** conversation summaries, behavioral learning, spending prediction, personalized coaching, semantic memory, forecasting.
-
-## Out of scope (do not touch until its phase)
-
-Vector search / embeddings / RAG · conversation summarization · user facts / financial profile extraction · any "memory manager" abstraction. Also **not** in scope: having the AI execute SQL, access the database, or implement business logic.
-
----
-
-# Definition of Done (for Phase 1 feature work)
-
-1. A multi-turn conversation, including a mock-tool turn, survives a full backend restart — a new message after restart reflects earlier context.
-2. Reloading a conversation that used a tool does not throw a `tool_call_id`-pairing error from the model API.
-3. Sending the same request twice with the same `idempotency_key` does not create a duplicate message.
-4. All schema changes exist via reversible Alembic migrations, with existing rows backfilled.
+When implementation and documentation disagree, verify code and migrations first, then update the relevant documentation in the same change.

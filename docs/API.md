@@ -1,399 +1,117 @@
 # API Reference
 
-All endpoints are served by the FastAPI app in `ai_service/main.py`. Read this before changing any endpoint or request/response schema. Interactive docs: `http://localhost:8000/docs`.
-
----
+The FastAPI application is defined in `ai_service/main.py`. Interactive documentation is available at `http://localhost:8000/docs`.
 
 ## Authentication
 
-Authentication is handled entirely by **Supabase Auth** on the frontend (the
-client uses `@supabase/supabase-js` to sign up / sign in). This backend performs
-**no** user creation, password storage, or token issuance. It only **verifies**
-the Supabase-issued access token (JWT) sent by the client and derives the
-authenticated user from it.
+All routes except `/health` and `/health/live` require:
 
-### Authorization header
-
-Every protected endpoint requires:
-
-```
+```text
 Authorization: Bearer <supabase_access_token>
 ```
 
-The token is verified by `ai_service/auth/`:
+The backend validates the token against Supabase JWKS, issuer, audience, and expiry. The verified `sub` claim becomes `CurrentUser.id`. No endpoint accepts `user_id` in a body, path, or query parameter.
 
-- **Signature**: validated against the project's JWKS (asymmetric public keys —
-  ES256 for this project; RS256 also supported). No HS256 shared secret is ever
-  stored on the backend.
-- **Issuer** (`iss`): must equal `SUPABASE_URL + "/auth/v1"`.
-- **Audience** (`aud`): must equal `authenticated`.
-- **Expiration** (`exp`): enforced automatically.
+Errors use FastAPI's `{"detail": "..."}` shape. Authentication errors are HTTP 401 with `WWW-Authenticate: Bearer`.
 
-The verified `sub` claim becomes `CurrentUser.id` — this is the **only**
-`user_id` the application trusts. Request bodies, path params, and query
-params **never** carry `user_id`. Adding a `user_id` field to a request is a
-regression.
+## Money Contract
 
-### Errors — `401 Unauthorized`
+API write requests use integer minor units. For INR, `1050` means `INR 10.50`. Responses include the integer field and a `display_*` float for presentation. The API does not use floats as the persisted or service calculation representation.
 
-```json
-{ "detail": "Authorization header missing or not a Bearer token." }
-```
+## Profile Initialization
 
-| cause | detail |
-|---|---|
-| Missing / non-Bearer header | `Authorization header missing or not a Bearer token.` |
-| Invalid signature / claims / malformed | `Invalid authentication token.` |
-| Expired | `Authentication token has expired.` |
+`GET /api/v1/profile` returns the authenticated profile. `POST /api/v1/profile` creates or partially updates it. The first profile creation also seeds 20 user-owned categories and an active `Cash` account.
 
-All 401 responses include `WWW-Authenticate: Bearer`.
+## Accounts
 
-### Dev helper — `POST /api/v1/dev/token` (development only)
-
-Registered **only** when `ENVIRONMENT=development` (returns 404 otherwise).
-Relays email/password to Supabase Auth's password grant and returns the issued
-JWT so it can be pasted into Swagger's **Authorize** button. It performs no
-authentication of its own.
-
-```json
-// request
-{ "email": "user@buywise.dev", "password": "..." }
-// response
-{ "access_token": "eyJ...", "token_type": "bearer", "expires_in": 3600,
-  "user_id": "00000000-0000-0000-0000-000000000001", "email": "user@buywise.dev" }
-```
-
----
-
-## Conventions
-
-- JSON request/response bodies.
-- Error format (FastAPI default): `{"detail": "..."}`.
-- The authenticated `user_id` comes from the verified JWT (`CurrentUser.id`),
-  injected via `Depends(get_current_user)`. It is never read from the body/path/query.
-- All conversation reads/writes are scoped by that `user_id` at the repository
-  layer — the security boundary (see AGENTS.md).
-- **Rate limiting:** protected and public API endpoints are rate-limited using a
-  hashed `X-User-ID`, hashed bearer token, or IP fallback. Exceeding the limit returns
-  `429 Too Many Requests` with
-  `Retry-After` and `X-RateLimit-*` headers. See `docs/ARCHITECTURE.md#rate-limiting`
-  for tier details. `/health/live` is intentionally exempt for liveness checks.
-
----
-
-## `POST /api/v1/chat`
-
-Send a message to the AI assistant and get a response. Creates a new conversation automatically if no `conversation_id` is given. **Requires authentication.**
-
-### Request headers
-
-```
-Authorization: Bearer <supabase_access_token>
-```
-
-### Request body
-
-```json
-{
-  "message": "What is my current balance?",
-  "conversation_id": "019fbf89-af86-74a0-9c0b-4dc051ae0f8d",
-  "idempotency_key": "3f7a...optional-client-generated-uuid"
-}
-```
-
-| field | type | required | description |
-|---|---|---|---|
-| `message` | string | yes | user's message |
-| `conversation_id` | uuid | no | existing conversation; auto-created if omitted |
-| `idempotency_key` | string | no | exactly-once: a prior completed send with the same key is replayed |
-
-### Response — `200 OK`
-
-```json
-{
-  "response": "Your current balance is ₹47,250.00.",
-  "conversation_id": "019fbf89-af86-74a0-9c0b-4dc051ae0f8d",
-  "tool_calls": [
-    {
-      "tool_name": "get_dashboard",
-      "tool_input": {},
-      "tool_output": "{...json string...}"
-    }
-  ]
-}
-```
-
-### Idempotency semantics
-
-- Same `conversation_id` + same `idempotency_key` → the prior `ChatResponse` is returned as-is. **No new user message, no agent call, no new rows.**
-- Omit `idempotency_key` and the server generates one internally for the user message, so network retries are still deduplicated.
-- A replay is scoped to the owning user and to that send's turn only.
-
-### Errors
-| status | when |
-|---|---|
-| `401` | missing/invalid/expired JWT |
-| `404` | `conversation_id` not found for that user (or belongs to another user) |
-| `422` | schema validation failure (e.g. empty `message`) |
-| `429` | rate limit exceeded (20 req/min per user) |
-
-On an agent failure the endpoint still returns `200` with an apology message and the assistant turn is persisted as `status='failed'`; retry with a **fresh** `idempotency_key` for a new attempt.
-
----
-
-## `POST /api/v1/conversations`
-
-Create a conversation explicitly. **Requires authentication.**
-
-### Request body
-
-```json
-{ "title": "My budget" }
-```
-
-### Response — `200 OK` (`ConversationRead`)
-
-```json
-{
-  "id": "019fbf89-af86-74a0-9c0b-4dc051ae0f8d",
-  "user_id": "00000000-0000-0000-0000-000000000001",
-  "title": "My budget",
-  "message_count": 0,
-  "last_message_at": null,
-  "created_at": "2026-08-02T00:00:00Z",
-  "updated_at": "2026-08-02T00:00:00Z"
-}
-```
-
-`user_id` is taken from the JWT, not the body.
-
----
-
-## `GET /api/v1/conversations`
-
-List the authenticated user's conversations, most recently active first. **Requires authentication.** (Replaces the old `GET /api/v1/users/{user_id}/conversations`.)
-
-### Query params
-
-| param | type | required | description |
-|---|---|---|---|
-| `cursor` | datetime | no | `updated_at` keyset cursor for pagination |
-| `limit` | int (1–200) | no | page size, default 50 |
-
-### Response — `200 OK`
-
-```json
-[
-  {
-    "id": "019fbf89-af86-74a0-9c0b-4dc051ae0f8d",
-    "user_id": "00000000-0000-0000-0000-000000000001",
-    "title": null,
-    "message_count": 8,
-    "last_message_at": "2026-08-02T00:00:01Z",
-    "created_at": "2026-08-02T00:00:00Z",
-    "updated_at": "2026-08-02T00:00:01Z"
-  }
-]
-```
-
-Soft-deleted conversations are excluded.
-
----
-
-## `GET /api/v1/conversations/{conversation_id}/messages`
-
-Full message history for UI display. **Requires authentication.** **Never fed to the agent** — the agent only ever receives `ChatService`'s capped recent context.
-
-### Query params
-
-| param | type | required | description |
-|---|---|---|---|
-| `cursor` | datetime | no | created_at keyset cursor for pagination |
-| `limit` | int (1–500) | no | page size, default 100 |
-
-### Response — `200 OK`
-
-```json
-{
-  "conversation_id": "019fbf89-af86-74a0-9c0b-4dc051ae0f8d",
-  "messages": [
-    {
-      "id": "...",
-      "role": "user",
-      "content": "What is my current balance?",
-      "tool_call_id": null,
-      "status": "completed",
-      "created_at": "2026-08-02T00:00:00Z"
-    },
-    {
-      "id": "...",
-      "role": "assistant",
-      "content": "",
-      "tool_call_id": null,
-      "status": "completed",
-      "created_at": "2026-08-02T00:00:00.001Z"
-    },
-    {
-      "id": "...",
-      "role": "tool",
-      "content": "{...stringified tool output...}",
-      "tool_call_id": "call_abc123",
-      "status": "completed",
-      "created_at": "2026-08-02T00:00:00.002Z"
-    }
-  ]
-}
-```
-
-`role` is `user | assistant | system | tool`; `status` is `pending | completed | failed`.
-
-### Errors
-| status | when |
-|---|---|
-| `401` | missing/invalid/expired JWT |
-| `404` | conversation not found for the authenticated user (incl. other users / soft-deleted) |
-
----
-
-## `DELETE /api/v1/conversations/{conversation_id}`
-
-Soft-delete a conversation (sets `deleted_at`). Messages are hidden from reads but rows remain. **Requires authentication.**
-
-### Response — `200 OK`
-
-```json
-{ "status": "deleted", "conversation_id": "019fbf89-af86-74a0-9c0b-4dc051ae0f8d" }
-```
-
-### Errors
-| status | when |
-|---|---|
-| `401` | missing/invalid/expired JWT |
-| `404` | conversation not found for the authenticated user |
-
----
-
-## `GET /api/v1/profile`
-
-Return the authenticated user's financial profile (used by the onboarding/settings UI). **Requires authentication.**
-
-### Response — `200 OK`
-
-```json
-{
-  "id": "00000000-0000-0000-0000-000000000001",
-  "full_name": "Rahul Sharma",
-  "currency": "INR",
-  "income_type": "salaried",
-  "salary_day": 28,
-  "timezone": "Asia/Kolkata",
-  "onboarding_complete": true,
-  "savings_target_percent": 20,
-  "investment_style": "moderate",
-  "budget_alerts": true,
-  "created_at": "2026-08-05T00:00:00Z",
-  "updated_at": "2026-08-05T00:00:00Z"
-}
-```
-
-`id` is derived from the verified JWT, never the request. `income_type` is one of `salaried | freelancer | business_owner | retired | other`; `investment_style` is `conservative | moderate | aggressive`.
-
-### Errors
-| status | when |
-|---|---|
-| `401` | missing/invalid/expired JWT |
-| `404` | user has no profile yet (before onboarding) |
-
----
-
-## `POST /api/v1/profile`
-
-Create or update the authenticated user's profile. Called by the onboarding form (first sign-in) and the settings page. **Requires authentication.** This endpoint is **not** called by the AI — profile data is collected via the UI, the AI only reads it via the `get_profile` tool.
-
-### Request body (all optional — partial updates)
-
-```json
-{
-  "full_name": "Rahul Sharma",
-  "currency": "INR",
-  "income_type": "salaried",
-  "salary_day": 28,
-  "savings_target_percent": 20,
-  "investment_style": "moderate",
-  "budget_alerts": true,
-  "onboarding_complete": true
-}
-```
-
-| field | type | notes |
+| method | path | behavior |
 |---|---|---|
-| `full_name` | string | |
-| `currency` | string | default `INR` |
-| `income_type` | enum | `salaried` / `freelancer` / `business_owner` / `retired` / `other` |
-| `salary_day` | int (1–31) | nullable — many users are freelancers/business owners |
-| `savings_target_percent` | int (0–100) | |
-| `investment_style` | enum | `conservative` / `moderate` / `aggressive` |
-| `budget_alerts` | bool | default `true` |
-| `onboarding_complete` | bool | set `true` when the form submits the full set |
+| POST | `/api/v1/accounts` | create account; optional `starting_balance` creates a starting-balance ledger row |
+| GET | `/api/v1/accounts` | list active accounts with ledger balances |
+| GET | `/api/v1/accounts/{account_id}` | get one owned active account |
+| PATCH | `/api/v1/accounts/{account_id}` | update name, type, or currency |
+| DELETE | `/api/v1/accounts/{account_id}` | deactivate account |
 
-If no profile row exists yet, one is created with `id = auth.uid()`.
+Account balances include starting balances, income, expenses, and signed transfer sides.
 
-### Response — `200 OK` (`ProfileRead`, same shape as GET)
+## Categories And Payees
 
-### Errors
-| status | when |
-|---|---|
-| `401` | missing/invalid/expired JWT |
-| `422` | no fields provided / invalid enum or range |
+| method | path | behavior |
+|---|---|---|
+| POST/GET | `/api/v1/categories` | create or list owned categories; `type=expense|income` filters |
+| GET/PATCH/DELETE | `/api/v1/categories/{category_id}` | get, update, or deactivate one category |
+| POST/GET | `/api/v1/payees` | create or list owned payees |
+| GET/PATCH/DELETE | `/api/v1/payees/{payee_id}` | get, rename, or delete one payee |
 
----
+Category deletion is a soft deactivation. Payee deletion is hard delete and transaction `payee_id` becomes null.
 
-## `GET /health`
+## Transactions
 
-Public (no authentication).
+| method | path | behavior |
+|---|---|---|
+| POST | `/api/v1/transactions` | create expense, income, or starting balance |
+| GET | `/api/v1/transactions` | list with filters and pagination |
+| GET | `/api/v1/transactions/{transaction_id}` | get one owned transaction |
+| PATCH | `/api/v1/transactions/{transaction_id}` | update owned transaction fields |
+| DELETE | `/api/v1/transactions/{transaction_id}` | hard delete owned transaction |
+
+GET filters are `account_id`, `category_id`, `payee_id`, `transaction_type`, `cleared_status`, `date_from`, `date_to`, `period`, `limit`, and `offset`. `transaction_type` accepts `expense`, `income`, `transfer`, and `starting_balance`; `period` accepts `this_month` and `last_month`.
+
+Example create request:
 
 ```json
-{ "status": "ok", "service": "buywise-ai" }
+{
+  "account_id": "00000000-0000-0000-0000-000000000001",
+  "category_id": "00000000-0000-0000-0000-000000000002",
+  "payee_name": "Local Cafe",
+  "amount": 1250,
+  "transaction_type": "expense",
+  "transaction_date": "2026-08-11",
+  "cleared_status": "cleared"
+}
 ```
 
-## `GET /health/live`
+## Transfers
 
-Public and intentionally exempt from rate limiting. Use this only for process
-orchestrator liveness checks.
+`POST /api/v1/transfers` creates two linked transfer rows atomically. It requires `from_account_id`, `to_account_id`, positive minor-unit `amount`, optional date, and optional description. `DELETE /api/v1/transfers/{transfer_group_id}` removes both owned sides atomically. Transfers require matching account currencies and are excluded from income/expense totals.
 
-```json
-{ "status": "ok", "service": "buywise-ai" }
-```
+## Budgets
 
----
+| method | path | behavior |
+|---|---|---|
+| POST | `/api/v1/budgets` | upsert one expense-category budget for month/year |
+| GET | `/api/v1/budgets/{YYYY-MM}` | list budgets with spent, remaining, and percent used |
+| GET | `/api/v1/budgets/id/{budget_id}` | get one budget |
+| PATCH | `/api/v1/budgets/{budget_id}` | update budget amount |
+| DELETE | `/api/v1/budgets/{budget_id}` | delete budget |
 
-## Example workflow (curl)
+`GET /api/v1/dashboard` includes overall budget totals for `this_month` or `last_month`.
 
-```bash
-# 0. (Development only) Obtain a Supabase JWT via the dev helper.
-TOKEN=$(curl -s -X POST http://localhost:8000/api/v1/dev/token \
-  -H 'Content-Type: application/json' \
-  -d '{"email":"user@buywise.dev","password":"your-password"}' | jq -r .access_token)
+## Analytics
 
-# 1. First message (new conversation auto-created)
-curl -s -X POST http://localhost:8000/api/v1/chat \
-  -H "Authorization: Bearer $TOKEN" \
-  -H 'Content-Type: application/json' \
-  -d '{"message":"What is my balance?"}'
+| method | path | query |
+|---|---|---|
+| GET | `/api/v1/analytics/monthly` | `month`, `year` |
+| GET | `/api/v1/analytics/categories` | `month`, `year` |
+| GET | `/api/v1/analytics/comparison` | `month1`, `year1`, `month2`, `year2` |
 
-# 2. Follow-up in the same conversation (use the returned conversation_id)
-curl -s -X POST http://localhost:8000/api/v1/chat \
-  -H "Authorization: Bearer $TOKEN" \
-  -H 'Content-Type: application/json' \
-  -d '{"message":"Any Swiggy transactions?","conversation_id":"<id from step 1>"}'
+Analytics returns integer minor units. Expense and income totals exclude transfers, starting balances, and split child rows. Month comparison includes signed amount and percentage changes; percentage is null when the previous value is zero.
 
-# 3. Idempotent retry (safe to re-send; replays the prior result)
-curl -s -X POST http://localhost:8000/api/v1/chat \
-  -H "Authorization: Bearer $TOKEN" \
-  -H 'Content-Type: application/json' \
-  -d '{"message":"What is my balance?","idempotency_key":"fixed-key-for-this-send"}'
+## Goals And Dashboard
 
-# 4. Read history (no user_id query param — derived from the JWT)
-curl -s "http://localhost:8000/api/v1/conversations/<id>/messages" \
-  -H "Authorization: Bearer $TOKEN"
-```
+- `GET /api/v1/goals?status=active|completed|archived`
+- `POST /api/v1/goals`
+- `PATCH /api/v1/goals/{goal_id}`
+- `GET /api/v1/dashboard?period=this_month|last_month`
+
+Goals support optional category linkage and manual progress. Reaching `target_amount` marks the goal completed.
+
+## Chat And Development Token
+
+`POST /api/v1/chat` retains the existing conversation and idempotency semantics. Its AI tools use the same account, category, transaction, budget, analytics, and goal services as the HTTP API.
+
+`POST /api/v1/dev/token` is available only under `ENVIRONMENT=development`; it relays a password grant to Supabase Auth and is not registered in other environments.
+
+## Rate Limits
+
+Protected financial endpoints use the configured financial limit, default `60/minute`. Chat defaults to `20/minute`, conversations to `60/minute`, profile to `30/minute`, health to `60/minute`, and the dev helper to `10/minute`. `/health/live` is intentionally not rate limited.

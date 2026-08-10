@@ -6,9 +6,11 @@ from ai_service.models.conversation import (
     generate_uuid7,
 )
 from ai_service.models.financial import (
+    Account,
+    BudgetEntry,
     Category,
     Goal,
-    MonthlyPlan,
+    Payee,
     Profile,
     Transaction,
 )
@@ -20,8 +22,10 @@ __all__ = [
     "MessageStatus",
     "generate_uuid7",
     "Profile",
+    "Account",
     "Category",
+    "Payee",
     "Transaction",
-    "MonthlyPlan",
+    "BudgetEntry",
     "Goal",
 ]

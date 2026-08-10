@@ -1,24 +1,18 @@
 from datetime import date
+from uuid import UUID
 
 from langchain_core.tools import tool
 
 from ai_service.core.context import get_current_user_id, get_db_session
+from ai_service.repositories import CategoryRepository
 from ai_service.services.goal_service import GoalNotFoundError, GoalService
+from ai_service.utils.financial import amount_to_minor
 
 
 @tool
 async def get_financial_goals(status: str = "active") -> dict:
-    """List the user's financial goals with progress metrics.
-
-    Returns each goal's target/current amount, progress percent, remaining
-    amount, target date, and the monthly contribution needed to hit it on
-    time. Use this when the user asks about their savings goals or progress.
-    ``status`` is 'active' (default), 'completed', or 'archived'.
-    """
-    user_id = get_current_user_id()
-    session = get_db_session()
-    service = GoalService(session)
-    return await service.list_goals(user_id, status=status)
+    """List financial goals with integer and display progress values."""
+    return await GoalService(get_db_session()).list_goals(get_current_user_id(), status=status)
 
 
 @tool
@@ -29,33 +23,30 @@ async def add_goal(
     target_date: str | None = None,
     description: str | None = None,
     priority: str | None = None,
+    category: str | None = None,
 ) -> dict:
-    """Create a new financial goal for the user.
-
-    ``title`` is the goal name (e.g. 'Emergency Fund'). ``target_amount`` is a
-    positive number. ``goal_type`` is one of emergency_fund, purchase,
-    vacation, investment, debt_repayment, education, retirement, custom.
-    ``target_date`` is an ISO date (YYYY-MM-DD) — optional. Use this when the
-    user asks to create or save toward a new goal.
-    """
+    """Create a goal; target amounts are supplied in normal currency values."""
     user_id = get_current_user_id()
     session = get_db_session()
-    service = GoalService(session)
-    parsed_date: date | None = None
-    if target_date:
-        try:
-            parsed_date = date.fromisoformat(target_date)
-        except ValueError:
-            return {"status": "error", "message": f"Invalid target_date '{target_date}'. Use YYYY-MM-DD."}
+    parsed_date = None
     try:
-        return await service.add_goal(
+        if target_date:
+            parsed_date = date.fromisoformat(target_date)
+        category_id = None
+        if category:
+            category_row = await CategoryRepository(session).find_by_name(user_id, category, "expense")
+            if category_row is None:
+                return {"status": "error", "message": f"Category '{category}' not found."}
+            category_id = category_row.id
+        return await GoalService(session).add_goal(
             user_id,
             title=title,
-            target_amount=target_amount,
+            target_amount=amount_to_minor(target_amount),
             goal_type=goal_type,
+            target_date=parsed_date,
             description=description,
             priority=priority,
-            target_date=parsed_date,
+            category_id=category_id,
         )
     except ValueError as exc:
         return {"status": "error", "message": str(exc)}
@@ -63,24 +54,12 @@ async def add_goal(
 
 @tool
 async def update_goal_progress(goal_id: str, current_amount: float) -> dict:
-    """Update the current amount saved toward a financial goal.
-
-    ``goal_id`` is the goal's id string. ``current_amount`` is the total saved
-    so far (non-negative). Use this when the user says they added money to a
-    goal. Marks the goal completed automatically when the target is reached.
-    """
-    user_id = get_current_user_id()
-    session = get_db_session()
-    service = GoalService(session)
+    """Update the manually tracked amount saved toward a goal."""
     try:
-        from uuid import UUID
-
-        return await service.update_progress(
-            user_id,
+        return await GoalService(get_db_session()).update_progress(
+            get_current_user_id(),
             goal_id=UUID(goal_id),
-            current_amount=current_amount,
+            current_amount=amount_to_minor(current_amount),
         )
-    except GoalNotFoundError as exc:
-        return {"status": "error", "message": str(exc)}
-    except ValueError as exc:
+    except (GoalNotFoundError, ValueError) as exc:
         return {"status": "error", "message": str(exc)}

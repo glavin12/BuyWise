@@ -10,3 +10,9 @@ sqlalchemy
 alembic
 asyncpg
 uuid-utils
+slowapi
+PyJWT[crypto]
+pytest
+pytest-asyncio
+httpx
+aiosqlite

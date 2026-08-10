@@ -2,7 +2,7 @@
 
 AI-first personal finance assistant. The AI understands the user's financial situation, uses tools to retrieve real data, and provides accurate financial help — with persistent conversation memory.
 
-**Status:** Phase 1 (AI Chat Foundation) shipped — persistent conversation memory, tool calling, idempotency, and user-scoped access control.
+**Status:** Manual expense tracker foundation shipped — account-based ledger, user-owned categories/payees, integer money, budgets, analytics, goals, transfers, persistent AI chat, and user-scoped access control.
 
 ## Stack
 
@@ -15,7 +15,7 @@ AI-first personal finance assistant. The AI understands the user's financial sit
 
 ```bash
 # 1. Install dependencies
-uv sync
+uv sync --dev
 
 # 2. Configure environment
 cp .env.example .env
@@ -37,10 +37,10 @@ ai_service/
 ├── main.py          FastAPI app + lifespan
 ├── core/            settings (env-driven)
 ├── db/              async engine/session
-├── models/          SQLAlchemy ORM (conversations, messages)
+├── models/          SQLAlchemy ORM (chat and financial ledger)
 ├── schemas/         Pydantic request/response models
-├── routers/         HTTP endpoints (chat, conversations, health)
-├── services/        chat flow, conversation lifecycle, agent
+├── routers/         HTTP endpoints for chat and manual finance CRUD
+├── services/        financial business rules, chat flow, and agent
 ├── repositories/    all database access (user_id-scoped)
 ├── tools/           database-backed financial tools (AI-accessible)
 └── utils/           DB rows → LangChain messages, month/period helpers
@@ -74,4 +74,11 @@ uv run alembic current          # current DB revision
 
 ## Testing
 
-There is no automated test suite yet (target: add one before Phase 2). Verification today is manual smoke tests: multi-turn chat with a tool turn surviving a restart, tool reload with no pairing errors, and idempotency replay.
+The automated suite uses pytest, pytest-asyncio, httpx, and aiosqlite:
+
+```bash
+uv run pytest tests/ -v
+uv run python -m compileall ai_service alembic
+```
+
+The migration baseline is a clean rebuild. Apply it only to a fresh or disposable database when existing application rows do not need preservation.

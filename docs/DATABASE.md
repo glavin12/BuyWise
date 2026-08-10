@@ -1,202 +1,107 @@
 # Database Schema
 
-Reference for the PostgreSQL (Supabase) schema. Read this before touching any table, column, index, or migration.
+The PostgreSQL/Supabase schema is defined by the clean Alembic baseline in `alembic/versions/001_baseline.py`. The rebuild intentionally replaces the previous seven-migration chain and does not preserve old application rows.
 
----
+## Common Conventions
 
-## ID strategy
+- Financial primary keys use PostgreSQL `gen_random_uuid()` with an application-side UUID default in ORM tests and non-Postgres environments.
+- Conversation and message IDs are UUIDv7 generated in Python, with a database fallback.
+- Owner IDs are UUIDs derived from the verified Supabase JWT subject.
+- Financial amounts are `BIGINT` minor units. Amount sign is represented by transaction type and, for transfers, `transfer_direction`.
+- Timestamp columns use `timestamptz`; transaction dates use calendar `DATE` without timezone.
+- All user-owned tables have an index on `user_id` or an equivalent composite index.
 
-- Primary keys are `UUID` columns.
-- Values are **UUIDv7 generated in the application layer** via `generate_uuid7()` (`ai_service/models/conversation.py`, backed by `uuid-utils`). Postgres 17.6 has no native `uuidv7()`, so the value is produced in Python and stored in a plain UUID column.
-- The columns keep `server_default=gen_random_uuid()` as a harmless fallback for non-app inserts; the app's Python-side `default` takes precedence for our writes.
+## Tables
 
----
+### `profiles`
 
-## `conversations`
+One row per Supabase user. `id` references `auth.users.id` and is the application owner ID. Existing profile fields are preserved: `full_name`, `currency`, `income_type`, `salary_day`, `timezone`, `onboarding_complete`, `savings_target_percent`, `investment_style`, and `budget_alerts`, with the existing validation checks.
 
-| column | type | nullable | default | notes |
-|---|---|---|---|---|
-| `id` | `uuid` | NO | (app uuid7) | PK |
-| `user_id` | `uuid` | NO | — | FK → `auth.users(id) ON DELETE CASCADE`; indexed |
-| `title` | `varchar(255)` | YES | — | generated from first exchange in a later phase |
-| `message_count` | `integer` | NO | `0` | denormalized, `+N` on every message save |
-| `last_message_at` | `timestamptz` | YES | — | denormalized, set on every message save |
-| `created_at` | `timestamptz` | NO | `now()` | |
-| `updated_at` | `timestamptz` | NO | `now()` | bumped on touch |
-| `deleted_at` | `timestamptz` | YES | — | soft delete |
+### `conversations`
 
-Indexes: `ix_conversations_user_id`.
+Stores authenticated chat conversations with `user_id`, optional title, message counters, timestamps, and `deleted_at`. Indexes cover `user_id` and `(user_id, deleted_at)`. Conversations are soft-deleted.
 
----
+### `messages`
 
-## `messages`
+Stores conversation messages with `conversation_id`, `user_id`, enum `role` (`user`, `assistant`, `system`, `tool`), content, JSONB tool calls, tool-call ID, enum `status`, idempotency key, metadata, token counts, timestamps, and soft-delete timestamp. A partial unique index on non-null `idempotency_key` enforces exactly-once sends. The conversation FK is `ON DELETE RESTRICT`.
 
-| column | type | nullable | default | notes |
-|---|---|---|---|---|
-| `id` | `uuid` | NO | (app uuid7) | PK |
-| `conversation_id` | `uuid` | NO | — | FK → `conversations(id) ON DELETE RESTRICT` |
-| `user_id` | `uuid` | NO | — | denormalized owner copy; access checks need no join |
-| `role` | enum `message_role` | NO | — | `user` / `assistant` / `system` / `tool` |
-| `content` | `text` | NO | — | for `tool` rows: stringified tool output |
-| `tool_call_id` | `text` | YES | — | required on `tool` rows; matches an `id` in the paired assistant row's `tool_calls` |
-| `tool_calls` | `jsonb` | YES | — | assistant rows only: array of `{name, args, id}` mirroring LangChain `AIMessage.tool_calls` |
-| `status` | enum `message_status` | NO | `'completed'` | `pending` / `completed` / `failed` |
-| `idempotency_key` | `text` | YES | — | client key; partial-unique |
-| `metadata` | `jsonb` | YES | — | extras: model/version, latency_ms, error details |
-| `prompt_tokens` | `integer` | YES | — | assistant rows |
-| `completion_tokens` | `integer` | YES | — | assistant rows |
-| `total_tokens` | `integer` | YES | — | assistant rows |
-| `created_at` | `timestamptz` | NO | `now()` | order with `(created_at, id)` — same-ms messages are possible |
-| `deleted_at` | `timestamptz` | YES | — | soft delete |
+### `accounts`
 
-> **`metadata` column, Python attribute:** `metadata` is a reserved name in SQLAlchemy's Declarative API, so the ORM attribute is `message_metadata` mapped to the DB column `metadata`.
+| column | type | rules |
+|---|---|---|
+| `id` | uuid | PK |
+| `user_id` | uuid | FK `profiles.id` `CASCADE` |
+| `name` | text | required, non-empty |
+| `account_type` | text | `checking`, `savings`, `cash`, `credit_card` |
+| `currency` | text | default `INR` |
+| `is_active` | boolean | default `true`; deactivation is the API delete behavior |
+| `created_at`, `updated_at` | timestamptz | required |
 
-### Indexes
-| index | columns | uniqueness | notes |
-|---|---|---|---|
-| `ix_messages_conversation_created_at_id` | `(conversation_id, created_at, id)` | no | hit on every chat request; supports `ORDER BY created_at, id` |
-| `ix_messages_user_id` | `(user_id)` | no | access checks |
-| `ix_messages_idempotency_key` | `(idempotency_key)` | **unique partial** | `WHERE idempotency_key IS NOT NULL` — enforces exactly-once |
-| `messages_pkey` | `(id)` | PK | |
+### `categories`
 
-### Foreign keys
-- `conversation_id → conversations(id) ON DELETE RESTRICT` — conversations are soft-deleted only, so this never fires.
+Categories are user-owned. Columns are `id`, `user_id`, `name`, `type` (`expense` or `income`), optional `icon` and `color`, `is_active`, and timestamps. `(user_id, name, type)` is unique. Profile creation seeds 20 defaults per user; there are no global `is_system` categories.
 
-### Enums
-- `message_role`: `user`, `assistant`, `system`, `tool`
-- `message_status`: `pending`, `completed`, `failed`
+### `payees`
 
----
+Columns are `id`, `user_id`, `name`, `normalized_name`, and timestamps. `(user_id, normalized_name)` is unique. `normalized_name` is lowercase trimmed text used by `find_or_create()`.
 
-## Financial tables
+### `transactions`
 
-The core financial schema (`profiles`, `categories`, `transactions`, `monthly_plans`) was created by the Supabase migration `20260728184215` ("create_buywise_core_schema") **outside** the Alembic chain. Alembic migration `202608050001` enhanced them and added `goals`. Models live in `ai_service/models/financial.py`.
+The ledger source of truth:
 
-> **ID strategy note:** financial tables use DB-side `gen_random_uuid()` (v4) as their PK default — unlike `conversations`/`messages` which use app-layer UUIDv7. The repository layer relies on the DB default + flush/refresh to obtain the id.
+| column | type | rules |
+|---|---|---|
+| `id` | uuid | PK |
+| `user_id` | uuid | FK `profiles.id` `CASCADE` |
+| `account_id` | uuid | required FK `accounts.id` `RESTRICT` |
+| `category_id` | uuid | nullable FK `categories.id` `RESTRICT` |
+| `payee_id` | uuid | nullable FK `payees.id` `SET NULL` |
+| `amount` | bigint | non-negative minor units |
+| `currency` | text | default `INR` |
+| `transaction_type` | text | `expense`, `income`, `transfer`, `starting_balance` |
+| `transaction_date` | date | default current date |
+| `description`, `notes` | text | nullable |
+| `cleared_status` | text | `pending` or `cleared` |
+| `transfer_group_id` | uuid | required for transfers |
+| `transfer_direction` | text | transfer-only `in` or `out` |
+| `parent_transaction_id` | uuid | nullable self-FK `CASCADE` for future splits |
+| timestamps | timestamptz | required |
 
-### `profiles` — one row per user (`id` = `auth.users.id`)
+Expense and income rows require a category. Transfers require a group and direction. Non-transfer rows cannot carry a transfer direction. Parent rows are excluded from analytical aggregates when split children are present.
 
-| column | type | nullable | default | notes |
-|---|---|---|---|---|
-| `id` | `uuid` | NO | — | PK, FK → `auth.users(id) ON DELETE CASCADE` |
-| `full_name` | `text` | YES | — | |
-| `currency` | `text` | NO | `'INR'` | |
-| `income_type` | `text` | YES | — | `salaried` / `freelancer` / `business_owner` / `retired` / `other` |
-| `salary_day` | `integer` | YES | — | day of month income lands; nullable (freelancers etc.), CHECK 1–31 |
-| `timezone` | `text` | NO | `'Asia/Kolkata'` | |
-| `onboarding_complete` | `boolean` | NO | `false` | |
-| `savings_target_percent` | `integer` | YES | — | CHECK 0–100 |
-| `investment_style` | `text` | YES | — | `conservative` / `moderate` / `aggressive` |
-| `budget_alerts` | `boolean` | NO | `true` | |
-| `created_at` | `timestamptz` | NO | `now()` | |
-| `updated_at` | `timestamptz` | NO | `now()` | |
+Indexes cover `user_id`, `account_id`, `category_id`, `payee_id`, `transaction_date`, `(user_id, transaction_date)`, `(user_id, transaction_type)`, and non-null `transfer_group_id`.
 
-### `categories` — shared lookup, hierarchical
+Account balance sign logic is:
 
-| column | type | nullable | default | notes |
-|---|---|---|---|---|
-| `id` | `uuid` | NO | `gen_random_uuid()` | PK |
-| `name` | `text` | NO | — | CHECK non-empty; `UNIQUE(name, type)` |
-| `type` | `text` | NO | — | `expense` / `income` |
-| `icon` | `text` | YES | — | |
-| `color` | `text` | YES | — | |
-| `parent_category_id` | `uuid` | YES | — | self-FK → `categories(id) ON DELETE SET NULL`; 1 level of nesting for MVP |
-| `is_system` | `boolean` | NO | `false` | built-in defaults vs user-created |
-| `created_at` | `timestamptz` | NO | `now()` | |
+```text
+starting_balance + income - expense + transfer(in) - transfer(out)
+```
 
-### `transactions` — source of truth ledger
+### `budget_entries`
 
-| column | type | nullable | default | notes |
-|---|---|---|---|---|
-| `id` | `uuid` | NO | `gen_random_uuid()` | PK |
-| `profile_id` | `uuid` | NO | — | FK → `profiles(id) ON DELETE CASCADE`; indexed |
-| `category_id` | `uuid` | NO | — | FK → `categories(id) ON DELETE RESTRICT`; indexed |
-| `amount` | `numeric(14,2)` | NO | — | CHECK `>= 0`; sign is encoded in `type`, not the amount |
-| `type` | `text` | NO | — | `expense` / `income` |
-| `title` | `text` | NO | — | CHECK non-empty |
-| `merchant_name` | `text` | YES | — | |
-| `description` | `text` | YES | — | |
-| `payment_method` | `text` | YES | — | |
-| `source` | `text` | YES | — | future: `manual` / `voice` / `import` |
-| `is_recurring` | `boolean` | NO | `false` | subscription/regular-payment flag for forecasting |
-| `transaction_date` | `timestamptz` | NO | `now()` | indexed |
-| `created_at` | `timestamptz` | NO | `now()` | |
-| `updated_at` | `timestamptz` | NO | `now()` | |
+Per-category monthly budgets. Columns are `id`, `user_id`, `category_id`, `month`, `year`, `budgeted_amount` in minor units, and timestamps. `(user_id, category_id, month, year)` is unique. Month is 1-12, year is 2020-2100, and amount is non-negative. The service only accepts active user-owned expense categories.
 
-### `monthly_plans` — user's intention per month (only non-calculable inputs)
+### `goals`
 
-| column | type | nullable | default | notes |
-|---|---|---|---|---|
-| `id` | `uuid` | NO | `gen_random_uuid()` | PK |
-| `profile_id` | `uuid` | NO | — | FK → `profiles(id) ON DELETE CASCADE`; indexed |
-| `month` | `integer` | NO | — | CHECK 1–12 |
-| `year` | `integer` | NO | — | CHECK 2020–2100 |
-| `expected_income` | `numeric(14,2)` | NO | `0` | CHECK `>= 0`; per-month to preserve income history |
-| `minimum_savings_goal` | `numeric(14,2)` | NO | `0` | CHECK `>= 0` |
-| `status` | `text` | NO | `'active'` | `active` / `completed` / `archived` |
-| `created_at` | `timestamptz` | NO | `now()` | |
-| `updated_at` | `timestamptz` | NO | `now()` | |
+Columns are `id`, `user_id`, nullable `category_id`, title, description, `target_amount`, `current_amount`, goal type, priority, target date, status, and timestamps. Amounts are minor units. Category deletion sets the goal category to null. Status is `active`, `completed`, or `archived`; reaching the target marks a goal completed.
 
-- `UNIQUE(profile_id, month, year)` — one plan per month.
-- `ix_monthly_plans_active_profile` — **partial unique** `(profile_id) WHERE status = 'active'` — at most one active plan per user.
-- Derived values (total spent, remaining balance, achieved savings) are **never stored** — computed from `transactions`.
+## Ownership And RLS
 
-### `goals` — dedicated goals table
+RLS is enabled on every public application table. Policies use `TO authenticated` and `(select auth.uid()) = user_id` (or `id` for profiles). Update policies include both `USING` and `WITH CHECK`; child tables use their denormalized `user_id`.
 
-| column | type | nullable | default | notes |
-|---|---|---|---|---|
-| `id` | `uuid` | NO | `gen_random_uuid()` | PK |
-| `profile_id` | `uuid` | NO | — | FK → `profiles(id) ON DELETE CASCADE` |
-| `title` | `text` | NO | — | |
-| `description` | `text` | YES | — | |
-| `target_amount` | `numeric(14,2)` | NO | — | CHECK `> 0` |
-| `current_amount` | `numeric(14,2)` | NO | `0` | CHECK `>= 0`; live value, allocation history is a future table |
-| `goal_type` | `text` | YES | — | `emergency_fund` / `purchase` / `vacation` / `investment` / `debt_repayment` / `education` / `retirement` / `custom` |
-| `priority` | `text` | YES | — | free-form for now |
-| `target_date` | `date` | YES | — | |
-| `status` | `text` | NO | `'active'` | `active` / `completed` / `archived` |
-| `created_at` | `timestamptz` | NO | `now()` | |
-| `updated_at` | `timestamptz` | NO | `now()` | |
-
-Indexes: `ix_goals_profile`, `ix_goals_profile_status`.
-
-> **Future (not implemented):** `goal_allocations(id, goal_id, monthly_plan_id, amount, created_at)` to preserve monthly savings-allocation history; `goals.current_amount` becomes a denormalized SUM.
-
----
-
-## Access control (RLS)
-
-- Row-Level Security **is enabled** and the original policies exist, but **the service does not rely on them**: it connects via its own SQLAlchemy session as the DB superuser, which bypasses RLS.
-- The real security boundary is **`user_id` filtering in every repository read/write** (`docs/ARCHITECTURE.md`). Never add a repository method that omits the `user_id` filter.
-- Defense-in-depth policies exist for the financial tables (`202608050001`): owner-scoped `SELECT`/`INSERT`/`UPDATE` on `profiles`, `transactions`, `monthly_plans`, `goals` (+ `DELETE` on `goals`), and shared `SELECT` on `categories` for `authenticated`.
-
----
+RLS is defense in depth, not the service security boundary. Every repository query still filters by the authenticated owner. New tables in the Supabase public schema may also require explicit Data API grants because Supabase no longer exposes newly created tables automatically.
 
 ## Migrations
 
-Location: `alembic/versions/`. Convention: `<YYYYMMDD>_<sequence>_<slug>`; always reversible; backfill existing rows when adding non-null columns.
-
 | revision | description |
 |---|---|
-| `202607310001` | create `conversations` + `messages`, enum `message_role`, RLS + policies |
-| `202608020001` | make `conversations.user_id` nullable *(superseded — reverted in 202608020002)* |
-| `202608020002` | conversation hardening: `message_count`, `last_message_at`, `deleted_at`; `user_id` NOT NULL again; backfill |
-| `202608020003` | message hardening: `user_id`, `tool_call_id`, `tool_calls`, `status` + enum, `idempotency_key`, `metadata`, token columns, `deleted_at`; role enum + `tool`; FK → RESTRICT; index rebuild; backfill |
-| `202608050001` | financial schema: enrich `profiles`; hierarchical `categories`; `transactions.is_recurring`; `monthly_plans` cleanup (`planned_expenses`/`salary_date` dropped, `savings_goal` → `minimum_savings_goal`, `status` + checks + partial-unique active index); create `goals`; RLS policies |
-| `202608050002` | seed 20 default `categories` (13 expense, 7 income) with `is_system=true` |
-
-> The core financial tables (`profiles`, `categories`, `transactions`, `monthly_plans`) were created by Supabase migration `20260728184215`, outside this Alembic chain. `202608050001` alters those tables in place, so its `downgrade()` restores the pre-enrichment shape.
-
-**Current head: `202608050002`.**
-
-Commands:
+| `001` | complete fresh schema, indexes, checks, enums, and RLS |
 
 ```bash
-uv run alembic upgrade head     # apply all pending
-uv run alembic downgrade -1     # roll back one
-uv run alembic current          # DB's current revision
-uv run alembic heads            # latest revision
-uv run alembic revision -m "description"
+uv run alembic heads
+uv run alembic upgrade head
+uv run alembic downgrade base
+uv run alembic upgrade head
 ```
 
-Alembic targets Supabase via `DATABASE_URL` (`ai_service/db/session.py`). A `postgresql://` URL is normalized to `postgresql+asyncpg://` at runtime.
+Only run the downgrade/upgrade round trip against a disposable database. The baseline is a clean rebuild and is not a data-preserving migration for the previous schema.

@@ -1,6 +1,6 @@
 from langchain_core.tools import tool
 
-from ai_service.core.context import get_db_session
+from ai_service.core.context import get_current_user_id, get_db_session
 from ai_service.services.category_service import CategoryService
 
 
@@ -15,4 +15,4 @@ async def get_categories(type: str | None = None) -> dict:
     """
     session = get_db_session()
     service = CategoryService(session)
-    return await service.list_categories(type=type)
+    return await service.list_categories(get_current_user_id(), type=type)

@@ -1,10 +1,17 @@
+from datetime import date
+from uuid import UUID
+
 from langchain_core.tools import tool
 
 from ai_service.core.context import get_current_user_id, get_db_session
+from ai_service.repositories import AccountRepository, CategoryRepository
 from ai_service.services.transaction_service import (
+    AccountReferenceError,
     CategoryNotFoundError,
+    PayeeReferenceError,
     TransactionService,
 )
+from ai_service.utils.financial import amount_to_minor
 
 
 @tool
@@ -12,76 +19,64 @@ async def get_recent_transactions(
     limit: int = 10,
     period: str | None = None,
     category: str | None = None,
-    type: str | None = None,
+    transaction_type: str | None = None,
 ) -> dict:
-    """List the user's recent transactions.
-
-    Returns the most recent transactions with title, merchant, amount, type,
-    category, payment method, and date. Optionally filter by ``period``
-    ('this_month'/'last_month'), ``category`` (category name), or ``type``
-    ('expense'/'income'). Use this when the user asks to see their
-    transactions or a specific past purchase.
-    """
+    """List recent user transactions with account, payee, category, and date."""
     user_id = get_current_user_id()
     session = get_db_session()
-    service = TransactionService(session)
-
     category_id = None
     if category is not None:
-        from ai_service.repositories import CategoryRepository
-
-        repo = CategoryRepository(session)
-        cat = await repo.find_by_name(category, type or "expense")
-        if cat is None:
-            return {
-                "status": "error",
-                "message": f"Category '{category}' not found for type '{type or 'expense'}'.",
-            }
-        category_id = cat.id
-
-    return await service.list_transactions(
+        category_row = await CategoryRepository(session).find_by_name(
+            user_id, category, transaction_type or "expense"
+        )
+        if category_row is None:
+            return {"status": "error", "message": f"Category '{category}' not found."}
+        category_id = category_row.id
+    return await TransactionService(session).list_transactions(
         user_id,
-        limit=limit,
+        limit=max(1, min(limit, 100)),
         period=period,
         category_id=category_id,
-        type=type,
+        transaction_type=transaction_type,
     )
 
 
 @tool
 async def add_transaction(
-    title: str,
     amount: float,
     category: str,
-    type: str = "expense",
-    merchant_name: str | None = None,
+    transaction_type: str = "expense",
+    account_id: str | None = None,
+    payee: str | None = None,
     description: str | None = None,
-    payment_method: str | None = None,
-    is_recurring: bool = False,
+    notes: str | None = None,
+    transaction_date: str | None = None,
+    cleared_status: str = "pending",
 ) -> dict:
-    """Add a new financial transaction for the user.
+    """Record an expense, income, or starting balance in minor-unit storage.
 
-    ``title`` is a short description (e.g. 'Swiggy order'). ``amount`` is a
-    positive number. ``type`` is 'expense' (default) or 'income'. ``category``
-    must be one of the user's known category names — use get_categories to see
-    valid options. Use this when the user asks to log an expense or income.
+    Amounts are supplied as normal currency values and converted exactly before
+    persistence. The first active account is used when account_id is omitted.
     """
     user_id = get_current_user_id()
     session = get_db_session()
-    service = TransactionService(session)
+    accounts = AccountRepository(session)
     try:
-        return await service.add_transaction(
+        account = await accounts.get_default(user_id) if account_id is None else await accounts.get(user_id, UUID(account_id))
+        if account is None:
+            return {"status": "error", "message": "No active account is available."}
+        parsed_date = date.fromisoformat(transaction_date) if transaction_date else date.today()
+        return await TransactionService(session).add_transaction(
             user_id,
-            title=title,
-            amount=amount,
+            account_id=account.id,
+            amount=amount_to_minor(amount),
             category_name=category,
-            type=type,
-            merchant_name=merchant_name,
+            transaction_type=transaction_type,
+            payee_name=payee,
             description=description,
-            payment_method=payment_method,
-            is_recurring=is_recurring,
+            notes=notes,
+            transaction_date=parsed_date,
+            cleared_status=cleared_status,
         )
-    except CategoryNotFoundError as exc:
-        return {"status": "error", "message": str(exc)}
-    except ValueError as exc:
+    except (ValueError, AccountReferenceError, CategoryNotFoundError, PayeeReferenceError) as exc:
         return {"status": "error", "message": str(exc)}

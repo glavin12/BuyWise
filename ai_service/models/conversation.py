@@ -5,9 +5,9 @@ import uuid
 from datetime import datetime
 
 import uuid_utils
-from sqlalchemy import DateTime, Enum, ForeignKey, Index, Integer, String, Text, func, text
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy import DateTime, Enum, ForeignKey, Index, Integer, JSON, String, Text, func, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.types import Uuid
 
 from ai_service.db.base import Base
 
@@ -38,13 +38,13 @@ class Conversation(Base):
     __tablename__ = "conversations"
 
     id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
+        Uuid(as_uuid=True),
         primary_key=True,
         default=generate_uuid7,
         server_default=text("gen_random_uuid()"),
     )
     user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
+        Uuid(as_uuid=True),
         nullable=False,
         index=True,
     )
@@ -94,19 +94,19 @@ class Message(Base):
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
+        Uuid(as_uuid=True),
         primary_key=True,
         default=generate_uuid7,
         server_default=text("gen_random_uuid()"),
     )
     conversation_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
+        Uuid(as_uuid=True),
         ForeignKey("conversations.id", ondelete="RESTRICT"),
         nullable=False,
         index=True,
     )
     user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
+        Uuid(as_uuid=True),
         nullable=False,
         index=True,
     )
@@ -120,7 +120,7 @@ class Message(Base):
     )
     content: Mapped[str] = mapped_column(Text, nullable=False)
     tool_call_id: Mapped[str | None] = mapped_column(Text, nullable=True)
-    tool_calls: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+    tool_calls: Mapped[list | None] = mapped_column(JSON, nullable=True)
     status: Mapped[MessageStatus] = mapped_column(
         Enum(
             MessageStatus,
@@ -132,7 +132,7 @@ class Message(Base):
         server_default=text("'completed'"),
     )
     idempotency_key: Mapped[str | None] = mapped_column(Text, nullable=True)
-    message_metadata: Mapped[dict | None] = mapped_column("metadata", JSONB, nullable=True)
+    message_metadata: Mapped[dict | None] = mapped_column("metadata", JSON, nullable=True)
     prompt_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
     completion_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
     total_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)

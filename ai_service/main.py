@@ -17,7 +17,20 @@ from ai_service.auth import AuthError
 from ai_service.core.config import get_settings
 from ai_service.core.rate_limit import limiter
 from ai_service.db.session import dispose_engine
-from ai_service.routers import chat, conversations, financial, health, profile
+from ai_service.routers import (
+    accounts,
+    analytics,
+    budgets,
+    categories,
+    chat,
+    conversations,
+    financial,
+    health,
+    payees,
+    profile,
+    transactions,
+    transfers,
+)
 
 # Configure logging
 logging.basicConfig(
@@ -74,6 +87,13 @@ app.include_router(chat.router)
 app.include_router(conversations.router)
 app.include_router(profile.router)
 app.include_router(financial.router)
+app.include_router(accounts.router)
+app.include_router(categories.router)
+app.include_router(payees.router)
+app.include_router(transactions.router)
+app.include_router(transfers.router)
+app.include_router(budgets.router)
+app.include_router(analytics.router)
 
 # Development-only utilities. Never registered outside the ``development``
 # environment, so these routes return 404 (not 401) in staging/production.

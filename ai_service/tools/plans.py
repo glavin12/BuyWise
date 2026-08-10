@@ -1,52 +1,40 @@
 from langchain_core.tools import tool
 
 from ai_service.core.context import get_current_user_id, get_db_session
-from ai_service.services.monthly_plan_service import MonthlyPlanService
-from ai_service.utils.financial import current_month_range
+from ai_service.repositories import CategoryRepository
+from ai_service.services.budget_service import BudgetService
+from ai_service.utils.financial import amount_to_minor, current_month_range
 
 
 @tool
 async def get_budget_status(period: str = "this_month") -> dict:
-    """Compare the user's monthly plan against actual spending/income.
-
-    Returns expected vs actual income, total spent, actual savings, whether
-    the savings goal is on track, remaining balance, and daily budget
-    remaining. Use this when the user asks if they are on budget, on track
-    to save, or how much they can spend this month.
-    """
-    user_id = get_current_user_id()
-    session = get_db_session()
-    service = MonthlyPlanService(session)
-    return await service.budget_status(user_id, period=period)
+    """Compare per-category budgets with actual expense totals."""
+    return await BudgetService(get_db_session()).budget_status(
+        get_current_user_id(), period=period
+    )
 
 
 @tool
-async def set_monthly_plan(
-    expected_income: float | None = None,
-    minimum_savings_goal: float | None = None,
+async def set_category_budget(
+    category: str,
+    budgeted_amount: float,
     month: int | None = None,
     year: int | None = None,
 ) -> dict:
-    """Set or update the user's monthly financial plan.
-
-    ``expected_income`` is how much the user expects to earn this month and
-    ``minimum_savings_goal`` is the minimum they plan to save. Either can be
-    omitted to keep the existing value. Defaults to the current month. Use
-    this when the user tells you their monthly income or savings target.
-    """
+    """Set a monthly budget for one expense category."""
     user_id = get_current_user_id()
     session = get_db_session()
-    service = MonthlyPlanService(session)
     window = current_month_range()
-    m = month or window.month
-    y = year or window.year
+    category_row = await CategoryRepository(session).find_by_name(user_id, category, "expense")
+    if category_row is None:
+        return {"status": "error", "message": f"Expense category '{category}' not found."}
     try:
-        return await service.set_plan(
+        return await BudgetService(session).set_budget(
             user_id,
-            month=m,
-            year=y,
-            expected_income=expected_income,
-            minimum_savings_goal=minimum_savings_goal,
+            category_id=category_row.id,
+            budgeted_amount=amount_to_minor(budgeted_amount),
+            month=month or window.month,
+            year=year or window.year,
         )
     except ValueError as exc:
         return {"status": "error", "message": str(exc)}
