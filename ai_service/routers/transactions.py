@@ -10,7 +10,6 @@ from ai_service.core.rate_limit import limiter
 from ai_service.db.session import get_async_session
 from ai_service.schemas.financial import TransactionCreate, TransactionListResponse, TransactionResponse, TransactionUpdate
 from ai_service.services.transaction_service import (
-    AccountReferenceError,
     CategoryNotFoundError,
     PayeeReferenceError,
     TransactionNotFoundError,
@@ -26,7 +25,7 @@ settings = get_settings()
 async def create_transaction(request: Request, response: Response, body: TransactionCreate, session: AsyncSession = Depends(get_async_session), current_user: CurrentUser = Depends(get_current_user)):
     try:
         return await TransactionService(session).add_transaction(current_user.id, **body.model_dump())
-    except (ValueError, AccountReferenceError, CategoryNotFoundError, PayeeReferenceError) as exc:
+    except (ValueError, CategoryNotFoundError, PayeeReferenceError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
@@ -35,10 +34,9 @@ async def create_transaction(request: Request, response: Response, body: Transac
 async def list_transactions(
     request: Request,
     response: Response,
-    account_id: UUID | None = None,
     category_id: UUID | None = None,
     payee_id: UUID | None = None,
-    transaction_type: str | None = Query(None, pattern="^(expense|income|starting_balance|transfer)$"),
+    transaction_type: str | None = Query(None, pattern="^(expense|income|starting_balance)$"),
     cleared_status: str | None = Query(None, pattern="^(pending|cleared)$"),
     date_from: date | None = None,
     date_to: date | None = None,
@@ -50,7 +48,6 @@ async def list_transactions(
 ):
     return await TransactionService(session).list_transactions(
         current_user.id,
-        account_id=account_id,
         category_id=category_id,
         payee_id=payee_id,
         transaction_type=transaction_type,
@@ -80,7 +77,7 @@ async def update_transaction(transaction_id: UUID, request: Request, response: R
         raise HTTPException(status_code=422, detail="No transaction fields provided")
     try:
         return await TransactionService(session).update_transaction(current_user.id, transaction_id, **data)
-    except (ValueError, AccountReferenceError, CategoryNotFoundError, PayeeReferenceError, TransactionNotFoundError) as exc:
+    except (ValueError, CategoryNotFoundError, PayeeReferenceError, TransactionNotFoundError) as exc:
         raise HTTPException(status_code=404 if isinstance(exc, TransactionNotFoundError) else 400, detail=str(exc)) from exc
 
 

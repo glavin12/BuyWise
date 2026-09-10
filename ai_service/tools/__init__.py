@@ -10,7 +10,6 @@ tool to call for which user question.
 """
 
 from ai_service.tools.calculator import calculator
-from ai_service.tools.accounts import get_accounts
 from ai_service.tools.categories import get_categories
 from ai_service.tools.dashboard import get_dashboard
 from ai_service.tools.goals import add_goal, get_financial_goals, update_goal_progress
@@ -21,7 +20,6 @@ from ai_service.tools.transactions import add_transaction, get_recent_transactio
 
 all_tools = [
     get_dashboard,
-    get_accounts,
     get_profile,
     get_recent_transactions,
     add_transaction,

@@ -7,7 +7,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai_service.models import Transaction
 from ai_service.repositories import (
-    AccountRepository,
     CategoryRepository,
     PayeeRepository,
     TransactionRepository,
@@ -24,10 +23,6 @@ class TransactionNotFoundError(LookupError):
     pass
 
 
-class AccountReferenceError(LookupError):
-    pass
-
-
 class PayeeReferenceError(LookupError):
     pass
 
@@ -36,7 +31,6 @@ class TransactionService:
     def __init__(self, session: AsyncSession):
         self.session = session
         self.transactions = TransactionRepository(session)
-        self.accounts = AccountRepository(session)
         self.categories = CategoryRepository(session)
         self.payees = PayeeRepository(session)
 
@@ -63,13 +57,13 @@ class TransactionService:
         self,
         user_id: uuid.UUID,
         *,
-        account_id: uuid.UUID,
         amount: int,
         transaction_type: str,
         category_id: uuid.UUID | None = None,
         category_name: str | None = None,
         payee_id: uuid.UUID | None = None,
         payee_name: str | None = None,
+        payment_method: str | None = None,
         currency: str | None = None,
         transaction_date: date | None = None,
         description: str | None = None,
@@ -79,9 +73,6 @@ class TransactionService:
         self._validate_amount(amount)
         if transaction_type not in {"expense", "income", "starting_balance"}:
             raise ValueError("transaction_type must be expense, income, or starting_balance")
-        account = await self.accounts.get(user_id, account_id)
-        if account is None or not account.is_active:
-            raise AccountReferenceError("Account not found")
         category = await self._resolve_category(
             user_id, category_id, category_name, transaction_type
         )
@@ -90,12 +81,12 @@ class TransactionService:
             raise CategoryNotFoundError("A category is required for expense and income transactions")
         transaction = await self.transactions.create(
             user_id,
-            account_id=account_id,
             category_id=category.id if category else None,
             payee_id=payee.id if payee else None,
             amount=amount,
-            currency=currency or account.currency,
+            currency=currency or "INR",
             transaction_type=transaction_type,
+            payment_method=payment_method,
             transaction_date=transaction_date or date.today(),
             description=description,
             notes=notes,
@@ -117,16 +108,8 @@ class TransactionService:
         current = await self.transactions.get(user_id, transaction_id)
         if current is None:
             raise TransactionNotFoundError("Transaction not found")
-        if current.transaction_type == "transfer":
-            raise ValueError("transfer rows must be changed through the transfers API")
-        if fields.get("transaction_type") == "transfer":
-            raise ValueError("use the transfers API to create transfers")
         if "amount" in fields:
             self._validate_amount(fields["amount"])
-        if "account_id" in fields:
-            account = await self.accounts.get(user_id, fields["account_id"])
-            if account is None or not account.is_active:
-                raise AccountReferenceError("Account not found")
         if "category_id" in fields and fields["category_id"] is not None:
             category = await self.categories.get(user_id, fields["category_id"])
             if category is None or not category.is_active:
@@ -138,9 +121,6 @@ class TransactionService:
         merged_category = fields.get("category_id", current.category_id)
         if merged_type in {"expense", "income"} and merged_category is None:
             raise CategoryNotFoundError("A category is required for expense and income transactions")
-        if merged_type != "transfer":
-            fields.setdefault("transfer_group_id", None)
-            fields.setdefault("transfer_direction", None)
         transaction = await self.transactions.update(user_id, transaction_id, **fields)
         await self.session.commit()
         return self._transaction_to_dict(transaction)

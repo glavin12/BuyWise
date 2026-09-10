@@ -18,6 +18,13 @@ class CategorySpend:
     transaction_count: int
 
 
+@dataclass
+class MethodSpend:
+    method: str | None
+    amount: int
+    transaction_count: int
+
+
 class TransactionRepository:
     """User-scoped ledger queries and integer-only financial aggregates."""
 
@@ -35,7 +42,6 @@ class TransactionRepository:
         return await self.session.scalar(
             select(Transaction)
             .options(
-                selectinload(Transaction.account),
                 selectinload(Transaction.category),
                 selectinload(Transaction.payee),
             )
@@ -48,7 +54,6 @@ class TransactionRepository:
         *,
         limit: int = 20,
         offset: int = 0,
-        account_id: uuid.UUID | None = None,
         category_id: uuid.UUID | None = None,
         payee_id: uuid.UUID | None = None,
         transaction_type: str | None = None,
@@ -59,14 +64,11 @@ class TransactionRepository:
         stmt = (
             select(Transaction)
             .options(
-                selectinload(Transaction.account),
                 selectinload(Transaction.category),
                 selectinload(Transaction.payee),
             )
             .where(Transaction.user_id == user_id)
         )
-        if account_id is not None:
-            stmt = stmt.where(Transaction.account_id == account_id)
         if category_id is not None:
             stmt = stmt.where(Transaction.category_id == category_id)
         if payee_id is not None:
@@ -162,44 +164,44 @@ class TransactionRepository:
             for category, amount, count in result.all()
         ]
 
-    async def get_balance(self, user_id: uuid.UUID, account_id: uuid.UUID) -> int:
+    async def get_balance(self, user_id: uuid.UUID) -> int:
+        """Single running balance for the user: income + starting balances - expenses."""
         signed_amount = case(
             (Transaction.transaction_type.in_(("income", "starting_balance")), Transaction.amount),
             (Transaction.transaction_type == "expense", -Transaction.amount),
-            (
-                Transaction.transaction_type == "transfer",
-                case((Transaction.transfer_direction == "in", Transaction.amount), else_=-Transaction.amount),
-            ),
             else_=0,
         )
         stmt = select(func.coalesce(func.sum(signed_amount), 0)).where(
             Transaction.user_id == user_id,
-            Transaction.account_id == account_id,
             Transaction.parent_transaction_id.is_(None),
         )
         return int(await self.session.scalar(stmt) or 0)
 
-    async def sum_transfer_out(self, user_id: uuid.UUID, *, start: date, end: date) -> int:
-        stmt = select(func.coalesce(func.sum(Transaction.amount), 0)).where(
-            Transaction.user_id == user_id,
-            Transaction.transaction_type == "transfer",
-            Transaction.transfer_direction == "out",
-            Transaction.transaction_date >= start,
-            Transaction.transaction_date < end,
-            Transaction.parent_transaction_id.is_(None),
-        )
-        return int(await self.session.scalar(stmt) or 0)
-
-    async def get_transfer_group(
-        self, user_id: uuid.UUID, transfer_group_id: uuid.UUID
-    ) -> list[Transaction]:
-        result = await self.session.scalars(
-            select(Transaction).where(
+    async def sum_by_payment_method(
+        self,
+        user_id: uuid.UUID,
+        *,
+        transaction_type: str,
+        start: date,
+        end: date,
+    ) -> list[MethodSpend]:
+        stmt = (
+            select(Transaction.payment_method, func.sum(Transaction.amount), func.count(Transaction.id))
+            .where(
                 Transaction.user_id == user_id,
-                Transaction.transfer_group_id == transfer_group_id,
+                Transaction.transaction_type == transaction_type,
+                Transaction.transaction_date >= start,
+                Transaction.transaction_date < end,
+                Transaction.parent_transaction_id.is_(None),
             )
+            .group_by(Transaction.payment_method)
+            .order_by(func.sum(Transaction.amount).desc())
         )
-        return list(result)
+        result = await self.session.execute(stmt)
+        return [
+            MethodSpend(method=method, amount=int(amount or 0), transaction_count=int(count))
+            for method, amount, count in result.all()
+        ]
 
     async def top_payees(
         self,

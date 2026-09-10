@@ -1,12 +1,10 @@
 from datetime import date
-from uuid import UUID
 
 from langchain_core.tools import tool
 
 from ai_service.core.context import get_current_user_id, get_db_session
-from ai_service.repositories import AccountRepository, CategoryRepository
+from ai_service.repositories import CategoryRepository
 from ai_service.services.transaction_service import (
-    AccountReferenceError,
     CategoryNotFoundError,
     PayeeReferenceError,
     TransactionService,
@@ -21,7 +19,7 @@ async def get_recent_transactions(
     category: str | None = None,
     transaction_type: str | None = None,
 ) -> dict:
-    """List recent user transactions with account, payee, category, and date."""
+    """List recent user transactions with payee, category, payment method, and date."""
     user_id = get_current_user_id()
     session = get_db_session()
     category_id = None
@@ -46,7 +44,7 @@ async def add_transaction(
     amount: float,
     category: str,
     transaction_type: str = "expense",
-    account_id: str | None = None,
+    payment_method: str | None = None,
     payee: str | None = None,
     description: str | None = None,
     notes: str | None = None,
@@ -56,27 +54,24 @@ async def add_transaction(
     """Record an expense, income, or starting balance in minor-unit storage.
 
     Amounts are supplied as normal currency values and converted exactly before
-    persistence. The first active account is used when account_id is omitted.
+    persistence. payment_method, when known, is one of cash, upi, bank_transfer,
+    card, or other.
     """
     user_id = get_current_user_id()
     session = get_db_session()
-    accounts = AccountRepository(session)
     try:
-        account = await accounts.get_default(user_id) if account_id is None else await accounts.get(user_id, UUID(account_id))
-        if account is None:
-            return {"status": "error", "message": "No active account is available."}
         parsed_date = date.fromisoformat(transaction_date) if transaction_date else date.today()
         return await TransactionService(session).add_transaction(
             user_id,
-            account_id=account.id,
             amount=amount_to_minor(amount),
             category_name=category,
             transaction_type=transaction_type,
+            payment_method=payment_method,
             payee_name=payee,
             description=description,
             notes=notes,
             transaction_date=parsed_date,
             cleared_status=cleared_status,
         )
-    except (ValueError, AccountReferenceError, CategoryNotFoundError, PayeeReferenceError) as exc:
+    except (ValueError, CategoryNotFoundError, PayeeReferenceError) as exc:
         return {"status": "error", "message": str(exc)}
