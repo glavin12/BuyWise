@@ -15,3 +15,16 @@ async def test_categories_and_accounts_api_use_authenticated_owner(api_client, s
     assert categories.json()["count"] == 20
     assert accounts.status_code == 200
     assert accounts.json()["accounts"][0]["name"] == "Cash"
+
+
+@pytest.mark.asyncio
+async def test_account_create_bootstraps_a_user_without_a_profile(api_client):
+    client, _ = api_client
+
+    response = await client.post(
+        "/api/v1/accounts",
+        json={"name": "Savings", "account_type": "savings"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["name"] == "Savings"

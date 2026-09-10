@@ -41,6 +41,11 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 @layer utilities {
+  /* DESIGN.md §4: tabular figures on every number */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+
   .glass {
     @apply bg-surface/80 backdrop-blur-md border border-border/50 shadow-sm;
   }
@@ -52,7 +57,14 @@ h1, h2, h3, h4, h5, h6 {
   .text-balance {
     text-wrap: balance;
   }
+
+  /* Safe area for mobile bottom tab bar */
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
 }
+
+/* ── Animations ────────────────────────────────────────────────── */
 
 @keyframes fade-in {
   from {
@@ -76,4 +88,36 @@ h1, h2, h3, h4, h5, h6 {
 
 .animate-pulse-soft {
   animation: pulse-soft 1.5s ease-in-out infinite;
+}
+
+/* ── Scrollbar styling ─────────────────────────────────────────── */
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #27272A;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #3f3f46;
+}
+
+/* ── Form elements ─────────────────────────────────────────────── */
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  cursor: pointer;
+}
+
+select option {
+  background: #0A0A0A;
+  color: #F4F4F5;
 }

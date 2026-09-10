@@ -1,66 +1,68 @@
+/**
+ * Dashboard — DESIGN.md §5.1
+ *
+ * The Monarch-style "everything at a glance" screen.
+ * 1. Header row: total balance, month switcher, quick-add
+ * 2. Three stat cards: Income, Expenses, Left to Spend
+ * 3. Budget snapshot: top 3-5 categories closest to limit
+ * 4. Recent transactions: 5-8 rows using TransactionRow compact
+ * 5. Goals strip: horizontal scroll of progress cards
+ *
+ * Empty state: "Add your first transaction" with quick-add button per §5.1.
+ */
 "use client";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
-  MessageSquare,
-  ArrowRight,
   TrendingDown,
   TrendingUp,
-  Target,
   Wallet,
+  ArrowRight,
+  Target,
   Receipt,
   PiggyBank,
-  ArrowUpRight,
-  ArrowDownRight,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { AmountText } from "@/components/ui/amount-text";
+import { TransactionRow } from "@/components/ui/transaction-row";
+import { ProgressBar } from "@/components/ui/progress-bar";
+import { ProgressRing } from "@/components/ui/progress-ring";
+import { MonthSwitcher } from "@/components/ui/month-switcher";
+import { EmptyState } from "@/components/ui/empty-state";
 import { api } from "@/lib/api";
-import type { Conversation, DashboardData, Goal, Transaction } from "@/lib/types";
-
-function formatCurrency(amount: number, currency = "INR") {
-  const locales: Record<string, string> = {
-    INR: "en-IN",
-    USD: "en-US",
-    EUR: "de-DE",
-    GBP: "en-GB",
-  };
-  try {
-    return new Intl.NumberFormat(locales[currency] || "en-US", {
-      style: "currency",
-      currency,
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(amount);
-  } catch {
-    return `${currency} ${amount.toLocaleString("en-US", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })}`;
-  }
-}
+import { formatCurrency } from "@/lib/format";
+import type { DashboardData, Goal, Transaction, Budget } from "@/lib/types";
 
 export default function DashboardPage() {
-  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const now = new Date();
+  const [month, setMonth] = useState(now.getMonth() + 1);
+  const [year, setYear] = useState(now.getFullYear());
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [budgets, setBudgets] = useState<Budget[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const isCurrentMonth =
+    month === now.getMonth() + 1 && year === now.getFullYear();
+  const period = isCurrentMonth ? "this_month" : "last_month";
 
   useEffect(() => {
     const load = async () => {
+      setLoading(true);
       try {
-        const [convData, dashData, goalsData, txData] = await Promise.allSettled([
-          api.listConversations(5),
-          api.getDashboard(),
-          api.getGoals(),
-          api.getTransactions(8),
+        const [dashRes, goalsRes, txRes, budgetRes] = await Promise.allSettled([
+          api.getDashboard(period),
+          api.listGoals("active"),
+          api.listTransactions({ limit: 8, period }),
+          api.getMonthBudgets(year, month),
         ]);
-        if (convData.status === "fulfilled") setConversations(convData.value);
-        if (dashData.status === "fulfilled") setDashboard(dashData.value);
-        if (goalsData.status === "fulfilled") setGoals(goalsData.value.goals);
-        if (txData.status === "fulfilled") setTransactions(txData.value.transactions);
+        if (dashRes.status === "fulfilled") setDashboard(dashRes.value);
+        if (goalsRes.status === "fulfilled") setGoals(goalsRes.value.goals);
+        if (txRes.status === "fulfilled") setTransactions(txRes.value.transactions);
+        if (budgetRes.status === "fulfilled") setBudgets(budgetRes.value.budgets);
       } catch (err) {
         console.error("Failed to load dashboard:", err);
       } finally {
@@ -68,195 +70,233 @@ export default function DashboardPage() {
       }
     };
     load();
-  }, []);
+  }, [month, year, period]);
 
   const currency = dashboard?.currency || "INR";
-  const remainingLabel = dashboard
-    ? dashboard.has_plan
-      ? "Planned Remaining"
-      : "Logged Savings"
-    : "Remaining";
-  const remainingValue = dashboard?.has_plan
-    ? dashboard.current_balance
-    : dashboard?.actual_savings ?? 0;
+
+  // Total balance across all accounts
+  const totalBalance =
+    dashboard?.account_balances?.reduce((sum, a) => sum + a.display_balance, 0) ?? 0;
+
+  // Top budget categories closest to limit (sorted by percent_used desc)
+  const topBudgets = [...budgets]
+    .filter((b) => b.percent_used !== null)
+    .sort((a, b) => (b.percent_used ?? 0) - (a.percent_used ?? 0))
+    .slice(0, 5);
+
+  // Empty state check
+  const isEmpty = !loading && transactions.length === 0 && !dashboard?.total_spent;
+
+  if (isEmpty) {
+    return (
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <EmptyState
+            icon={<Receipt className="w-7 h-7" />}
+            title="Add your first transaction to see your spending here"
+            description="Use the + Add Transaction button in the sidebar or ask the AI chat to add one for you."
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex-1 overflow-y-auto">
+    <div className="flex-1 overflow-y-auto pb-20 sm:pb-0">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <h1 className="text-2xl font-semibold text-primary">
-            Dashboard
-          </h1>
-          <p className="text-sm text-muted mt-1">
-            Your financial overview at a glance
-          </p>
+        {/* §5.1.1 Header row: total balance, month switcher */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+          <div>
+            <h1 className="text-2xl font-semibold text-zinc-100">Dashboard</h1>
+            <div className="flex items-center gap-3 mt-1">
+              <span className="text-sm text-zinc-500">Total Balance</span>
+              {loading ? (
+                <div className="h-6 bg-zinc-800 rounded w-28 animate-pulse-soft" />
+              ) : (
+                <AmountText
+                  amount={totalBalance}
+                  currency={currency}
+                  context="balance"
+                  size="lg"
+                />
+              )}
+            </div>
+          </div>
+          <MonthSwitcher month={month} year={year} onChange={(m, y) => { setMonth(m); setYear(y); }} />
         </div>
 
-        {/* Stat Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <StatCard
-            icon={<Wallet className="w-5 h-5" />}
-            label={remainingLabel}
-            value={loading ? null : formatCurrency(remainingValue, currency)}
-            color="text-accent"
-            bg="bg-accent/10"
-          />
+        {/* §5.1.2 Three stat cards: Income, Expenses, Left to Spend */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
           <StatCard
             icon={<TrendingUp className="w-5 h-5" />}
             label="Income"
-            value={loading ? null : formatCurrency(dashboard?.total_income_received ?? 0, currency)}
-            color="text-success"
-            bg="bg-success/10"
+            loading={loading}
+            amount={dashboard?.display_total_income ?? 0}
+            currency={currency}
+            context="income"
+            bg="bg-emerald-500/10"
+            iconColor="text-emerald-400"
           />
           <StatCard
             icon={<TrendingDown className="w-5 h-5" />}
-            label="Spent"
-            value={loading ? null : formatCurrency(dashboard?.total_spent ?? 0, currency)}
-            color="text-error"
-            bg="bg-error/10"
+            label="Expenses"
+            loading={loading}
+            amount={dashboard?.display_total_spent ?? 0}
+            currency={currency}
+            context="neutral"
+            bg="bg-zinc-800"
+            iconColor="text-zinc-400"
           />
           <StatCard
-            icon={<PiggyBank className="w-5 h-5" />}
-            label="Savings"
-            value={loading ? null : formatCurrency(dashboard?.actual_savings ?? 0, currency)}
-            color="text-warning"
-            bg="bg-warning/10"
+            icon={<Wallet className="w-5 h-5" />}
+            label="Left to Spend"
+            loading={loading}
+            amount={dashboard?.display_net ?? 0}
+            currency={currency}
+            context="balance"
+            bg="bg-blue-500/10"
+            iconColor="text-blue-400"
           />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Goals */}
+          {/* §5.1.3 Budget snapshot */}
           <Card className="lg:col-span-1">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="font-semibold text-primary flex items-center gap-2">
-                <Target className="w-4 h-4 text-accent" />
-                Goals
+              <h2 className="font-medium text-zinc-100 flex items-center gap-2">
+                <PiggyBank className="w-4 h-4 text-emerald-400" />
+                Budget
               </h2>
-              <span className="text-xs text-muted">
-                {goals.length} active
-              </span>
+              <Link href="/budget">
+                <Button variant="ghost" size="sm">
+                  See full budget <ArrowRight className="w-3.5 h-3.5 ml-1" />
+                </Button>
+              </Link>
             </div>
 
             {loading ? (
               <div className="space-y-4">
                 {[1, 2, 3].map((i) => (
                   <div key={i} className="space-y-2">
-                    <div className="h-4 bg-surface-hover rounded w-3/4 animate-pulse-soft" />
-                    <div className="h-2 bg-surface-hover rounded animate-pulse-soft" />
+                    <div className="h-4 bg-zinc-800 rounded w-3/4 animate-pulse-soft" />
+                    <div className="h-2 bg-zinc-800 rounded animate-pulse-soft" />
                   </div>
                 ))}
               </div>
-            ) : goals.length === 0 ? (
+            ) : topBudgets.length === 0 ? (
               <div className="text-center py-6">
-                <Target className="w-8 h-8 text-muted mx-auto mb-2" />
-                <p className="text-sm text-muted">No goals yet</p>
-                <p className="text-xs text-muted mt-1">
-                  Ask the AI to set a financial goal
-                </p>
+                <PiggyBank className="w-7 h-7 text-zinc-600 mx-auto mb-2" />
+                <p className="text-sm text-zinc-500">No budgets set</p>
+                <Link href="/budget">
+                  <Button variant="ghost" size="sm" className="mt-2">
+                    Set your first budget
+                  </Button>
+                </Link>
               </div>
             ) : (
               <div className="space-y-4">
-                {goals.slice(0, 4).map((goal) => (
-                  <GoalItem key={goal.id} goal={goal} currency={currency} />
+                {topBudgets.map((b) => (
+                  <div key={b.id} className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-zinc-300 truncate">
+                        {b.category || "Uncategorized"}
+                      </span>
+                      <span className="text-xs text-zinc-500 tabular-nums">
+                        {formatCurrency(b.display_spent ?? 0, currency)} / {formatCurrency(b.display_budgeted_amount, currency)}
+                      </span>
+                    </div>
+                    <ProgressBar value={b.percent_used ?? 0} size="sm" />
+                  </div>
                 ))}
               </div>
             )}
           </Card>
 
-          {/* Transactions */}
+          {/* §5.1.4 Recent transactions — TransactionRow compact */}
           <Card className="lg:col-span-2">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="font-semibold text-primary flex items-center gap-2">
-                <Receipt className="w-4 h-4 text-accent" />
+              <h2 className="font-medium text-zinc-100 flex items-center gap-2">
+                <Receipt className="w-4 h-4 text-emerald-400" />
                 Recent Transactions
               </h2>
-              <span className="text-xs text-muted">
-                {transactions.length} recent
-              </span>
+              <Link href="/transactions">
+                <Button variant="ghost" size="sm">
+                  View all <ArrowRight className="w-3.5 h-3.5 ml-1" />
+                </Button>
+              </Link>
             </div>
 
             {loading ? (
               <div className="space-y-3">
                 {[1, 2, 3, 4, 5].map((i) => (
                   <div key={i} className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-surface-hover rounded-lg animate-pulse-soft" />
+                    <div className="w-8 h-8 bg-zinc-800 rounded-lg animate-pulse-soft" />
                     <div className="flex-1 space-y-1.5">
-                      <div className="h-4 bg-surface-hover rounded w-1/3 animate-pulse-soft" />
-                      <div className="h-3 bg-surface-hover rounded w-1/4 animate-pulse-soft" />
+                      <div className="h-4 bg-zinc-800 rounded w-1/3 animate-pulse-soft" />
+                      <div className="h-3 bg-zinc-800 rounded w-1/4 animate-pulse-soft" />
                     </div>
-                    <div className="h-4 bg-surface-hover rounded w-16 animate-pulse-soft" />
+                    <div className="h-4 bg-zinc-800 rounded w-16 animate-pulse-soft" />
                   </div>
                 ))}
               </div>
             ) : transactions.length === 0 ? (
               <div className="text-center py-6">
-                <Receipt className="w-8 h-8 text-muted mx-auto mb-2" />
-                <p className="text-sm text-muted">No transactions yet</p>
-                <p className="text-xs text-muted mt-1">
-                  Try the AI chat to add transactions
-                </p>
+                <Receipt className="w-7 h-7 text-zinc-600 mx-auto mb-2" />
+                <p className="text-sm text-zinc-500">No transactions yet</p>
               </div>
             ) : (
-              <div className="space-y-1">
+              <div className="space-y-0.5">
                 {transactions.map((tx) => (
-                  <TransactionItem key={tx.id} tx={tx} currency={currency} />
+                  <TransactionRow
+                    key={tx.id}
+                    transaction={tx}
+                    variant="compact"
+                    currency={currency}
+                  />
                 ))}
               </div>
             )}
           </Card>
         </div>
 
-        {/* Recent Conversations */}
-        <Card className="mt-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-primary flex items-center gap-2">
-              <MessageSquare className="w-4 h-4 text-accent" />
-              Recent Conversations
-            </h2>
-            <Link href="/chat">
-              <Button variant="ghost" size="sm">
-                View All <ArrowRight className="w-4 h-4 ml-1" />
-              </Button>
-            </Link>
-          </div>
-
-          {loading ? (
-            <div className="space-y-3">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="h-12 bg-surface-hover rounded-lg animate-pulse-soft" />
-              ))}
-            </div>
-          ) : conversations.length === 0 ? (
-            <div className="text-center py-6">
-              <MessageSquare className="w-8 h-8 text-muted mx-auto mb-2" />
-              <p className="text-sm text-muted mb-3">No conversations yet</p>
-              <Link href="/chat">
-                <Button size="sm">Start a Chat</Button>
+        {/* §5.1.5 Goals strip — only shown if goals exist */}
+        {goals.length > 0 && (
+          <Card className="mt-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-medium text-zinc-100 flex items-center gap-2">
+                <Target className="w-4 h-4 text-emerald-400" />
+                Goals
+              </h2>
+              <Link href="/goals">
+                <Button variant="ghost" size="sm">
+                  View all <ArrowRight className="w-3.5 h-3.5 ml-1" />
+                </Button>
               </Link>
             </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {conversations.map((conv) => (
-                <Link
-                  key={conv.id}
-                  href={`/chat/${conv.id}`}
-                  className="flex items-center gap-3 p-3 rounded-lg border border-border hover:border-accent/30 hover:bg-surface-hover transition-all duration-200 group"
+            <div className="flex gap-4 overflow-x-auto pb-2 -mx-1 px-1">
+              {goals.slice(0, 6).map((goal) => (
+                <div
+                  key={goal.id}
+                  className="flex-shrink-0 flex items-center gap-3 p-3 bg-zinc-900 border border-zinc-800 rounded-xl min-w-[200px]"
                 >
-                  <MessageSquare className="w-4 h-4 text-muted flex-shrink-0 group-hover:text-accent transition-colors" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-primary truncate">
-                      {conv.title || "New conversation"}
+                  <ProgressRing value={goal.progress_percent} size={48} strokeWidth={4}>
+                    <span className="text-[10px] font-medium text-zinc-300 tabular-nums">
+                      {Math.round(goal.progress_percent)}%
+                    </span>
+                  </ProgressRing>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-zinc-100 truncate">
+                      {goal.title}
                     </p>
-                    <p className="text-xs text-muted">
-                      {conv.message_count} messages
+                    <p className="text-xs text-zinc-500 tabular-nums">
+                      {formatCurrency(goal.display_current_amount, currency)} / {formatCurrency(goal.display_target_amount, currency)}
                     </p>
                   </div>
-                  <ArrowRight className="w-4 h-4 text-muted group-hover:text-accent transition-colors" />
-                </Link>
+                </div>
               ))}
             </div>
-          )}
-        </Card>
+          </Card>
+        )}
       </div>
     </div>
   );
@@ -265,89 +305,42 @@ export default function DashboardPage() {
 function StatCard({
   icon,
   label,
-  value,
-  color,
+  loading,
+  amount,
+  currency,
+  context,
   bg,
+  iconColor,
 }: {
   icon: React.ReactNode;
   label: string;
-  value: string | null;
-  color: string;
+  loading: boolean;
+  amount: number;
+  currency: string;
+  context: "income" | "neutral" | "balance";
   bg: string;
+  iconColor: string;
 }) {
   return (
     <Card>
       <div className="flex items-center gap-3">
-        <div className={`w-10 h-10 ${bg} rounded-lg flex items-center justify-center`}>
-          <span className={color}>{icon}</span>
+        <div className={`w-10 h-10 ${bg} rounded-lg flex items-center justify-center flex-shrink-0`}>
+          <span className={iconColor}>{icon}</span>
         </div>
         <div className="min-w-0">
-          <p className="text-xs text-muted">{label}</p>
-          {value === null ? (
-            <div className="h-6 bg-surface-hover rounded w-24 animate-pulse-soft mt-0.5" />
+          <p className="text-xs text-zinc-500">{label}</p>
+          {loading ? (
+            <div className="h-6 bg-zinc-800 rounded w-24 animate-pulse-soft mt-0.5" />
           ) : (
-            <p className="text-lg font-semibold text-primary truncate">{value}</p>
+            <AmountText
+              amount={amount}
+              currency={currency}
+              context={context}
+              size="lg"
+            />
           )}
         </div>
       </div>
     </Card>
-  );
-}
-
-function GoalItem({ goal, currency }: { goal: Goal; currency: string }) {
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <p className="text-sm font-medium text-primary truncate">{goal.title}</p>
-        <span className="text-xs text-accent font-medium">{goal.progress_percent}%</span>
-      </div>
-      <div className="w-full h-2 bg-surface-hover rounded-full overflow-hidden">
-        <div
-          className="h-full bg-accent rounded-full transition-all duration-500"
-          style={{ width: `${Math.min(goal.progress_percent, 100)}%` }}
-        />
-      </div>
-      <div className="flex items-center justify-between text-xs text-muted">
-        <span>{formatCurrency(goal.current_amount, currency)}</span>
-        <span>{formatCurrency(goal.target_amount, currency)}</span>
-      </div>
-    </div>
-  );
-}
-
-function TransactionItem({ tx, currency }: { tx: Transaction; currency: string }) {
-  const isExpense = tx.type === "expense";
-  return (
-    <div className="flex items-center gap-3 py-2.5 border-b border-border/50 last:border-0">
-      <div className={`w-9 h-9 rounded-lg flex items-center justify-center text-sm ${
-        isExpense ? "bg-error/10 text-error" : "bg-success/10 text-success"
-      }`}>
-        {isExpense ? (
-          <ArrowDownRight className="w-4 h-4" />
-        ) : (
-          <ArrowUpRight className="w-4 h-4" />
-        )}
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-primary truncate">{tx.title}</p>
-        <p className="text-xs text-muted">
-          {tx.category || "Uncategorized"}
-          {tx.merchant_name ? ` \u00B7 ${tx.merchant_name}` : ""}
-        </p>
-      </div>
-      <div className="text-right">
-        <p className={`text-sm font-medium ${isExpense ? "text-error" : "text-success"}`}>
-          {isExpense ? "-" : "+"}{formatCurrency(tx.amount, currency)}
-        </p>
-        {tx.transaction_date && (
-          <p className="text-xs text-muted">
-            {new Date(tx.transaction_date).toLocaleDateString("en-IN", {
-              day: "numeric",
-              month: "short",
-            })}
-          </p>
-        )}
-      </div>
-    </div>
   );
 }

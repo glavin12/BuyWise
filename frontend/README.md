@@ -18,7 +18,8 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 Before starting the app, copy `.env.example` to `.env.local` and set the
 Supabase URL and publishable key. Keep `NEXT_PUBLIC_API_URL` pointed at the
-running FastAPI service.
+running FastAPI service. For the default local Uvicorn listener, use
+`http://127.0.0.1:8000` rather than `localhost`.
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 

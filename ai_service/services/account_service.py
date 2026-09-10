@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai_service.models import Account
 from ai_service.repositories import AccountRepository, TransactionRepository
+from ai_service.services.profile_service import ProfileService
 from ai_service.utils.financial import minor_to_amount
 
 
@@ -19,6 +20,7 @@ class AccountService:
         self.session = session
         self.accounts = AccountRepository(session)
         self.transactions = TransactionRepository(session)
+        self.profiles = ProfileService(session)
 
     async def create_account(
         self,
@@ -32,6 +34,7 @@ class AccountService:
         self._validate_name(name)
         if starting_balance is not None and starting_balance < 0:
             raise ValueError("starting_balance must be non-negative")
+        await self.profiles.ensure_profile(user_id)
         account = await self.accounts.create(
             user_id, name=name, account_type=account_type, currency=currency
         )
