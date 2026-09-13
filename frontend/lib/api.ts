@@ -1,9 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
 import type {
-  Account,
-  AccountCreate,
-  AccountListResponse,
-  AccountUpdate,
   Budget,
   BudgetCreate,
   BudgetMonthResponse,
@@ -28,13 +24,12 @@ import type {
   PayeeCreate,
   PayeeListResponse,
   PayeeUpdate,
+  PaymentMethodSpending,
   ProfileUpdate,
   Transaction,
   TransactionCreate,
   TransactionsResponse,
   TransactionUpdate,
-  TransferCreate,
-  TransferResponse,
   UserProfile,
 } from "./types";
 
@@ -121,31 +116,6 @@ export const api = {
   getDashboard: (period = "this_month") =>
     fetchAPI<DashboardData>(`/api/v1/dashboard?period=${period}`),
 
-  // ── Accounts ───────────────────────────────────────────────────
-  listAccounts: () =>
-    fetchAPI<AccountListResponse>("/api/v1/accounts"),
-
-  getAccount: (id: string) =>
-    fetchAPI<Account>(`/api/v1/accounts/${id}`),
-
-  createAccount: (data: AccountCreate) =>
-    fetchAPI<Account>("/api/v1/accounts", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
-
-  updateAccount: (id: string, data: AccountUpdate) =>
-    fetchAPI<Account>(`/api/v1/accounts/${id}`, {
-      method: "PATCH",
-      body: JSON.stringify(data),
-    }),
-
-  deleteAccount: (id: string) =>
-    fetchAPI<{ status: string; account_id: string }>(
-      `/api/v1/accounts/${id}`,
-      { method: "DELETE" }
-    ),
-
   // ── Categories ─────────────────────────────────────────────────
   listCategories: (type?: "expense" | "income") => {
     const params = new URLSearchParams();
@@ -204,7 +174,6 @@ export const api = {
 
   // ── Transactions ───────────────────────────────────────────────
   listTransactions: (params: {
-    account_id?: string;
     category_id?: string;
     payee_id?: string;
     transaction_type?: string;
@@ -216,7 +185,6 @@ export const api = {
     offset?: number;
   } = {}) => {
     const qs = new URLSearchParams();
-    if (params.account_id) qs.set("account_id", params.account_id);
     if (params.category_id) qs.set("category_id", params.category_id);
     if (params.payee_id) qs.set("payee_id", params.payee_id);
     if (params.transaction_type) qs.set("transaction_type", params.transaction_type);
@@ -249,19 +217,6 @@ export const api = {
   deleteTransaction: (id: string) =>
     fetchAPI<{ status: string; transaction_id: string }>(
       `/api/v1/transactions/${id}`,
-      { method: "DELETE" }
-    ),
-
-  // ── Transfers ──────────────────────────────────────────────────
-  createTransfer: (data: TransferCreate) =>
-    fetchAPI<TransferResponse>("/api/v1/transfers", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
-
-  deleteTransfer: (groupId: string) =>
-    fetchAPI<{ status: string; transfer_group_id: string }>(
-      `/api/v1/transfers/${groupId}`,
       { method: "DELETE" }
     ),
 
@@ -317,6 +272,11 @@ export const api = {
   categoryAnalytics: (month: number, year: number) =>
     fetchAPI<CategorySpending[]>(
       `/api/v1/analytics/categories?month=${month}&year=${year}`
+    ),
+
+  paymentMethodAnalytics: (month: number, year: number) =>
+    fetchAPI<PaymentMethodSpending[]>(
+      `/api/v1/analytics/payment-methods?month=${month}&year=${year}`
     ),
 
   comparisonAnalytics: (

@@ -27,38 +27,16 @@ export interface ProfileUpdate {
   budget_alerts?: boolean;
 }
 
-// ── Accounts ────────────────────────────────────────────────────
+// ── Payment methods ─────────────────────────────────────────────
+// Multi-account model was removed; each transaction is tagged with an
+// optional payment method instead. Balance is a single ledger-derived value.
 
-export type AccountType = "checking" | "savings" | "cash" | "credit_card";
-
-export interface Account {
-  id: string;
-  name: string;
-  account_type: AccountType;
-  currency: string;
-  is_active: boolean;
-  balance: number;
-  display_balance: number;
-  created_at: string | null;
-  updated_at: string | null;
-}
-
-export interface AccountCreate {
-  name: string;
-  account_type: AccountType;
-  currency?: string;
-  starting_balance?: number | null;
-}
-
-export interface AccountUpdate {
-  name?: string;
-  account_type?: AccountType;
-  currency?: string;
-}
-
-export interface AccountListResponse {
-  accounts: Account[];
-}
+export type PaymentMethod =
+  | "cash"
+  | "upi"
+  | "bank_transfer"
+  | "card"
+  | "other";
 
 // ── Categories ──────────────────────────────────────────────────
 
@@ -119,13 +97,10 @@ export interface PayeeListResponse {
 // ── Transactions ────────────────────────────────────────────────
 
 export type TransactionType = "expense" | "income" | "starting_balance";
-export type FullTransactionType = "expense" | "income" | "transfer" | "starting_balance";
 export type ClearedStatus = "pending" | "cleared";
 
 export interface Transaction {
   id: string;
-  account_id: string;
-  account: string | null;
   category_id: string | null;
   category: string | null;
   category_icon: string | null;
@@ -134,26 +109,25 @@ export interface Transaction {
   amount: number;
   display_amount: number;
   currency: string;
-  transaction_type: FullTransactionType;
+  transaction_type: TransactionType;
+  payment_method: PaymentMethod | null;
   transaction_date: string;
   description: string | null;
   notes: string | null;
   cleared_status: ClearedStatus;
-  transfer_group_id: string | null;
-  transfer_direction: string | null;
   parent_transaction_id: string | null;
   created_at: string | null;
   updated_at: string | null;
 }
 
 export interface TransactionCreate {
-  account_id: string;
   category_id?: string | null;
   payee_id?: string | null;
   payee_name?: string | null;
   amount: number;
   currency?: string | null;
   transaction_type: TransactionType;
+  payment_method?: PaymentMethod | null;
   transaction_date?: string;
   description?: string | null;
   notes?: string | null;
@@ -161,12 +135,12 @@ export interface TransactionCreate {
 }
 
 export interface TransactionUpdate {
-  account_id?: string;
   category_id?: string | null;
   payee_id?: string | null;
   amount?: number;
   currency?: string | null;
   transaction_type?: TransactionType;
+  payment_method?: PaymentMethod | null;
   transaction_date?: string;
   description?: string | null;
   notes?: string | null;
@@ -180,25 +154,6 @@ export interface TransactionsResponse {
   limit: number;
   offset: number;
   transactions: Transaction[];
-}
-
-// ── Transfers ───────────────────────────────────────────────────
-
-export interface TransferCreate {
-  from_account_id: string;
-  to_account_id: string;
-  amount: number;
-  transaction_date?: string;
-  description?: string | null;
-}
-
-export interface TransferResponse {
-  transfer_group_id: string;
-  amount: number;
-  from_account_id: string;
-  to_account_id: string;
-  transaction_date: string;
-  description: string | null;
 }
 
 // ── Budgets ─────────────────────────────────────────────────────
@@ -295,7 +250,6 @@ export interface MonthlySummary {
   year: number;
   income: number;
   expenses: number;
-  transfers: number;
   net: number;
 }
 
@@ -304,6 +258,14 @@ export interface CategorySpending {
   category: string;
   icon: string | null;
   color: string | null;
+  amount: number;
+  display_amount: number;
+  transaction_count: number;
+  percent_of_total: number;
+}
+
+export interface PaymentMethodSpending {
+  payment_method: string | null;
   amount: number;
   display_amount: number;
   transaction_count: number;
@@ -323,7 +285,8 @@ export interface DashboardData {
   month: string;
   year: number;
   currency: string;
-  account_balances: Account[];
+  current_balance: number;
+  display_current_balance: number;
   active_goals_count: number;
   total_income: number;
   display_total_income: number;

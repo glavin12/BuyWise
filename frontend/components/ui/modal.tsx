@@ -65,13 +65,13 @@ export function Modal({
       }}
     >
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
 
       {/* Panel — full-width sheet on mobile, centered dialog on desktop */}
       <div
         className={cn(
-          "relative w-full bg-zinc-950 border border-zinc-800 shadow-2xl animate-fade-in",
-          "sm:rounded-xl rounded-t-xl sm:mx-4",
+          "relative w-full bg-surface border border-border shadow-2xl animate-fade-in",
+          "sm:rounded-[18px] rounded-t-[18px] sm:mx-4",
           "max-h-[90vh] overflow-y-auto",
           sizeClass,
           className
@@ -79,11 +79,11 @@ export function Modal({
       >
         {/* Header */}
         {title && (
-          <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800">
-            <h2 className="text-base font-semibold text-zinc-100">{title}</h2>
+          <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+            <h2 className="serif text-xl text-primary">{title}</h2>
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-zinc-100 transition-colors cursor-pointer"
+              className="p-1.5 rounded-lg hover:bg-surface-hover text-secondary hover:text-primary transition-colors cursor-pointer"
               aria-label="Close"
             >
               <X className="w-4 h-4" />

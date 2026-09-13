@@ -37,13 +37,13 @@ export default function LoginPage() {
   };
 
   return (
-    <Card variant="elevated" className="w-full max-w-md">
+    <Card className="w-full max-w-md">
       <div className="space-y-6">
         <div className="text-center">
-          <h1 className="text-2xl font-semibold text-primary">
+          <h1 className="serif text-3xl text-primary">
             Welcome back
           </h1>
-          <p className="text-sm text-muted mt-1">
+          <p className="text-sm text-secondary mt-1">
             Sign in to your BuyWise account
           </p>
         </div>
@@ -69,21 +69,21 @@ export default function LoginPage() {
           />
 
           {error && (
-            <div className="p-3 bg-error/10 border border-error/20 rounded-lg">
-              <p className="text-sm text-error">{error}</p>
+            <div className="p-3 bg-[#FCE9E5] border border-[#F4C7BF] rounded-xl">
+              <p className="text-sm text-negative">{error}</p>
             </div>
           )}
 
           <Button type="submit" className="w-full" loading={loading}>
-            Sign In
+            Sign in
           </Button>
         </form>
 
-        <p className="text-center text-sm text-muted">
+        <p className="text-center text-sm text-secondary">
           Don&apos;t have an account?{" "}
           <Link
             href="/signup"
-            className="text-accent hover:text-accent-hover font-medium"
+            className="text-primary font-medium underline hover:opacity-70"
           >
             Sign up
           </Link>

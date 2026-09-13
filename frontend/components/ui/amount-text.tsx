@@ -4,8 +4,10 @@
  * Renders display_* values with tabular-nums. Every currency amount in the app
  * goes through this component, no exceptions.
  *
- * Color rules per §4: green for income/positive status, red ONLY for status
- * (over-budget, negative balance), neutral for expenses in lists.
+ * "Colorful cream": md/lg/hero use Instrument Serif; sm stays sans (dense rows,
+ * meta). Colour rules per §4: positive/income green (#3E7A5A), status-negative
+ * red (#B93D28), everything else primary ink. Expenses are neutral ink — the
+ * "−" sign carries the meaning, not colour.
  */
 "use client";
 
@@ -15,7 +17,13 @@ import { formatCurrency } from "@/lib/format";
 interface AmountTextProps {
   amount: number;
   currency?: string;
-  context?: "income" | "expense" | "balance" | "neutral" | "status-positive" | "status-negative";
+  context?:
+    | "income"
+    | "expense"
+    | "balance"
+    | "neutral"
+    | "status-positive"
+    | "status-negative";
   sign?: boolean;
   className?: string;
   size?: "sm" | "md" | "lg" | "hero";
@@ -34,32 +42,25 @@ export function AmountText({
 
   const colorClass =
     context === "income" || context === "status-positive"
-      ? "text-emerald-400"
+      ? "text-positive"
       : context === "status-negative"
-        ? "text-red-400"
+        ? "text-negative"
         : context === "balance" && amount < 0
-          ? "text-red-400"
-          : context === "balance"
-            ? "text-zinc-100"
-            : "text-zinc-100";
+          ? "text-negative"
+          : "text-primary";
 
   const sizeClass =
     size === "hero"
-      ? "text-[28px] font-semibold"
+      ? "serif text-[44px] leading-none"
       : size === "lg"
-        ? "text-xl font-semibold"
-        : size === "sm"
-          ? "text-xs"
-          : "text-sm font-medium";
+        ? "serif text-xl"
+        : size === "md"
+          ? "serif text-lg"
+          : "text-xs font-medium";
 
   return (
     <span
-      className={cn(
-        "tabular-nums tracking-tight",
-        colorClass,
-        sizeClass,
-        className
-      )}
+      className={cn("tabular-nums", sizeClass, colorClass, className)}
     >
       {prefix}
       {formatted}

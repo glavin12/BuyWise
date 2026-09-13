@@ -71,7 +71,7 @@ export function InlineEditableField({
     return (
       <div className={cn("inline-flex items-center", className)}>
         {prefix && (
-          <span className="text-sm text-zinc-400 mr-1">{prefix}</span>
+          <span className="text-sm text-secondary mr-1">{prefix}</span>
         )}
         <input
           ref={inputRef}
@@ -82,8 +82,8 @@ export function InlineEditableField({
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           className={cn(
-            "bg-zinc-900 border border-emerald-500/50 rounded px-2 py-1 text-sm text-zinc-100 tabular-nums",
-            "focus:outline-none focus:ring-1 focus:ring-emerald-500/50",
+            "bg-surface border border-primary/40 rounded-lg px-2 py-1 text-sm text-primary tabular-nums",
+            "focus:outline-none focus:ring-2 focus:ring-primary/20",
             "w-24",
             inputClassName
           )}
@@ -97,7 +97,7 @@ export function InlineEditableField({
     <button
       onClick={() => setEditing(true)}
       className={cn(
-        "tabular-nums cursor-pointer hover:bg-zinc-800 rounded px-1.5 py-0.5 -mx-1.5 transition-colors",
+        "tabular-nums cursor-pointer hover:bg-surface-hover rounded px-1.5 py-0.5 -mx-1.5 transition-colors",
         displayClassName,
         className
       )}

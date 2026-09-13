@@ -9,21 +9,17 @@ interface ProgressRingProps {
   value: number; // 0-100
   size?: number; // px
   strokeWidth?: number;
+  /** ring colour (hex from lib/categories). */
+  color?: string;
   className?: string;
   children?: React.ReactNode;
-}
-
-function getRingColor(percent: number): string {
-  if (percent >= 100) return "stroke-emerald-400";
-  if (percent >= 75) return "stroke-emerald-400";
-  if (percent >= 50) return "stroke-blue-400";
-  return "stroke-zinc-400";
 }
 
 export function ProgressRing({
   value,
   size = 80,
   strokeWidth = 6,
+  color = "#1B1B1B",
   className,
   children,
 }: ProgressRingProps) {
@@ -43,9 +39,8 @@ export function ProgressRing({
           cy={size / 2}
           r={radius}
           fill="none"
-          stroke="currentColor"
+          stroke="#F0E6D2"
           strokeWidth={strokeWidth}
-          className="text-zinc-800"
         />
         {/* Progress ring */}
         <circle
@@ -53,11 +48,12 @@ export function ProgressRing({
           cy={size / 2}
           r={radius}
           fill="none"
+          stroke={color}
           strokeWidth={strokeWidth}
           strokeLinecap="round"
           strokeDasharray={circumference}
           strokeDashoffset={offset}
-          className={cn("transition-all duration-700 ease-out", getRingColor(value))}
+          className="transition-all duration-700 ease-out"
         />
       </svg>
       {/* Center content */}

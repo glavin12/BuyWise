@@ -1,38 +1,23 @@
 /**
- * Dashboard — DESIGN.md §5.1
- *
- * The Monarch-style "everything at a glance" screen.
- * 1. Header row: total balance, month switcher, quick-add
- * 2. Three stat cards: Income, Expenses, Left to Spend
- * 3. Budget snapshot: top 3-5 categories closest to limit
- * 4. Recent transactions: 5-8 rows using TransactionRow compact
- * 5. Goals strip: horizontal scroll of progress cards
- *
- * Empty state: "Add your first transaction" with quick-add button per §5.1.
+ * Dashboard — colorful-cream reskin (see "Buywise backend colorful redesign"/_Dash.dc.html).
+ * Hero balance card + income/spent tiles, budget snapshot, recent transactions, goals strip.
+ * One balance, no accounts (backend dropped multi-account for a single ledger balance).
  */
 "use client";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import {
-  TrendingDown,
-  TrendingUp,
-  Wallet,
-  ArrowRight,
-  Target,
-  Receipt,
-  PiggyBank,
-} from "lucide-react";
+import { Search, Bell, Receipt } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { AmountText } from "@/components/ui/amount-text";
 import { TransactionRow } from "@/components/ui/transaction-row";
 import { ProgressBar } from "@/components/ui/progress-bar";
-import { ProgressRing } from "@/components/ui/progress-ring";
 import { MonthSwitcher } from "@/components/ui/month-switcher";
+import { FilterChip } from "@/components/ui/filter-chip";
 import { EmptyState } from "@/components/ui/empty-state";
 import { api } from "@/lib/api";
-import { formatCurrency } from "@/lib/format";
+import { categoryStyle, categoryEmoji, HUES } from "@/lib/categories";
+import { comingSoonProps } from "@/lib/coming-soon";
 import type { DashboardData, Goal, Transaction, Budget } from "@/lib/types";
 
 export default function DashboardPage() {
@@ -56,7 +41,7 @@ export default function DashboardPage() {
         const [dashRes, goalsRes, txRes, budgetRes] = await Promise.allSettled([
           api.getDashboard(period),
           api.listGoals("active"),
-          api.listTransactions({ limit: 8, period }),
+          api.listTransactions({ period: "this_month", limit: 7 }),
           api.getMonthBudgets(year, month),
         ]);
         if (dashRes.status === "fulfilled") setDashboard(dashRes.value);
@@ -74,18 +59,15 @@ export default function DashboardPage() {
 
   const currency = dashboard?.currency || "INR";
 
-  // Total balance across all accounts
-  const totalBalance =
-    dashboard?.account_balances?.reduce((sum, a) => sum + a.display_balance, 0) ?? 0;
-
   // Top budget categories closest to limit (sorted by percent_used desc)
   const topBudgets = [...budgets]
     .filter((b) => b.percent_used !== null)
     .sort((a, b) => (b.percent_used ?? 0) - (a.percent_used ?? 0))
     .slice(0, 5);
 
-  // Empty state check
-  const isEmpty = !loading && transactions.length === 0 && !dashboard?.total_spent;
+  const topGoals = goals.slice(0, 4);
+
+  const isEmpty = !loading && transactions.length === 0 && !dashboard?.display_total_spent;
 
   if (isEmpty) {
     return (
@@ -103,74 +85,145 @@ export default function DashboardPage() {
 
   return (
     <div className="flex-1 overflow-y-auto pb-20 sm:pb-0">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* §5.1.1 Header row: total balance, month switcher */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-          <div>
-            <h1 className="text-2xl font-semibold text-zinc-100">Dashboard</h1>
-            <div className="flex items-center gap-3 mt-1">
-              <span className="text-sm text-zinc-500">Total Balance</span>
+      <div className="max-w-[1400px] mx-auto p-4 sm:p-5 lg:p-8">
+        {/* Small header row — no big title here, month switcher + coming-soon actions */}
+        <div className="flex items-center justify-between gap-3 mb-5 flex-wrap">
+          <h1 className="text-lg font-semibold text-primary">Dashboard</h1>
+          <div className="flex items-center gap-2">
+            <MonthSwitcher
+              month={month}
+              year={year}
+              onChange={(m, y) => {
+                setMonth(m);
+                setYear(y);
+              }}
+            />
+            <FilterChip aria-label="Search" {...comingSoonProps("Search")}>
+              <Search className="w-3.5 h-3.5" />
+            </FilterChip>
+            <FilterChip aria-label="Notifications" {...comingSoonProps("Notifications")}>
+              <Bell className="w-3.5 h-3.5" />
+            </FilterChip>
+          </div>
+        </div>
+
+        {/* Hero: balance card + income/spent tiles */}
+        <div className="grid grid-cols-1 md:grid-cols-[1.4fr_1fr] gap-5 mb-5">
+          <div className="relative overflow-hidden rounded-[22px] p-7 text-primary bg-gradient-to-br from-[#FF6F5C] to-[#F2C14E]">
+            <div
+              aria-hidden="true"
+              className="absolute -top-10 -right-10 w-[220px] h-[220px] rounded-full bg-white/[0.18] pointer-events-none"
+            />
+            <div
+              aria-hidden="true"
+              className="absolute -bottom-[30px] right-[60px] w-[120px] h-[120px] rounded-full bg-black/[0.08] pointer-events-none"
+            />
+            <div className="relative">
+              <div className="text-xs uppercase tracking-wider opacity-75">Total balance</div>
               {loading ? (
-                <div className="h-6 bg-zinc-800 rounded w-28 animate-pulse-soft" />
+                <div className="h-16 w-64 max-w-full bg-black/10 rounded-xl animate-pulse-soft mt-2" />
               ) : (
                 <AmountText
-                  amount={totalBalance}
+                  amount={dashboard?.display_current_balance ?? 0}
                   currency={currency}
                   context="balance"
-                  size="lg"
+                  size="hero"
+                  className="text-[56px] sm:text-[64px]"
                 />
+              )}
+              {!loading && (
+                <div className="flex flex-wrap gap-6 mt-6 text-[13px]">
+                  <div>
+                    <span className="opacity-70">This month</span>
+                    <div>
+                      <AmountText amount={dashboard?.display_net ?? 0} currency={currency} sign size="md" />
+                    </div>
+                  </div>
+                  <div>
+                    <span className="opacity-70">Days left</span>
+                    <div className="serif text-lg tabular-nums">
+                      {dashboard?.days_remaining_in_month ?? 0} days
+                    </div>
+                  </div>
+                  {dashboard?.has_budget && (
+                    <div>
+                      <span className="opacity-70">Ready to assign</span>
+                      <div>
+                        <AmountText amount={dashboard?.display_remaining_budget ?? 0} currency={currency} size="md" />
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           </div>
-          <MonthSwitcher month={month} year={year} onChange={(m, y) => { setMonth(m); setYear(y); }} />
+
+          <div className="flex flex-col gap-5">
+            <div
+              className="rounded-[18px] border p-5 flex items-center gap-4"
+              style={{ backgroundColor: HUES.mint.bg, borderColor: HUES.mint.border }}
+            >
+              <div
+                className="w-11 h-11 rounded-xl flex items-center justify-center text-xl shrink-0"
+                style={{ backgroundColor: HUES.mint.bar }}
+              >
+                ↑
+              </div>
+              <div className="min-w-0">
+                <div className="text-xs uppercase tracking-wider" style={{ color: HUES.mint.fg }}>
+                  Income
+                </div>
+                {loading ? (
+                  <div className="h-9 w-28 bg-black/10 rounded animate-pulse-soft mt-1" />
+                ) : (
+                  <AmountText
+                    amount={dashboard?.display_total_income ?? 0}
+                    currency={currency}
+                    size="lg"
+                    className="text-[32px] sm:text-[34px] leading-tight"
+                  />
+                )}
+              </div>
+            </div>
+            <div
+              className="rounded-[18px] border p-5 flex items-center gap-4"
+              style={{ backgroundColor: HUES.coral.bg, borderColor: HUES.coral.border }}
+            >
+              <div
+                className="w-11 h-11 rounded-xl flex items-center justify-center text-xl text-white shrink-0"
+                style={{ backgroundColor: HUES.coral.bar }}
+              >
+                ↓
+              </div>
+              <div className="min-w-0">
+                <div className="text-xs uppercase tracking-wider" style={{ color: HUES.coral.fg }}>
+                  Spent
+                </div>
+                {loading ? (
+                  <div className="h-9 w-28 bg-black/10 rounded animate-pulse-soft mt-1" />
+                ) : (
+                  <AmountText
+                    amount={dashboard?.display_total_spent ?? 0}
+                    currency={currency}
+                    size="lg"
+                    className="text-[32px] sm:text-[34px] leading-tight"
+                  />
+                )}
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* §5.1.2 Three stat cards: Income, Expenses, Left to Spend */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-          <StatCard
-            icon={<TrendingUp className="w-5 h-5" />}
-            label="Income"
-            loading={loading}
-            amount={dashboard?.display_total_income ?? 0}
-            currency={currency}
-            context="income"
-            bg="bg-emerald-500/10"
-            iconColor="text-emerald-400"
-          />
-          <StatCard
-            icon={<TrendingDown className="w-5 h-5" />}
-            label="Expenses"
-            loading={loading}
-            amount={dashboard?.display_total_spent ?? 0}
-            currency={currency}
-            context="neutral"
-            bg="bg-zinc-800"
-            iconColor="text-zinc-400"
-          />
-          <StatCard
-            icon={<Wallet className="w-5 h-5" />}
-            label="Left to Spend"
-            loading={loading}
-            amount={dashboard?.display_net ?? 0}
-            currency={currency}
-            context="balance"
-            bg="bg-blue-500/10"
-            iconColor="text-blue-400"
-          />
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* §5.1.3 Budget snapshot */}
-          <Card className="lg:col-span-1">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-medium text-zinc-100 flex items-center gap-2">
-                <PiggyBank className="w-4 h-4 text-emerald-400" />
-                Budget
-              </h2>
-              <Link href="/budget">
-                <Button variant="ghost" size="sm">
-                  See full budget <ArrowRight className="w-3.5 h-3.5 ml-1" />
-                </Button>
+        {/* Row 2: budget snapshot + recent transactions */}
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_1.6fr] gap-5 mb-5">
+          <Card>
+            <div className="flex items-start gap-3 mb-4">
+              <div>
+                <h2 className="font-semibold text-[15px] text-primary">Budget snapshot</h2>
+                <p className="text-xs text-secondary">Closest to limit</p>
+              </div>
+              <Link href="/budget" className="ml-auto text-xs text-secondary hover:text-primary shrink-0 pt-0.5">
+                See all →
               </Link>
             </div>
 
@@ -178,51 +231,55 @@ export default function DashboardPage() {
               <div className="space-y-4">
                 {[1, 2, 3].map((i) => (
                   <div key={i} className="space-y-2">
-                    <div className="h-4 bg-zinc-800 rounded w-3/4 animate-pulse-soft" />
-                    <div className="h-2 bg-zinc-800 rounded animate-pulse-soft" />
+                    <div className="h-3.5 bg-surface-hover rounded w-3/4 animate-pulse-soft" />
+                    <div className="h-2 bg-surface-hover rounded animate-pulse-soft" />
                   </div>
                 ))}
               </div>
             ) : topBudgets.length === 0 ? (
-              <div className="text-center py-6">
-                <PiggyBank className="w-7 h-7 text-zinc-600 mx-auto mb-2" />
-                <p className="text-sm text-zinc-500">No budgets set</p>
-                <Link href="/budget">
-                  <Button variant="ghost" size="sm" className="mt-2">
-                    Set your first budget
-                  </Button>
-                </Link>
-              </div>
+              <p className="text-sm text-secondary text-center py-6">No budgets set for this month yet.</p>
             ) : (
-              <div className="space-y-4">
-                {topBudgets.map((b) => (
-                  <div key={b.id} className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-zinc-300 truncate">
-                        {b.category || "Uncategorized"}
-                      </span>
-                      <span className="text-xs text-zinc-500 tabular-nums">
-                        {formatCurrency(b.display_spent ?? 0, currency)} / {formatCurrency(b.display_budgeted_amount, currency)}
-                      </span>
+              <div className="flex flex-col gap-3.5">
+                {topBudgets.map((b) => {
+                  const style = categoryStyle(b.category);
+                  return (
+                    <div key={b.id}>
+                      <div className="flex items-center gap-2 text-[13px] mb-1.5">
+                        <span className="truncate">
+                          {categoryEmoji(b.category)} {b.category || "Uncategorized"}
+                        </span>
+                        <span className="ml-auto shrink-0 flex items-center gap-1">
+                          <AmountText
+                            amount={b.display_spent ?? 0}
+                            currency={currency}
+                            size="sm"
+                            className="!text-secondary"
+                          />
+                          <span className="text-secondary">/</span>
+                          <AmountText
+                            amount={b.display_budgeted_amount}
+                            currency={currency}
+                            size="sm"
+                            className="!text-secondary"
+                          />
+                        </span>
+                      </div>
+                      <ProgressBar value={b.percent_used ?? 0} color={style.bar} overColor="#B93D28" size="sm" />
                     </div>
-                    <ProgressBar value={b.percent_used ?? 0} size="sm" />
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </Card>
 
-          {/* §5.1.4 Recent transactions — TransactionRow compact */}
-          <Card className="lg:col-span-2">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-medium text-zinc-100 flex items-center gap-2">
-                <Receipt className="w-4 h-4 text-emerald-400" />
-                Recent Transactions
-              </h2>
-              <Link href="/transactions">
-                <Button variant="ghost" size="sm">
-                  View all <ArrowRight className="w-3.5 h-3.5 ml-1" />
-                </Button>
+          <Card>
+            <div className="flex items-start gap-3 mb-4">
+              <div>
+                <h2 className="font-semibold text-[15px] text-primary">Recent transactions</h2>
+                <p className="text-xs text-secondary">This month</p>
+              </div>
+              <Link href="/transactions" className="ml-auto text-xs text-secondary hover:text-primary shrink-0 pt-0.5">
+                View all →
               </Link>
             </div>
 
@@ -230,117 +287,83 @@ export default function DashboardPage() {
               <div className="space-y-3">
                 {[1, 2, 3, 4, 5].map((i) => (
                   <div key={i} className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-zinc-800 rounded-lg animate-pulse-soft" />
+                    <div className="w-9 h-9 bg-surface-hover rounded-[10px] animate-pulse-soft shrink-0" />
                     <div className="flex-1 space-y-1.5">
-                      <div className="h-4 bg-zinc-800 rounded w-1/3 animate-pulse-soft" />
-                      <div className="h-3 bg-zinc-800 rounded w-1/4 animate-pulse-soft" />
+                      <div className="h-3.5 bg-surface-hover rounded w-1/3 animate-pulse-soft" />
+                      <div className="h-3 bg-surface-hover rounded w-1/4 animate-pulse-soft" />
                     </div>
-                    <div className="h-4 bg-zinc-800 rounded w-16 animate-pulse-soft" />
+                    <div className="h-4 bg-surface-hover rounded w-16 animate-pulse-soft" />
                   </div>
                 ))}
               </div>
             ) : transactions.length === 0 ? (
-              <div className="text-center py-6">
-                <Receipt className="w-7 h-7 text-zinc-600 mx-auto mb-2" />
-                <p className="text-sm text-zinc-500">No transactions yet</p>
-              </div>
+              <p className="text-sm text-secondary text-center py-6">No transactions yet this month.</p>
             ) : (
-              <div className="space-y-0.5">
+              <div>
                 {transactions.map((tx) => (
-                  <TransactionRow
-                    key={tx.id}
-                    transaction={tx}
-                    variant="compact"
-                    currency={currency}
-                  />
+                  <TransactionRow key={tx.id} transaction={tx} variant="full" currency={currency} />
                 ))}
               </div>
             )}
           </Card>
         </div>
 
-        {/* §5.1.5 Goals strip — only shown if goals exist */}
-        {goals.length > 0 && (
-          <Card className="mt-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-medium text-zinc-100 flex items-center gap-2">
-                <Target className="w-4 h-4 text-emerald-400" />
-                Goals
-              </h2>
-              <Link href="/goals">
-                <Button variant="ghost" size="sm">
-                  View all <ArrowRight className="w-3.5 h-3.5 ml-1" />
-                </Button>
-              </Link>
-            </div>
-            <div className="flex gap-4 overflow-x-auto pb-2 -mx-1 px-1">
-              {goals.slice(0, 6).map((goal) => (
-                <div
-                  key={goal.id}
-                  className="flex-shrink-0 flex items-center gap-3 p-3 bg-zinc-900 border border-zinc-800 rounded-xl min-w-[200px]"
-                >
-                  <ProgressRing value={goal.progress_percent} size={48} strokeWidth={4}>
-                    <span className="text-[10px] font-medium text-zinc-300 tabular-nums">
-                      {Math.round(goal.progress_percent)}%
-                    </span>
-                  </ProgressRing>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-zinc-100 truncate">
-                      {goal.title}
-                    </p>
-                    <p className="text-xs text-zinc-500 tabular-nums">
-                      {formatCurrency(goal.display_current_amount, currency)} / {formatCurrency(goal.display_target_amount, currency)}
-                    </p>
-                  </div>
-                </div>
+        {/* Goals strip */}
+        <Card>
+          <div className="flex items-center gap-3 mb-4">
+            <h2 className="font-semibold text-[15px] text-primary">Goals</h2>
+            <Link href="/goals" className="ml-auto text-xs text-secondary hover:text-primary shrink-0">
+              Manage →
+            </Link>
+          </div>
+
+          {loading ? (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="h-32 bg-surface-hover rounded-[14px] animate-pulse-soft" />
               ))}
             </div>
-          </Card>
-        )}
+          ) : topGoals.length === 0 ? (
+            <p className="text-sm text-secondary text-center py-6">No active goals yet.</p>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+              {topGoals.map((goal) => {
+                const style = categoryStyle(goal.category);
+                const emoji = goal.category ? categoryEmoji(goal.category) : "🎯";
+                return (
+                  <div
+                    key={goal.id}
+                    className="rounded-[14px] p-4 overflow-hidden"
+                    style={{ backgroundColor: style.bg }}
+                  >
+                    <div className="text-xl leading-none">{emoji}</div>
+                    <div className="mt-2 font-semibold text-sm text-primary truncate">{goal.title}</div>
+                    <div className="text-xs mt-0.5" style={{ color: style.fg }}>
+                      <AmountText
+                        amount={goal.display_current_amount}
+                        currency={currency}
+                        size="sm"
+                        className="!text-inherit"
+                      />
+                      <span> / </span>
+                      <AmountText
+                        amount={goal.display_target_amount}
+                        currency={currency}
+                        size="sm"
+                        className="!text-inherit"
+                      />
+                    </div>
+                    <ProgressBar value={goal.progress_percent} color={style.bar} size="sm" className="mt-3" />
+                    <div className="text-[11px] mt-1.5 tabular-nums" style={{ color: style.fg }}>
+                      {Math.round(goal.progress_percent)}%
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </Card>
       </div>
     </div>
-  );
-}
-
-function StatCard({
-  icon,
-  label,
-  loading,
-  amount,
-  currency,
-  context,
-  bg,
-  iconColor,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  loading: boolean;
-  amount: number;
-  currency: string;
-  context: "income" | "neutral" | "balance";
-  bg: string;
-  iconColor: string;
-}) {
-  return (
-    <Card>
-      <div className="flex items-center gap-3">
-        <div className={`w-10 h-10 ${bg} rounded-lg flex items-center justify-center flex-shrink-0`}>
-          <span className={iconColor}>{icon}</span>
-        </div>
-        <div className="min-w-0">
-          <p className="text-xs text-zinc-500">{label}</p>
-          {loading ? (
-            <div className="h-6 bg-zinc-800 rounded w-24 animate-pulse-soft mt-0.5" />
-          ) : (
-            <AmountText
-              amount={amount}
-              currency={currency}
-              context={context}
-              size="lg"
-            />
-          )}
-        </div>
-      </div>
-    </Card>
   );
 }

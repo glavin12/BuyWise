@@ -1,60 +1,40 @@
 /**
  * CategoryTag — DESIGN.md §6
  *
- * Colored pill used in transaction table, quick-add, and budget.
+ * Pastel pill: pastel bg + darker matching fg (e.g. Groceries green). All colour
+ * comes from lib/categories — no per-page hex. Emoji is optional; when omitted
+ * we use the category's own emoji from the map.
  */
 import { cn } from "@/lib/utils";
+import { categoryStyle, categoryEmoji } from "@/lib/categories";
 
 interface CategoryTagProps {
   name: string;
+  /** override emoji; defaults to the category's mapped emoji */
   icon?: string | null;
-  color?: string | null;
+  /** show the leading emoji (default true) */
+  showEmoji?: boolean;
   className?: string;
 }
 
-const DEFAULT_COLORS = [
-  "bg-emerald-500/15 text-emerald-400 border-emerald-500/20",
-  "bg-blue-500/15 text-blue-400 border-blue-500/20",
-  "bg-purple-500/15 text-purple-400 border-purple-500/20",
-  "bg-amber-500/15 text-amber-400 border-amber-500/20",
-  "bg-rose-500/15 text-rose-400 border-rose-500/20",
-  "bg-cyan-500/15 text-cyan-400 border-cyan-500/20",
-  "bg-orange-500/15 text-orange-400 border-orange-500/20",
-  "bg-pink-500/15 text-pink-400 border-pink-500/20",
-];
-
-function hashString(str: string): number {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    hash = (hash << 5) - hash + str.charCodeAt(i);
-    hash |= 0;
-  }
-  return Math.abs(hash);
-}
-
-export function CategoryTag({ name, icon, color, className }: CategoryTagProps) {
-  const colorClass = color
-    ? undefined
-    : DEFAULT_COLORS[hashString(name) % DEFAULT_COLORS.length];
+export function CategoryTag({
+  name,
+  icon,
+  showEmoji = true,
+  className,
+}: CategoryTagProps) {
+  const style = categoryStyle(name);
+  const emoji = icon ?? categoryEmoji(name);
 
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-md border",
-        colorClass,
+        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium",
         className
       )}
-      style={
-        color
-          ? {
-              backgroundColor: `${color}20`,
-              color: color,
-              borderColor: `${color}30`,
-            }
-          : undefined
-      }
+      style={{ backgroundColor: style.bg, color: style.fg }}
     >
-      {icon && <span className="text-xs">{icon}</span>}
+      {showEmoji && emoji && <span className="text-xs leading-none">{emoji}</span>}
       {name}
     </span>
   );

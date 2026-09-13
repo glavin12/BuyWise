@@ -32,12 +32,12 @@ export function EmptyState({
         className
       )}
     >
-      <div className="w-14 h-14 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-500 mb-4">
+      <div className="w-14 h-14 rounded-2xl bg-surface-hover border border-border flex items-center justify-center text-secondary mb-4">
         {icon}
       </div>
-      <h3 className="text-base font-medium text-zinc-100 mb-1">{title}</h3>
+      <h3 className="text-base font-medium text-primary mb-1">{title}</h3>
       {description && (
-        <p className="text-sm text-zinc-500 max-w-sm mb-4">{description}</p>
+        <p className="text-sm text-secondary max-w-sm mb-4">{description}</p>
       )}
       {action && (
         <Button onClick={action.onClick} size="sm">

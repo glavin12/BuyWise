@@ -3,18 +3,19 @@ import { cn } from "@/lib/utils";
 interface CardProps {
   children: React.ReactNode;
   className?: string;
-  variant?: "default" | "glass" | "elevated";
+  /** default = cream surface card. `flat` drops padding (for tables/lists). */
+  variant?: "default" | "flat";
 }
 
 export function Card({ children, className, variant = "default" }: CardProps) {
-  const variants = {
-    default: "bg-surface border border-border shadow-sm",
-    glass: "glass",
-    elevated: "bg-surface border border-border shadow-md shadow-black/20",
-  };
-
   return (
-    <div className={cn("rounded-xl p-5", variants[variant], className)}>
+    <div
+      className={cn(
+        "bg-surface border border-border rounded-[18px]",
+        variant === "default" && "p-5",
+        className
+      )}
+    >
       {children}
     </div>
   );

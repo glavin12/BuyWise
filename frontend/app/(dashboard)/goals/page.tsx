@@ -1,45 +1,50 @@
 /**
- * Goals — DESIGN.md §5.5
- *
- * Card grid, each card a progress ring + target amount + "Update progress"
- * action wired to update_goal endpoint.
+ * Goals — colorful cream reskin, per _Goals.dc.html.
+ * Featured goal (gradient hero) + contribute card, then the rest as a colored grid.
  */
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import {
-  Target,
-  Plus,
-  Pencil,
-  Calendar,
-  TrendingUp,
-} from "lucide-react";
+import { Target } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { FilterChip } from "@/components/ui/filter-chip";
 import { AmountText } from "@/components/ui/amount-text";
-import { ProgressRing } from "@/components/ui/progress-ring";
-import { Badge } from "@/components/ui/badge";
-import { Tabs } from "@/components/ui/tabs";
+import { ProgressBar } from "@/components/ui/progress-bar";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Modal } from "@/components/ui/modal";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/api";
-import { formatCurrency, displayToMinor, formatDate } from "@/lib/format";
+import { displayToMinor, formatMonth } from "@/lib/format";
+import { categoryEmoji, categoryHue, HUES } from "@/lib/categories";
+import { comingSoonProps } from "@/lib/coming-soon";
 import type { Goal, Category } from "@/lib/types";
 
-const STATUS_TABS = [
-  { id: "active", label: "Active" },
-  { id: "completed", label: "Completed" },
-  { id: "archived", label: "Archived" },
+const PRIORITY_OPTIONS = [
+  { value: "high", label: "High" },
+  { value: "medium", label: "Medium" },
+  { value: "low", label: "Low" },
 ];
 
-const PRIORITY_CONFIG: Record<string, { variant: "warning" | "info" | "default"; label: string }> = {
-  high: { variant: "warning", label: "High" },
-  medium: { variant: "info", label: "Medium" },
-  low: { variant: "default", label: "Low" },
-};
+const PRIORITY_RANK: Record<string, number> = { high: 0, medium: 1, low: 2 };
+
+/** "2027-04-15" → "April 2027" (reuses the shared month/year formatter). */
+function monthYearLabel(dateStr: string): string {
+  const d = new Date(dateStr);
+  return formatMonth(d.getMonth() + 1, d.getFullYear());
+}
+
+/** Whole months between now and a target date, floored at 0. */
+function monthsUntil(dateStr: string): number {
+  const d = new Date(dateStr);
+  const now = new Date();
+  return Math.max(0, (d.getFullYear() - now.getFullYear()) * 12 + (d.getMonth() - now.getMonth()));
+}
 
 export default function GoalsPage() {
-  const [activeTab, setActiveTab] = useState("active");
+  const [status, setStatus] = useState<"active" | "completed">("active");
   const [goals, setGoals] = useState<Goal[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -57,22 +62,22 @@ export default function GoalsPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Update progress modal
-  const [progressGoal, setProgressGoal] = useState<Goal | null>(null);
-  const [progressAmount, setProgressAmount] = useState("");
-  const [updatingProgress, setUpdatingProgress] = useState(false);
+  // One-time top-up modal (contributes to the featured goal)
+  const [topUpOpen, setTopUpOpen] = useState(false);
+  const [topUpAmount, setTopUpAmount] = useState("");
+  const [contributing, setContributing] = useState(false);
 
   const fetchGoals = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await api.listGoals(activeTab);
+      const res = await api.listGoals(status);
       setGoals(res.goals);
     } catch (err) {
       console.error("Failed to load goals:", err);
     } finally {
       setLoading(false);
     }
-  }, [activeTab]);
+  }, [status]);
 
   useEffect(() => {
     fetchGoals();
@@ -81,6 +86,13 @@ export default function GoalsPage() {
   useEffect(() => {
     api.listCategories().then((res) => setCategories(res.categories)).catch(() => {});
   }, []);
+
+  // Featured = highest priority (first active, ties broken by list order); rest fill the grid.
+  const sortedGoals = [...goals].sort(
+    (a, b) => (PRIORITY_RANK[a.priority ?? "medium"] ?? 1) - (PRIORITY_RANK[b.priority ?? "medium"] ?? 1)
+  );
+  const featured = sortedGoals[0];
+  const rest = sortedGoals.slice(1);
 
   const handleCreate = async () => {
     if (!createForm.title.trim() || !createForm.target_amount) {
@@ -120,342 +132,333 @@ export default function GoalsPage() {
     }
   };
 
-  const handleUpdateProgress = async () => {
-    if (!progressGoal || !progressAmount) return;
-    const num = parseFloat(progressAmount);
-    if (isNaN(num) || num < 0) return;
-    setUpdatingProgress(true);
+  const handleTopUp = async () => {
+    if (!featured || !topUpAmount) return;
+    const num = parseFloat(topUpAmount);
+    if (isNaN(num) || num <= 0) return;
+    setContributing(true);
     try {
-      await api.updateGoal(progressGoal.id, {
-        current_amount: displayToMinor(num),
+      await api.updateGoal(featured.id, {
+        current_amount: featured.current_amount + displayToMinor(num),
       });
-      setProgressGoal(null);
-      setProgressAmount("");
+      setTopUpOpen(false);
+      setTopUpAmount("");
       fetchGoals();
     } catch (err) {
-      console.error("Failed to update progress:", err);
+      console.error("Failed to add contribution:", err);
     } finally {
-      setUpdatingProgress(false);
-    }
-  };
-
-  const handleStatusChange = async (goal: Goal, status: "active" | "completed" | "archived") => {
-    try {
-      await api.updateGoal(goal.id, { status });
-      fetchGoals();
-    } catch (err) {
-      console.error("Failed to update status:", err);
+      setContributing(false);
     }
   };
 
   return (
-    <div className="flex-1 overflow-y-auto pb-20 sm:pb-0">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-          <div>
-            <h1 className="text-2xl font-semibold text-zinc-100">Goals</h1>
-            <p className="text-sm text-zinc-500 mt-0.5">
-              Track progress toward your financial targets
-            </p>
-          </div>
-          <Button onClick={() => setShowCreate(true)} size="sm">
-            <Plus className="w-4 h-4 mr-1" /> New Goal
-          </Button>
+    <div className="p-4 sm:p-8 max-w-[1400px] mx-auto">
+      {/* Header */}
+      <div className="flex flex-wrap items-end justify-between gap-4 mb-6">
+        <div>
+          <h1 className="serif text-[44px] leading-none">Goals</h1>
+          <p className="text-sm text-secondary mt-1.5">
+            {goals.length} {status === "active" ? "active" : "achieved"}.
+          </p>
         </div>
-
-        {/* Status tabs */}
-        <div className="mb-6">
-          <Tabs
-            tabs={STATUS_TABS}
-            activeTab={activeTab}
-            onChange={(id) => setActiveTab(id)}
-          />
+        <div className="flex gap-2">
+          <FilterChip active={status === "active"} onClick={() => setStatus("active")}>
+            Active
+          </FilterChip>
+          <FilterChip active={status === "completed"} onClick={() => setStatus("completed")}>
+            Achieved
+          </FilterChip>
+          <FilterChip active onClick={() => setShowCreate(true)}>
+            + New goal
+          </FilterChip>
         </div>
-
-        {/* Goal cards */}
-        {loading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <Card key={i} className="animate-pulse-soft">
-                <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 bg-zinc-800 rounded-full" />
-                  <div className="flex-1 space-y-2">
-                    <div className="h-5 bg-zinc-800 rounded w-3/4" />
-                    <div className="h-4 bg-zinc-800 rounded w-1/2" />
-                  </div>
-                </div>
-              </Card>
-            ))}
-          </div>
-        ) : goals.length === 0 ? (
-          <EmptyState
-            icon={<Target className="w-7 h-7" />}
-            title={`No ${activeTab} goals`}
-            description={
-              activeTab === "active"
-                ? "Create a goal to start tracking your progress."
-                : `You don't have any ${activeTab} goals yet.`
-            }
-            action={
-              activeTab === "active"
-                ? { label: "Create Goal", onClick: () => setShowCreate(true) }
-                : undefined
-            }
-          />
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {goals.map((goal) => {
-              const priorityConfig = PRIORITY_CONFIG[goal.priority || "medium"];
-              return (
-                <Card key={goal.id} className="group">
-                  <div className="flex items-start gap-4 mb-4">
-                    <ProgressRing value={goal.progress_percent} size={64} strokeWidth={5}>
-                      <span className="text-xs font-semibold text-zinc-100 tabular-nums">
-                        {Math.round(goal.progress_percent)}%
-                      </span>
-                    </ProgressRing>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-zinc-100 truncate">
-                        {goal.title}
-                      </p>
-                      {goal.description && (
-                        <p className="text-xs text-zinc-500 mt-0.5 line-clamp-2">
-                          {goal.description}
-                        </p>
-                      )}
-                      <div className="flex items-center gap-1.5 mt-1.5">
-                        {priorityConfig && (
-                          <Badge variant={priorityConfig.variant}>
-                            {priorityConfig.label}
-                          </Badge>
-                        )}
-                        {goal.category && (
-                          <Badge variant="default">{goal.category}</Badge>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Amount info */}
-                  <div className="space-y-2 mb-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-zinc-500">Progress</span>
-                      <span className="text-xs text-zinc-400 tabular-nums">
-                        {formatCurrency(goal.display_current_amount)} / {formatCurrency(goal.display_target_amount)}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-zinc-500">Remaining</span>
-                      <span className="text-xs text-zinc-300 tabular-nums">
-                        {formatCurrency(goal.display_remaining_amount)}
-                      </span>
-                    </div>
-                    {goal.display_monthly_needed_to_hit_target !== null && goal.display_monthly_needed_to_hit_target !== undefined && (
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-zinc-500">Monthly needed</span>
-                        <span className="text-xs text-amber-400 tabular-nums">
-                          {formatCurrency(goal.display_monthly_needed_to_hit_target)}
-                        </span>
-                      </div>
-                    )}
-                    {goal.target_date && (
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-zinc-500 flex items-center gap-1">
-                          <Calendar className="w-3 h-3" /> Target
-                        </span>
-                        <span className="text-xs text-zinc-400">
-                          {formatDate(goal.target_date, "medium")}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex items-center gap-2">
-                    {activeTab === "active" && (
-                      <>
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          className="flex-1"
-                          onClick={() => {
-                            setProgressGoal(goal);
-                            setProgressAmount(String(goal.display_current_amount));
-                          }}
-                        >
-                          <TrendingUp className="w-3.5 h-3.5 mr-1" /> Update
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleStatusChange(goal, "completed")}
-                        >
-                          Complete
-                        </Button>
-                      </>
-                    )}
-                    {activeTab === "completed" && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleStatusChange(goal, "archived")}
-                      >
-                        Archive
-                      </Button>
-                    )}
-                    {activeTab === "archived" && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleStatusChange(goal, "active")}
-                      >
-                        Reactivate
-                      </Button>
-                    )}
-                  </div>
-                </Card>
-              );
-            })}
-          </div>
-        )}
       </div>
 
-      {/* Create Goal Modal */}
-      <Modal open={showCreate} onClose={() => setShowCreate(false)} title="New Goal" size="md">
-        <div className="space-y-4">
-          <div className="space-y-1.5">
-            <label className="block text-sm font-medium text-zinc-100">Title</label>
-            <input
-              type="text"
-              value={createForm.title}
-              onChange={(e) => setCreateForm((f) => ({ ...f, title: e.target.value }))}
-              placeholder="e.g. Emergency Fund, Vacation..."
-              className="w-full px-3.5 py-2.5 text-sm bg-zinc-950 border border-zinc-800 rounded-lg text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
-            />
+      {loading ? (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Card key={i} className="h-40 animate-pulse-soft">
+              <span className="sr-only">Loading</span>
+            </Card>
+          ))}
+        </div>
+      ) : !featured ? (
+        <EmptyState
+          icon={<Target className="w-7 h-7" />}
+          title={`No ${status === "active" ? "active" : "achieved"} goals`}
+          description={
+            status === "active"
+              ? "Create a goal to start tracking your progress."
+              : "Goals you complete will show up here."
+          }
+          action={status === "active" ? { label: "New goal", onClick: () => setShowCreate(true) } : undefined}
+        />
+      ) : (
+        <>
+          {/* Featured goal + Contribute now */}
+          <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-5 mb-6">
+            <div className="relative overflow-hidden bg-gradient-to-br from-[#6FA8DC] to-[#A46FCF] text-white rounded-[22px] p-7">
+              <div className="absolute -right-10 -top-10 w-[220px] h-[220px] rounded-full bg-white/15" />
+              <div className="absolute -bottom-8 right-14 sm:right-24 text-[96px] sm:text-[120px] opacity-15 leading-none">
+                {categoryEmoji(featured.category)}
+              </div>
+              <div className="relative">
+                <span className="inline-block bg-white/20 px-2.5 py-1 rounded-full text-[11px] font-medium">
+                  {featured.target_date
+                    ? `Featured goal · ${monthsUntil(featured.target_date)} months left`
+                    : "Featured goal"}
+                </span>
+                <h2 className="serif text-[36px] sm:text-[44px] leading-[1.05] mt-3">{featured.title}</h2>
+                {featured.description && <p className="text-[13px] opacity-90 mt-1.5">{featured.description}</p>}
+
+                <div className="grid grid-cols-3 gap-4 sm:gap-5 mt-5">
+                  <div>
+                    <div className="text-[11px] uppercase tracking-[0.08em] opacity-75">Saved</div>
+                    <AmountText
+                      amount={featured.display_current_amount}
+                      size="lg"
+                      className="text-white block mt-0.5"
+                    />
+                  </div>
+                  <div>
+                    <div className="text-[11px] uppercase tracking-[0.08em] opacity-75">Target</div>
+                    <AmountText
+                      amount={featured.display_target_amount}
+                      size="lg"
+                      className="text-white block mt-0.5"
+                    />
+                  </div>
+                  <div>
+                    <div className="text-[11px] uppercase tracking-[0.08em] opacity-75">Need / mo</div>
+                    {featured.display_monthly_needed_to_hit_target != null ? (
+                      <AmountText
+                        amount={featured.display_monthly_needed_to_hit_target}
+                        size="lg"
+                        className="text-white block mt-0.5"
+                      />
+                    ) : (
+                      <div className="serif text-xl mt-0.5">—</div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="h-2.5 bg-white/20 rounded-full mt-5 overflow-hidden">
+                  <div
+                    className="h-full bg-[#F2C14E] rounded-full transition-all duration-500 ease-out"
+                    style={{ width: `${Math.max(0, Math.min(featured.progress_percent, 100))}%` }}
+                  />
+                </div>
+                <div className="flex items-center mt-2 text-xs opacity-90 tabular-nums">
+                  <span>{Math.round(featured.progress_percent)}% funded</span>
+                  {featured.target_date && (
+                    <span className="ml-auto">Target date · {monthYearLabel(featured.target_date)}</span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <Card>
+              <p className="text-[15px] font-semibold mb-3.5">Contribute now</p>
+              <div className="flex flex-col gap-2.5">
+                <button
+                  {...comingSoonProps("Move from balance")}
+                  className="flex items-center gap-3 p-3.5 rounded-[14px] border text-left cursor-pointer"
+                  style={{ backgroundColor: HUES.mint.bg, borderColor: HUES.mint.border }}
+                >
+                  <span
+                    className="w-9 h-9 rounded-[10px] flex items-center justify-center text-base shrink-0"
+                    style={{ backgroundColor: HUES.mint.bar }}
+                  >
+                    💰
+                  </span>
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-sm font-medium text-primary">Move from balance</span>
+                    <span className="block text-[11px] text-secondary">Fastest way to fund this goal</span>
+                  </span>
+                  <span className="text-base text-secondary">→</span>
+                </button>
+
+                <button
+                  {...comingSoonProps("Auto-save monthly")}
+                  className="flex items-center gap-3 p-3.5 rounded-[14px] border text-left cursor-pointer"
+                  style={{ backgroundColor: HUES.amber.bg, borderColor: HUES.amber.border }}
+                >
+                  <span
+                    className="w-9 h-9 rounded-[10px] flex items-center justify-center text-base shrink-0"
+                    style={{ backgroundColor: HUES.amber.bar }}
+                  >
+                    📅
+                  </span>
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-sm font-medium text-primary">Auto-save monthly</span>
+                    <span className="block text-[11px] text-secondary">Set a recurring contribution</span>
+                  </span>
+                  <span className="text-base text-secondary">→</span>
+                </button>
+
+                <button
+                  onClick={() => setTopUpOpen(true)}
+                  className="flex items-center gap-3 p-3.5 rounded-[14px] border text-left cursor-pointer hover:brightness-[0.98] transition-[filter]"
+                  style={{ backgroundColor: HUES.plum.bg, borderColor: HUES.plum.border }}
+                >
+                  <span
+                    className="w-9 h-9 rounded-[10px] flex items-center justify-center text-base shrink-0"
+                    style={{ backgroundColor: HUES.plum.bar }}
+                  >
+                    🎯
+                  </span>
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-sm font-medium text-primary">One-time top-up</span>
+                    <span className="block text-[11px] text-secondary">Enter any amount</span>
+                  </span>
+                  <span className="text-base text-secondary">→</span>
+                </button>
+              </div>
+            </Card>
           </div>
 
+          {/* Other goals */}
+          {rest.length > 0 && (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {rest.map((goal) => {
+                const style = HUES[categoryHue(goal.category)];
+                const label = goal.category || (goal.priority ? `${goal.priority} priority` : "Goal");
+                return (
+                  <div
+                    key={goal.id}
+                    className="rounded-[20px] p-5 sm:p-[22px] border"
+                    style={{ backgroundColor: style.bg, borderColor: style.border }}
+                  >
+                    <div className="text-[36px] leading-none">{categoryEmoji(goal.category)}</div>
+                    <div className="text-[11px] uppercase tracking-[0.08em] text-secondary mt-3.5">{label}</div>
+                    <h3 className="serif text-[26px] leading-[1.1] text-primary">{goal.title}</h3>
+                    <div className="flex items-center gap-1 text-[13px] text-tertiary mt-1.5">
+                      <AmountText amount={goal.display_current_amount} size="sm" className="text-tertiary" />
+                      <span>of</span>
+                      <AmountText amount={goal.display_target_amount} size="sm" className="text-tertiary" />
+                    </div>
+                    <ProgressBar value={goal.progress_percent} color={style.bar} className="mt-3.5" />
+                    <div className="flex items-center mt-2 text-[11px] text-tertiary tabular-nums">
+                      <span>{Math.round(goal.progress_percent)}% funded</span>
+                      {goal.target_date && <span className="ml-auto">{monthYearLabel(goal.target_date)}</span>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Create Goal Modal */}
+      <Modal open={showCreate} onClose={() => setShowCreate(false)} title="New goal" size="md">
+        <div className="space-y-4">
+          <Input
+            label="Title"
+            value={createForm.title}
+            onChange={(e) => setCreateForm((f) => ({ ...f, title: e.target.value }))}
+            placeholder="e.g. Emergency fund, Vacation..."
+          />
+
           <div className="space-y-1.5">
-            <label className="block text-sm font-medium text-zinc-100">Target Amount</label>
+            <label className="block text-sm font-medium text-primary">Target amount</label>
             <div className="relative">
-              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-zinc-500">₹</span>
-              <input
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-secondary pointer-events-none">
+                ₹
+              </span>
+              <Input
                 type="number"
                 step="0.01"
                 min="0"
                 value={createForm.target_amount}
                 onChange={(e) => setCreateForm((f) => ({ ...f, target_amount: e.target.value }))}
                 placeholder="0.00"
-                className="w-full pl-8 pr-3.5 py-2.5 text-sm bg-zinc-950 border border-zinc-800 rounded-lg text-zinc-100 tabular-nums focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                className="pl-8 tabular-nums"
               />
             </div>
           </div>
 
-          <div className="space-y-1.5">
-            <label className="block text-sm font-medium text-zinc-100">
-              Description <span className="text-zinc-600 font-normal">(optional)</span>
-            </label>
-            <input
-              type="text"
-              value={createForm.description}
-              onChange={(e) => setCreateForm((f) => ({ ...f, description: e.target.value }))}
-              placeholder="What's this goal for?"
-              className="w-full px-3.5 py-2.5 text-sm bg-zinc-950 border border-zinc-800 rounded-lg text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+          <Textarea
+            label="Description (optional)"
+            value={createForm.description}
+            onChange={(e) => setCreateForm((f) => ({ ...f, description: e.target.value }))}
+            placeholder="What's this goal for?"
+            rows={2}
+          />
+
+          <div className="grid grid-cols-2 gap-3">
+            <Select
+              label="Priority"
+              value={createForm.priority}
+              onChange={(e) => setCreateForm((f) => ({ ...f, priority: e.target.value }))}
+              options={PRIORITY_OPTIONS}
+            />
+            <Input
+              type="date"
+              label="Target date"
+              value={createForm.target_date}
+              onChange={(e) => setCreateForm((f) => ({ ...f, target_date: e.target.value }))}
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <label className="block text-sm font-medium text-zinc-100">Priority</label>
-              <select
-                value={createForm.priority}
-                onChange={(e) => setCreateForm((f) => ({ ...f, priority: e.target.value }))}
-                className="w-full px-3.5 py-2.5 text-sm bg-zinc-950 border border-zinc-800 rounded-lg text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 cursor-pointer"
-              >
-                <option value="high">High</option>
-                <option value="medium">Medium</option>
-                <option value="low">Low</option>
-              </select>
-            </div>
-            <div className="space-y-1.5">
-              <label className="block text-sm font-medium text-zinc-100">Target Date</label>
-              <input
-                type="date"
-                value={createForm.target_date}
-                onChange={(e) => setCreateForm((f) => ({ ...f, target_date: e.target.value }))}
-                className="w-full px-3.5 py-2.5 text-sm bg-zinc-950 border border-zinc-800 rounded-lg text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 cursor-pointer"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="block text-sm font-medium text-zinc-100">
-              Category <span className="text-zinc-600 font-normal">(optional)</span>
-            </label>
-            <select
-              value={createForm.category_id}
-              onChange={(e) => setCreateForm((f) => ({ ...f, category_id: e.target.value }))}
-              className="w-full px-3.5 py-2.5 text-sm bg-zinc-950 border border-zinc-800 rounded-lg text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 cursor-pointer"
-            >
-              <option value="">No category</option>
-              {categories.filter((c) => c.is_active).map((c) => (
-                <option key={c.id} value={c.id}>{c.icon ? `${c.icon} ` : ""}{c.name}</option>
-              ))}
-            </select>
-          </div>
+          <Select
+            label="Category (optional)"
+            value={createForm.category_id}
+            onChange={(e) => setCreateForm((f) => ({ ...f, category_id: e.target.value }))}
+            options={[
+              { value: "", label: "No category" },
+              ...categories
+                .filter((c) => c.is_active)
+                .map((c) => ({ value: c.id, label: `${c.icon ? `${c.icon} ` : ""}${c.name}` })),
+            ]}
+          />
 
           {error && (
-            <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
-              <p className="text-sm text-red-400">{error}</p>
+            <div className="p-3 bg-negative/10 border border-negative/20 rounded-lg">
+              <p className="text-sm text-negative">{error}</p>
             </div>
           )}
 
           <Button onClick={handleCreate} loading={saving} className="w-full">
-            Create Goal
+            Create goal
           </Button>
         </div>
       </Modal>
 
-      {/* Update Progress Modal */}
-      <Modal
-        open={!!progressGoal}
-        onClose={() => setProgressGoal(null)}
-        title="Update Progress"
-        size="sm"
-      >
-        {progressGoal && (
+      {/* One-time top-up modal */}
+      <Modal open={topUpOpen} onClose={() => setTopUpOpen(false)} title="One-time top-up" size="sm">
+        {featured && (
           <div className="space-y-4">
-            <div className="flex items-center gap-3 p-3 bg-zinc-900 rounded-lg">
-              <ProgressRing value={progressGoal.progress_percent} size={48} strokeWidth={4}>
-                <span className="text-[10px] font-medium text-zinc-300 tabular-nums">
-                  {Math.round(progressGoal.progress_percent)}%
-                </span>
-              </ProgressRing>
+            <div className="flex items-center gap-3 p-3 bg-surface-hover rounded-lg">
+              <span className="text-2xl">{categoryEmoji(featured.category)}</span>
               <div>
-                <p className="text-sm font-medium text-zinc-100">{progressGoal.title}</p>
-                <p className="text-xs text-zinc-500 tabular-nums">
-                  Target: {formatCurrency(progressGoal.display_target_amount)}
+                <p className="text-sm font-medium text-primary">{featured.title}</p>
+                <p className="text-xs text-secondary tabular-nums">
+                  {Math.round(featured.progress_percent)}% funded so far
                 </p>
               </div>
             </div>
 
             <div className="space-y-1.5">
-              <label className="block text-sm font-medium text-zinc-100">Current Amount</label>
+              <label className="block text-sm font-medium text-primary">Amount to add</label>
               <div className="relative">
-                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-zinc-500">₹</span>
-                <input
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-secondary pointer-events-none">
+                  ₹
+                </span>
+                <Input
                   type="number"
                   step="0.01"
                   min="0"
-                  value={progressAmount}
-                  onChange={(e) => setProgressAmount(e.target.value)}
-                  className="w-full pl-8 pr-3.5 py-2.5 text-sm bg-zinc-950 border border-zinc-800 rounded-lg text-zinc-100 tabular-nums focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                  value={topUpAmount}
+                  onChange={(e) => setTopUpAmount(e.target.value)}
+                  placeholder="0.00"
+                  className="pl-8 tabular-nums"
                 />
               </div>
             </div>
 
-            <Button onClick={handleUpdateProgress} loading={updatingProgress} className="w-full">
-              Update Progress
+            <Button onClick={handleTopUp} loading={contributing} className="w-full">
+              Add to goal
             </Button>
           </div>
         )}

@@ -1,7 +1,7 @@
 /**
  * MonthSwitcher — DESIGN.md §6
  *
- * Shared by Dashboard, Budget, Reports. One component, not three date pickers.
+ * Cream pill with chevrons, black text. Shared by Dashboard, Budget, Reports.
  */
 "use client";
 
@@ -23,41 +23,35 @@ export function MonthSwitcher({
   className,
 }: MonthSwitcherProps) {
   const handlePrev = () => {
-    if (month === 1) {
-      onChange(12, year - 1);
-    } else {
-      onChange(month - 1, year);
-    }
+    if (month === 1) onChange(12, year - 1);
+    else onChange(month - 1, year);
   };
 
   const handleNext = () => {
-    if (month === 12) {
-      onChange(1, year + 1);
-    } else {
-      onChange(month + 1, year);
-    }
+    if (month === 12) onChange(1, year + 1);
+    else onChange(month + 1, year);
   };
 
   return (
     <div
       className={cn(
-        "inline-flex items-center gap-1 bg-zinc-900 border border-zinc-800 rounded-lg px-1 py-1",
+        "inline-flex items-center gap-0.5 bg-surface-hover border border-border rounded-[10px] p-0.5",
         className
       )}
     >
       <button
         onClick={handlePrev}
-        className="p-1.5 rounded-md hover:bg-zinc-800 text-zinc-400 hover:text-zinc-100 transition-colors cursor-pointer"
+        className="p-1.5 rounded-[7px] hover:bg-border text-secondary hover:text-primary transition-colors cursor-pointer"
         aria-label="Previous month"
       >
         <ChevronLeft className="w-4 h-4" />
       </button>
-      <span className="text-sm font-medium text-zinc-100 min-w-[140px] text-center select-none">
+      <span className="text-sm font-medium text-primary min-w-[132px] text-center select-none tabular-nums">
         {formatMonth(month, year)}
       </span>
       <button
         onClick={handleNext}
-        className="p-1.5 rounded-md hover:bg-zinc-800 text-zinc-400 hover:text-zinc-100 transition-colors cursor-pointer"
+        className="p-1.5 rounded-[7px] hover:bg-border text-secondary hover:text-primary transition-colors cursor-pointer"
         aria-label="Next month"
       >
         <ChevronRight className="w-4 h-4" />

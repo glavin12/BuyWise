@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, type KeyboardEvent } from "react";
-import { Send } from "lucide-react";
+import { ArrowUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface ChatInputProps {
@@ -10,10 +10,17 @@ interface ChatInputProps {
   placeholder?: string;
 }
 
+const QUICK_ACTIONS = [
+  { label: "💡 Log expense", prefill: "Log an expense: " },
+  { label: "📊 Compare months", prefill: "Compare my spending this month vs last month" },
+  { label: "🎯 Fund a goal", prefill: "Add a contribution to my goal " },
+  { label: "🔎 Spending by category", prefill: "How much did I spend on " },
+];
+
 export function ChatInput({
   onSend,
   disabled = false,
-  placeholder = "Ask about your finances...",
+  placeholder = "Try: “add ₹580 dinner at Social to Food, UPI”",
 }: ChatInputProps) {
   const [message, setMessage] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -23,9 +30,7 @@ export function ChatInput({
     if (!trimmed || disabled) return;
     onSend(trimmed);
     setMessage("");
-    if (textareaRef.current) {
-      textareaRef.current.style.height = "auto";
-    }
+    if (textareaRef.current) textareaRef.current.style.height = "auto";
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -36,48 +41,74 @@ export function ChatInput({
   };
 
   const handleInput = () => {
-    const textarea = textareaRef.current;
-    if (textarea) {
-      textarea.style.height = "auto";
-      textarea.style.height = `${Math.min(textarea.scrollHeight, 160)}px`;
+    const el = textareaRef.current;
+    if (el) {
+      el.style.height = "auto";
+      el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
+    }
+  };
+
+  const prefill = (text: string) => {
+    setMessage(text);
+    const el = textareaRef.current;
+    if (el) {
+      el.focus();
+      requestAnimationFrame(() => {
+        el.style.height = "auto";
+        el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
+        el.setSelectionRange(text.length, text.length);
+      });
     }
   };
 
   return (
-    <div className="border-t border-border bg-surface/80 backdrop-blur-sm p-4">
-      <div className="max-w-3xl mx-auto">
-        <div className="flex items-end gap-2 bg-surface border border-border rounded-xl shadow-sm focus-within:ring-2 focus-within:ring-accent/50 focus-within:border-accent transition-all duration-200">
-          <textarea
-            ref={textareaRef}
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            onKeyDown={handleKeyDown}
-            onInput={handleInput}
-            placeholder={placeholder}
-            disabled={disabled}
-            rows={1}
-            className={cn(
-              "flex-1 px-4 py-3 text-sm bg-transparent resize-none focus:outline-none placeholder:text-muted min-h-[44px] max-h-[160px] text-primary",
-              disabled && "opacity-50 cursor-not-allowed"
-            )}
-          />
+    <div className="border-t border-border p-3 sm:p-4">
+      <div className="mb-2.5 flex gap-2 overflow-x-auto pb-0.5">
+        {QUICK_ACTIONS.map((a) => (
           <button
-            onClick={handleSend}
-            disabled={disabled || !message.trim()}
-            className={cn(
-              "flex-shrink-0 p-2.5 m-1.5 rounded-lg transition-all duration-200 cursor-pointer",
-              message.trim() && !disabled
-                ? "bg-accent text-white hover:bg-accent-hover shadow-sm"
-                : "text-muted hover:text-secondary"
-            )}
+            key={a.label}
+            type="button"
+            onClick={() => prefill(a.prefill)}
+            disabled={disabled}
+            className="whitespace-nowrap rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-medium text-primary hover:bg-surface-hover transition-colors cursor-pointer disabled:opacity-50"
           >
-            <Send className="w-4 h-4" />
+            {a.label}
           </button>
-        </div>
-        <p className="text-xs text-muted text-center mt-2">
-          BuyWise AI can make mistakes. Verify important financial information.
-        </p>
+        ))}
       </div>
+
+      <div className="flex items-end gap-2 bg-surface-hover rounded-2xl p-1.5 pl-3 focus-within:ring-2 focus-within:ring-primary/15 transition-all">
+        <textarea
+          ref={textareaRef}
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onInput={handleInput}
+          placeholder={placeholder}
+          disabled={disabled}
+          rows={1}
+          className={cn(
+            "flex-1 py-2 text-sm bg-transparent resize-none focus:outline-none placeholder:text-secondary/70 min-h-[36px] max-h-[160px] text-primary",
+            disabled && "opacity-50 cursor-not-allowed"
+          )}
+        />
+        <button
+          onClick={handleSend}
+          disabled={disabled || !message.trim()}
+          aria-label="Send message"
+          className={cn(
+            "flex-shrink-0 w-9 h-9 rounded-xl flex items-center justify-center transition-colors cursor-pointer",
+            message.trim() && !disabled
+              ? "bg-[#FF6F5C] text-white hover:brightness-95"
+              : "bg-border text-secondary cursor-not-allowed"
+          )}
+        >
+          <ArrowUp className="w-4 h-4" />
+        </button>
+      </div>
+      <p className="text-[11px] text-secondary text-center mt-2">
+        BuyWise AI can make mistakes. Verify important financial information.
+      </p>
     </div>
   );
 }

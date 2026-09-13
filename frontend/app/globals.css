@@ -1,37 +1,57 @@
 @import "tailwindcss";
 
+/* ── Colorful cream design tokens (see DESIGN.md / *.dc.html) ─────── */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --color-primary: #F4F4F5;
-  --color-secondary: #A1A1AA;
-  --color-accent: #10B981;
-  --color-accent-hover: #059669;
-  --color-surface: #0A0A0A;
-  --color-surface-hover: #18181B;
-  --color-border: #27272A;
-  --color-muted: #71717A;
-  --color-success: #22C55E;
-  --color-error: #EF4444;
-  --color-warning: #F59E0B;
-  --color-input: #0A0A0A;
-  --font-sans: var(--font-ibm-plex);
-  --font-heading: var(--font-ibm-plex);
+
+  --color-primary: #1B1B1B;        /* primary text + black CTA */
+  --color-secondary: #7A6F55;      /* muted text */
+  --color-muted: #7A6F55;
+  --color-tertiary: #4A4033;
+
+  --color-accent: #1B1B1B;         /* CTA is black now, not emerald */
+  --color-accent-hover: #2A2620;
+
+  --color-surface: #FFFCF4;        /* card */
+  --color-surface-hover: #EDE4CE;
+  --color-sidebar: #EDE4CE;
+  --color-border: #E4DBC5;
+  --color-divider: #F0E6D2;
+  --color-track: #F0E6D2;          /* progress track */
+  --color-input: #FFFCF4;
+
+  --color-positive: #3E7A5A;
+  --color-negative: #B93D28;
+  --color-warning: #8A6B24;
+  --color-success: #3E7A5A;
+  --color-error: #B93D28;
+
+  /* category / accent hues */
+  --color-coral: #FF6F5C;
+  --color-amber: #F2C14E;
+  --color-mint: #6FCF97;
+  --color-sky: #6FA8DC;
+  --color-plum: #A46FCF;
+  --color-pink: #E48BB0;
+  --color-teal: #5EC5C1;
+
+  --font-sans: var(--font-instrument-sans), system-ui, sans-serif;
+  --font-serif: var(--font-instrument-serif), Georgia, serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+  --font-heading: var(--font-instrument-sans), system-ui, sans-serif;
 }
 
 :root {
-  --background: #000000;
-  --foreground: #F4F4F5;
+  --background: #F4EEE1;
+  --foreground: #1B1B1B;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-sans, "IBM Plex Sans", sans-serif);
-}
-
-h1, h2, h3, h4, h5, h6 {
-  font-family: var(--font-heading, "IBM Plex Sans", sans-serif);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
 }
 
 @layer base {
@@ -42,16 +62,20 @@ h1, h2, h3, h4, h5, h6 {
 
 @layer utilities {
   /* DESIGN.md §4: tabular figures on every number */
-  .tabular-nums {
+  .tabular-nums,
+  .tnum {
     font-variant-numeric: tabular-nums;
   }
 
-  .glass {
-    @apply bg-surface/80 backdrop-blur-md border border-border/50 shadow-sm;
+  /* Instrument Serif — page titles + all currency amounts */
+  .serif {
+    font-family: var(--font-serif);
+    font-weight: 400;
+    letter-spacing: -0.01em;
   }
 
-  .glass-strong {
-    @apply bg-surface/90 backdrop-blur-lg border border-border shadow-md;
+  .mono {
+    font-family: var(--font-mono);
   }
 
   .text-balance {
@@ -93,8 +117,8 @@ h1, h2, h3, h4, h5, h6 {
 /* ── Scrollbar styling ─────────────────────────────────────────── */
 
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
@@ -102,22 +126,17 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #27272A;
-  border-radius: 3px;
+  background: #D8CFBB;
+  border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #3f3f46;
+  background: #C7BFA8;
 }
 
 /* ── Form elements ─────────────────────────────────────────────── */
 
-input[type="date"]::-webkit-calendar-picker-indicator {
-  filter: invert(1);
-  cursor: pointer;
-}
-
 select option {
-  background: #0A0A0A;
-  color: #F4F4F5;
+  background: #FFFCF4;
+  color: #1B1B1B;
 }
