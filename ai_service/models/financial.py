@@ -52,7 +52,6 @@ class Profile(Base):
         DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
     )
 
-    accounts: Mapped[list[Account]] = relationship(back_populates="user", cascade="all, delete-orphan")
     categories: Mapped[list[Category]] = relationship(back_populates="user", cascade="all, delete-orphan")
     payees: Mapped[list[Payee]] = relationship(back_populates="user", cascade="all, delete-orphan")
     transactions: Mapped[list[Transaction]] = relationship(back_populates="user", cascade="all, delete-orphan")
@@ -60,33 +59,6 @@ class Profile(Base):
         back_populates="user", cascade="all, delete-orphan"
     )
     goals: Mapped[list[Goal]] = relationship(back_populates="user", cascade="all, delete-orphan")
-
-
-class Account(Base):
-    __tablename__ = "accounts"
-    __table_args__ = (
-        CheckConstraint("length(name) > 0", name="accounts_name_not_empty_check"),
-        CheckConstraint(
-            "account_type IN ('checking', 'savings', 'cash', 'credit_card')",
-            name="accounts_account_type_check",
-        ),
-    )
-
-    id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()"))
-    user_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid(as_uuid=True), ForeignKey("profiles.id", ondelete="CASCADE"), nullable=False, index=True
-    )
-    name: Mapped[str] = mapped_column(Text, nullable=False)
-    account_type: Mapped[str] = mapped_column(Text, nullable=False)
-    currency: Mapped[str] = mapped_column(Text, nullable=False, default="INR", server_default=text("'INR'"))
-    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=text("true"))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
-    )
-
-    user: Mapped[Profile] = relationship(back_populates="accounts")
-    transactions: Mapped[list[Transaction]] = relationship(back_populates="account")
 
 
 class Category(Base):
@@ -142,7 +114,7 @@ class Transaction(Base):
     __table_args__ = (
         CheckConstraint("amount >= 0", name="transactions_amount_check"),
         CheckConstraint(
-            "transaction_type IN ('expense', 'income', 'transfer', 'starting_balance')",
+            "transaction_type IN ('expense', 'income', 'starting_balance')",
             name="transactions_type_check",
         ),
         CheckConstraint(
@@ -153,15 +125,11 @@ class Transaction(Base):
             name="transactions_parent_not_self_check",
         ),
         CheckConstraint(
-            "(transaction_type != 'transfer') OR (transfer_group_id IS NOT NULL AND transfer_direction IN ('in', 'out'))",
-            name="transactions_transfer_fields_check",
+            "payment_method IS NULL OR payment_method IN ('cash', 'upi', 'bank_transfer', 'card', 'other')",
+            name="transactions_payment_method_check",
         ),
         CheckConstraint(
-            "(transaction_type = 'transfer') OR transfer_direction IS NULL",
-            name="transactions_non_transfer_direction_check",
-        ),
-        CheckConstraint(
-            "(transaction_type IN ('transfer', 'starting_balance')) OR category_id IS NOT NULL",
+            "(transaction_type = 'starting_balance') OR (category_id IS NOT NULL)",
             name="transactions_category_required_check",
         ),
     )
@@ -169,9 +137,6 @@ class Transaction(Base):
     id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()"))
     user_id: Mapped[uuid.UUID] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("profiles.id", ondelete="CASCADE"), nullable=False, index=True
-    )
-    account_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid(as_uuid=True), ForeignKey("accounts.id", ondelete="RESTRICT"), nullable=False, index=True
     )
     category_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("categories.id", ondelete="RESTRICT"), nullable=True, index=True
@@ -182,14 +147,13 @@ class Transaction(Base):
     amount: Mapped[int] = mapped_column(BigInteger, nullable=False)
     currency: Mapped[str] = mapped_column(Text, nullable=False, default="INR", server_default=text("'INR'"))
     transaction_type: Mapped[str] = mapped_column(Text, nullable=False)
+    payment_method: Mapped[str | None] = mapped_column(Text, nullable=True)
     transaction_date: Mapped[date] = mapped_column(Date, nullable=False, server_default=text("CURRENT_DATE"))
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     cleared_status: Mapped[str] = mapped_column(
         Text, nullable=False, default="pending", server_default=text("'pending'")
     )
-    transfer_group_id: Mapped[uuid.UUID | None] = mapped_column(Uuid(as_uuid=True), nullable=True, index=True)
-    transfer_direction: Mapped[str | None] = mapped_column(Text, nullable=True)
     parent_transaction_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("transactions.id", ondelete="CASCADE"), nullable=True
     )
@@ -199,7 +163,6 @@ class Transaction(Base):
     )
 
     user: Mapped[Profile] = relationship(back_populates="transactions")
-    account: Mapped[Account] = relationship(back_populates="transactions")
     category: Mapped[Category | None] = relationship(back_populates="transactions")
     payee: Mapped[Payee | None] = relationship(back_populates="transactions")
     parent_transaction: Mapped[Transaction | None] = relationship(

@@ -147,27 +147,6 @@ def upgrade() -> None:
     )
 
     op.create_table(
-        "accounts",
-        sa.Column("id", uuid_type, server_default=sa.text("gen_random_uuid()"), nullable=False),
-        sa.Column("user_id", uuid_type, nullable=False),
-        sa.Column("name", sa.Text(), nullable=False),
-        sa.Column("account_type", sa.Text(), nullable=False),
-        sa.Column("currency", sa.Text(), server_default=sa.text("'INR'"), nullable=False),
-        sa.Column("is_active", sa.Boolean(), server_default=sa.text("true"), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.CheckConstraint("length(name) > 0", name="accounts_name_not_empty_check"),
-        sa.CheckConstraint(
-            "account_type IN ('checking', 'savings', 'cash', 'credit_card')",
-            name="accounts_account_type_check",
-        ),
-        sa.ForeignKeyConstraint(["user_id"], ["public.profiles.id"], ondelete="CASCADE"),
-        sa.PrimaryKeyConstraint("id"),
-        schema="public",
-    )
-    op.create_index("ix_accounts_user_id", "accounts", ["user_id"], schema="public")
-
-    op.create_table(
         "categories",
         sa.Column("id", uuid_type, server_default=sa.text("gen_random_uuid()"), nullable=False),
         sa.Column("user_id", uuid_type, nullable=False),
@@ -207,24 +186,22 @@ def upgrade() -> None:
         "transactions",
         sa.Column("id", uuid_type, server_default=sa.text("gen_random_uuid()"), nullable=False),
         sa.Column("user_id", uuid_type, nullable=False),
-        sa.Column("account_id", uuid_type, nullable=False),
         sa.Column("category_id", uuid_type, nullable=True),
         sa.Column("payee_id", uuid_type, nullable=True),
         sa.Column("amount", sa.BigInteger(), nullable=False),
         sa.Column("currency", sa.Text(), server_default=sa.text("'INR'"), nullable=False),
         sa.Column("transaction_type", sa.Text(), nullable=False),
+        sa.Column("payment_method", sa.Text(), nullable=True),
         sa.Column("transaction_date", sa.Date(), server_default=sa.text("CURRENT_DATE"), nullable=False),
         sa.Column("description", sa.Text(), nullable=True),
         sa.Column("notes", sa.Text(), nullable=True),
         sa.Column("cleared_status", sa.Text(), server_default=sa.text("'pending'"), nullable=False),
-        sa.Column("transfer_group_id", uuid_type, nullable=True),
-        sa.Column("transfer_direction", sa.Text(), nullable=True),
         sa.Column("parent_transaction_id", uuid_type, nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.CheckConstraint("amount >= 0", name="transactions_amount_check"),
         sa.CheckConstraint(
-            "transaction_type IN ('expense', 'income', 'transfer', 'starting_balance')",
+            "transaction_type IN ('expense', 'income', 'starting_balance')",
             name="transactions_type_check",
         ),
         sa.CheckConstraint(
@@ -236,19 +213,14 @@ def upgrade() -> None:
             name="transactions_parent_not_self_check",
         ),
         sa.CheckConstraint(
-            "(transaction_type != 'transfer') OR (transfer_group_id IS NOT NULL AND transfer_direction IN ('in', 'out'))",
-            name="transactions_transfer_fields_check",
+            "payment_method IS NULL OR payment_method IN ('cash', 'upi', 'bank_transfer', 'card', 'other')",
+            name="transactions_payment_method_check",
         ),
         sa.CheckConstraint(
-            "(transaction_type = 'transfer') OR transfer_direction IS NULL",
-            name="transactions_non_transfer_direction_check",
-        ),
-        sa.CheckConstraint(
-            "(transaction_type IN ('transfer', 'starting_balance')) OR (category_id IS NOT NULL)",
+            "(transaction_type = 'starting_balance') OR (category_id IS NOT NULL)",
             name="transactions_category_required_check",
         ),
         sa.ForeignKeyConstraint(["user_id"], ["public.profiles.id"], ondelete="CASCADE"),
-        sa.ForeignKeyConstraint(["account_id"], ["public.accounts.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(["category_id"], ["public.categories.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(["payee_id"], ["public.payees.id"], ondelete="SET NULL"),
         sa.ForeignKeyConstraint(["parent_transaction_id"], ["public.transactions.id"], ondelete="CASCADE"),
@@ -257,7 +229,6 @@ def upgrade() -> None:
     )
     for name, columns in (
         ("ix_transactions_user_id", ["user_id"]),
-        ("ix_transactions_account_id", ["account_id"]),
         ("ix_transactions_category_id", ["category_id"]),
         ("ix_transactions_payee_id", ["payee_id"]),
         ("ix_transactions_transaction_date", ["transaction_date"]),
@@ -265,13 +236,6 @@ def upgrade() -> None:
         ("ix_transactions_user_type", ["user_id", "transaction_type"]),
     ):
         op.create_index(name, "transactions", columns, schema="public")
-    op.create_index(
-        "ix_transactions_transfer_group_id",
-        "transactions",
-        ["transfer_group_id"],
-        postgresql_where=sa.text("transfer_group_id IS NOT NULL"),
-        schema="public",
-    )
     op.create_index(
         "ix_transactions_parent_transaction_id",
         "transactions",
@@ -412,7 +376,6 @@ def upgrade() -> None:
         )
         """
     )
-    _enable_owner_rls("accounts")
     _enable_owner_rls("categories")
     _enable_owner_rls("payees")
     _enable_owner_rls("transactions")
@@ -433,7 +396,6 @@ def downgrade() -> None:
         "transactions",
         "payees",
         "categories",
-        "accounts",
         "messages",
         "conversations",
         "profiles",
@@ -450,7 +412,6 @@ def downgrade() -> None:
     op.drop_index("ix_budget_entries_user_month", table_name="budget_entries", schema="public")
     op.drop_index("ix_budget_entries_category_id", table_name="budget_entries", schema="public")
     op.drop_table("budget_entries", schema="public")
-    op.drop_index("ix_transactions_transfer_group_id", table_name="transactions", schema="public")
     op.drop_index("ix_transactions_parent_transaction_id", table_name="transactions", schema="public")
     for name in (
         "ix_transactions_user_type",
@@ -458,7 +419,6 @@ def downgrade() -> None:
         "ix_transactions_transaction_date",
         "ix_transactions_payee_id",
         "ix_transactions_category_id",
-        "ix_transactions_account_id",
         "ix_transactions_user_id",
     ):
         op.drop_index(name, table_name="transactions", schema="public")
@@ -467,8 +427,6 @@ def downgrade() -> None:
     op.drop_table("payees", schema="public")
     op.drop_index("ix_categories_user_id", table_name="categories", schema="public")
     op.drop_table("categories", schema="public")
-    op.drop_index("ix_accounts_user_id", table_name="accounts", schema="public")
-    op.drop_table("accounts", schema="public")
     op.drop_index("ix_messages_idempotency_key", table_name="messages", schema="public")
     op.drop_index("ix_messages_conversation_created_at_id", table_name="messages", schema="public")
     op.drop_index("ix_messages_user_id", table_name="messages", schema="public")

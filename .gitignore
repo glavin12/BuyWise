@@ -25,3 +25,7 @@ Thumbs.db
 dist/
 build/
 *.egg-info/
+
+# Agent tool dirs
+.opencode/
+.serena/

@@ -25,15 +25,11 @@ class AnalyticsService:
         expenses = await self.transactions.sum_total(
             user_id, transaction_type="expense", start=window.start, end=window.end
         )
-        transfers = await self.transactions.sum_transfer_out(
-            user_id, start=window.start, end=window.end
-        )
         return {
             "month": month,
             "year": year,
             "income": income,
             "expenses": expenses,
-            "transfers": transfers,
             "net": income - expenses,
         }
 
@@ -57,6 +53,23 @@ class AnalyticsService:
             for row in rows
         ]
 
+    async def payment_method_spending(self, user_id: uuid.UUID, month: int, year: int) -> list[dict]:
+        window = month_range(month, year)
+        rows = await self.transactions.sum_by_payment_method(
+            user_id, transaction_type="expense", start=window.start, end=window.end
+        )
+        total = sum(row.amount for row in rows)
+        return [
+            {
+                "payment_method": row.method,
+                "amount": row.amount,
+                "display_amount": minor_to_amount(row.amount),
+                "transaction_count": row.transaction_count,
+                "percent_of_total": round(row.amount * 100 / total, 1) if total else 0,
+            }
+            for row in rows
+        ]
+
     async def month_comparison(
         self,
         user_id: uuid.UUID,
@@ -72,7 +85,7 @@ class AnalyticsService:
             "second": second,
             "change": {
                 field: self._change(second[field], first[field])
-                for field in ("income", "expenses", "transfers", "net")
+                for field in ("income", "expenses", "net")
             },
         }
 

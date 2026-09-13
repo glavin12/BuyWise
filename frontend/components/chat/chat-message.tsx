@@ -2,12 +2,17 @@
 
 import { cn } from "@/lib/utils";
 import type { Message, ToolCall } from "@/lib/types";
-import { User, Bot, Wrench } from "lucide-react";
 
 interface ChatMessageProps {
   message: Message;
   toolCalls?: ToolCall[];
 }
+
+const SparkAvatar = () => (
+  <div className="flex-shrink-0 w-7 h-7 rounded-[9px] bg-gradient-to-br from-[#5EC5C1] to-[#6FA8DC] text-white flex items-center justify-center text-sm">
+    ✦
+  </div>
+);
 
 export function ChatMessage({ message, toolCalls }: ChatMessageProps) {
   const isUser = message.role === "user";
@@ -21,42 +26,37 @@ export function ChatMessage({ message, toolCalls }: ChatMessageProps) {
     return null;
   }
 
-  return (
-    <div
-      className={cn(
-        "flex gap-3 max-w-3xl animate-fade-in",
-        isUser ? "ml-auto flex-row-reverse" : ""
-      )}
-    >
-      <div
-        className={cn(
-          "flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center",
-          isUser
-            ? "bg-accent text-white"
-            : "bg-surface-hover text-accent border border-border"
-        )}
-      >
-        {isUser ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
+  if (isUser) {
+    return (
+      <div className="flex justify-end animate-fade-in">
+        <div className="max-w-[80%] rounded-2xl rounded-br-md bg-primary text-background px-4 py-2.5 text-sm leading-relaxed">
+          {message.content}
+        </div>
       </div>
+    );
+  }
 
-      <div className={cn("space-y-2", isUser ? "text-right" : "")}>
+  const isError = message.status === "failed";
+
+  return (
+    <div className="flex gap-2.5 max-w-[85%] animate-fade-in">
+      <SparkAvatar />
+      <div className="space-y-2 min-w-0">
         <div
           className={cn(
-            "inline-block rounded-2xl px-4 py-2.5 text-sm leading-relaxed",
-            isUser
-              ? "bg-accent text-white rounded-br-md"
-              : "bg-surface border border-border rounded-bl-md"
+            "inline-block rounded-2xl rounded-bl-md px-4 py-2.5 text-sm leading-relaxed",
+            isError
+              ? "bg-[#FCE9E5] text-negative border border-[#F4C7BF]"
+              : "bg-surface-hover text-primary"
           )}
         >
-          {message.content || (
-            <span className="text-muted italic">Thinking...</span>
-          )}
+          {message.content || <span className="text-secondary italic">Thinking…</span>}
         </div>
 
         {toolCalls && toolCalls.length > 0 && (
           <div className="space-y-1.5">
-            {toolCalls.map((toolCall, i) => (
-              <ToolCallDisplay key={`${toolCall.tool_name}-${i}`} />
+            {toolCalls.map((tc, i) => (
+              <ToolCallCard key={`${tc.tool_name}-${i}`} toolCall={tc} />
             ))}
           </div>
         )}
@@ -65,16 +65,25 @@ export function ChatMessage({ message, toolCalls }: ChatMessageProps) {
   );
 }
 
-function ToolCallDisplay() {
+function prettyToolName(name: string): string {
+  return name
+    .replace(/^tool_/, "")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function ToolCallCard({ toolCall }: { toolCall: ToolCall }) {
   return (
-    <details className="group">
-      <summary className="flex items-center gap-1.5 text-xs text-muted cursor-pointer hover:text-accent transition-colors">
-        <Wrench className="w-3 h-3" />
-        <span className="font-medium">Checked account data</span>
-      </summary>
-      <div className="mt-1.5 p-3 bg-surface-hover border border-border rounded-lg text-xs text-secondary">
-        BuyWise used current financial data to prepare this response.
+    <div className="flex items-center gap-2.5 rounded-xl border border-border bg-surface px-3 py-2">
+      <div className="w-6 h-6 rounded-[7px] bg-[#DFF3F2] flex items-center justify-center text-xs">
+        ✦
       </div>
-    </details>
+      <span className="text-[13px] font-medium text-primary">
+        {prettyToolName(toolCall.tool_name)}
+      </span>
+      <span className="ml-auto text-[10px] text-positive bg-[#E9F5EE] px-2 py-0.5 rounded-full">
+        done
+      </span>
+    </div>
   );
 }

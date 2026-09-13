@@ -5,7 +5,7 @@ import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai_service.models import Profile
-from ai_service.repositories import AccountRepository, CategoryRepository, ProfileRepository
+from ai_service.repositories import CategoryRepository, ProfileRepository
 
 
 class ProfileNotFoundError(LookupError):
@@ -23,7 +23,6 @@ class ProfileService:
         self.session = session
         self.profiles = ProfileRepository(session)
         self.categories = CategoryRepository(session)
-        self.accounts = AccountRepository(session)
 
     async def get_profile(self, user_id: uuid.UUID) -> Profile | None:
         return await self.profiles.get(user_id)
@@ -35,6 +34,42 @@ class ProfileService:
         return profile
 
     async def create_profile(
+        self,
+        user_id: uuid.UUID,
+        *,
+        full_name: str | None = None,
+        currency: str | None = None,
+        income_type: str | None = None,
+        salary_day: int | None = None,
+        savings_target_percent: int | None = None,
+        investment_style: str | None = None,
+        budget_alerts: bool | None = None,
+        onboarding_complete: bool = False,
+        timezone: str | None = None,
+    ) -> Profile:
+        profile = await self._create_profile(
+            user_id,
+            full_name=full_name,
+            currency=currency,
+            income_type=income_type,
+            salary_day=salary_day,
+            savings_target_percent=savings_target_percent,
+            investment_style=investment_style,
+            budget_alerts=budget_alerts,
+            onboarding_complete=onboarding_complete,
+            timezone=timezone,
+        )
+        await self.session.commit()
+        return profile
+
+    async def ensure_profile(self, user_id: uuid.UUID) -> Profile:
+        """Create the default profile graph when a user has not onboarded yet."""
+        profile = await self.get_profile(user_id)
+        if profile is not None:
+            return profile
+        return await self._create_profile(user_id)
+
+    async def _create_profile(
         self,
         user_id: uuid.UUID,
         *,
@@ -61,8 +96,6 @@ class ProfileService:
             timezone=timezone or "Asia/Kolkata",
         )
         await self.categories.seed_defaults(user_id)
-        await self.accounts.create(user_id, name="Cash", account_type="cash", currency=profile.currency)
-        await self.session.commit()
         return profile
 
     async def update_profile(

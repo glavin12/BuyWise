@@ -9,42 +9,10 @@ from pydantic import AliasPath, BaseModel, ConfigDict, Field, computed_field
 from ai_service.utils.financial import minor_to_amount
 
 
-AccountType = Literal["checking", "savings", "cash", "credit_card"]
 CategoryType = Literal["expense", "income"]
 TransactionType = Literal["expense", "income", "starting_balance"]
-FullTransactionType = Literal["expense", "income", "transfer", "starting_balance"]
+PaymentMethod = Literal["cash", "upi", "bank_transfer", "card", "other"]
 ClearedStatus = Literal["pending", "cleared"]
-
-
-class AccountCreate(BaseModel):
-    name: str = Field(min_length=1, max_length=255)
-    account_type: AccountType
-    currency: str = Field(default="INR", min_length=3, max_length=10)
-    starting_balance: int | None = Field(default=None, ge=0)
-
-
-class AccountUpdate(BaseModel):
-    name: str | None = Field(default=None, min_length=1, max_length=255)
-    account_type: AccountType | None = None
-    currency: str | None = Field(default=None, min_length=3, max_length=10)
-
-
-class AccountResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: UUID
-    name: str
-    account_type: AccountType
-    currency: str
-    is_active: bool
-    balance: int
-    display_balance: float
-    created_at: datetime | None = None
-    updated_at: datetime | None = None
-
-
-class AccountListResponse(BaseModel):
-    accounts: list[AccountResponse]
 
 
 class CategoryCreate(BaseModel):
@@ -98,13 +66,13 @@ class PayeeListResponse(BaseModel):
 
 
 class TransactionCreate(BaseModel):
-    account_id: UUID
     category_id: UUID | None = None
     payee_id: UUID | None = None
     payee_name: str | None = Field(default=None, max_length=255)
     amount: int = Field(ge=0)
     currency: str | None = Field(default=None, min_length=3, max_length=10)
     transaction_type: TransactionType
+    payment_method: PaymentMethod | None = None
     transaction_date: date = Field(default_factory=date.today)
     description: str | None = None
     notes: str | None = None
@@ -112,12 +80,12 @@ class TransactionCreate(BaseModel):
 
 
 class TransactionUpdate(BaseModel):
-    account_id: UUID | None = None
     category_id: UUID | None = None
     payee_id: UUID | None = None
     amount: int | None = Field(default=None, ge=0)
     currency: str | None = Field(default=None, min_length=3, max_length=10)
     transaction_type: TransactionType | None = None
+    payment_method: PaymentMethod | None = None
     transaction_date: date | None = None
     description: str | None = None
     notes: str | None = None
@@ -128,8 +96,6 @@ class TransactionResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
     id: UUID
-    account_id: UUID
-    account: str | None = Field(default=None, validation_alias=AliasPath("account", "name"))
     category_id: UUID | None = None
     category: str | None = Field(default=None, validation_alias=AliasPath("category", "name"))
     category_icon: str | None = Field(
@@ -139,13 +105,12 @@ class TransactionResponse(BaseModel):
     payee: str | None = Field(default=None, validation_alias=AliasPath("payee", "name"))
     amount: int
     currency: str
-    transaction_type: FullTransactionType
+    transaction_type: TransactionType
+    payment_method: PaymentMethod | None = None
     transaction_date: date
     description: str | None = None
     notes: str | None = None
     cleared_status: ClearedStatus
-    transfer_group_id: UUID | None = None
-    transfer_direction: str | None = None
     parent_transaction_id: UUID | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
@@ -163,23 +128,6 @@ class TransactionListResponse(BaseModel):
     limit: int
     offset: int
     transactions: list[TransactionResponse]
-
-
-class TransferCreate(BaseModel):
-    from_account_id: UUID
-    to_account_id: UUID
-    amount: int = Field(gt=0)
-    transaction_date: date = Field(default_factory=date.today)
-    description: str | None = None
-
-
-class TransferResponse(BaseModel):
-    transfer_group_id: UUID
-    amount: int
-    from_account_id: UUID
-    to_account_id: UUID
-    transaction_date: date
-    description: str | None = None
 
 
 class BudgetCreate(BaseModel):
@@ -270,7 +218,6 @@ class MonthlySummaryResponse(BaseModel):
     year: int
     income: int
     expenses: int
-    transfers: int
     net: int
 
 
@@ -279,6 +226,14 @@ class CategorySpendingResponse(BaseModel):
     category: str
     icon: str | None = None
     color: str | None = None
+    amount: int
+    display_amount: float
+    transaction_count: int
+    percent_of_total: float
+
+
+class PaymentMethodSpendingResponse(BaseModel):
+    payment_method: str | None = None
     amount: int
     display_amount: float
     transaction_count: int
@@ -296,7 +251,8 @@ class DashboardResponse(BaseModel):
     month: str
     year: int
     currency: str
-    account_balances: list[AccountResponse]
+    current_balance: int
+    display_current_balance: float
     active_goals_count: int
     total_income: int
     display_total_income: float
