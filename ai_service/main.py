@@ -54,11 +54,14 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS: allow all origins in dev, tighten in prod.
+# CORS: frontend uses Authorization: Bearer, not cookies, so credentials are
+# not needed. Wildcard origin + credentials violates the W3C Fetch spec and is
+# rejected by browsers, so leave credentials off — this stays valid in prod.
+# ponytail: wildcard origin, replace with explicit list if we ever add cookie auth.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset"],

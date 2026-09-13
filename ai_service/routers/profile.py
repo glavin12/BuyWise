@@ -22,12 +22,14 @@ async def get_profile(
 ):
     """Return the authenticated user's profile.
 
-    The profile id is derived from the verified JWT, never the request.
+    Auto-provisions a default profile (and seeds default categories) on first
+    read so new users can immediately create transactions/budgets/goals
+    without hitting FK violations on ``profiles.id``.
     """
     service = ProfileService(session)
     profile = await service.get_profile(current_user.id)
     if profile is None:
-        raise HTTPException(status_code=404, detail="Profile not found")
+        profile = await service.create_profile(current_user.id)
     return profile
 
 
