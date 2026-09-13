@@ -144,7 +144,7 @@ export function QuickAddModal({ open, onClose, onAdded }: QuickAddModalProps) {
     p.name.toLowerCase().includes(payeeSearch.toLowerCase())
   );
 
-  const filteredCategories = categories.filter((c) => c.type === form.type);
+  const filteredCategories = categories.filter((c) => c.is_active && c.type === form.type);
 
   const typeOptions: { value: QuickAddType; label: string }[] = [
     { value: "expense", label: "Expense" },
