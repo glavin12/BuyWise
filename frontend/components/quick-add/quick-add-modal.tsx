@@ -93,6 +93,11 @@ export function QuickAddModal({ open, onClose, onAdded }: QuickAddModalProps) {
       return;
     }
 
+    if (!form.category_id) {
+      setError("Pick a category");
+      return;
+    }
+
     setSaving(true);
     try {
       // Find or reference payee
@@ -224,13 +229,17 @@ export function QuickAddModal({ open, onClose, onAdded }: QuickAddModalProps) {
 
         {/* Category */}
         <div className="space-y-1.5">
-          <label className="block text-sm font-medium text-primary">Category</label>
+          <label className="block text-sm font-medium text-primary">
+            Category <span className="text-secondary font-normal">(Required)</span>
+          </label>
           <select
             value={form.category_id}
             onChange={(e) => setForm((f) => ({ ...f, category_id: e.target.value }))}
             className={`${inputClass} cursor-pointer`}
           >
-            <option value="">No category</option>
+            <option value="" disabled>
+              Select a category
+            </option>
             {filteredCategories.map((c) => (
               <option key={c.id} value={c.id}>
                 {categoryEmoji(c.name)} {c.name}

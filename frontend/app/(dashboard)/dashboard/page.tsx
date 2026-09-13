@@ -34,6 +34,19 @@ export default function DashboardPage() {
     month === now.getMonth() + 1 && year === now.getFullYear();
   const period = isCurrentMonth ? "this_month" : "last_month";
 
+  // Backend /dashboard only accepts this_month/last_month, so the picker
+  // can't be allowed to land on anything else.
+  const prevMonthOfNow = now.getMonth() === 0 ? 12 : now.getMonth();
+  const prevYearOfNow = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+  const handleMonthChange = (m: number, y: number) => {
+    const isThisMonth = m === now.getMonth() + 1 && y === now.getFullYear();
+    const isLastMonth = m === prevMonthOfNow && y === prevYearOfNow;
+    if (isThisMonth || isLastMonth) {
+      setMonth(m);
+      setYear(y);
+    }
+  };
+
   useEffect(() => {
     const load = async () => {
       setLoading(true);
@@ -93,10 +106,7 @@ export default function DashboardPage() {
             <MonthSwitcher
               month={month}
               year={year}
-              onChange={(m, y) => {
-                setMonth(m);
-                setYear(y);
-              }}
+              onChange={handleMonthChange}
             />
             <FilterChip aria-label="Search" {...comingSoonProps("Search")}>
               <Search className="w-3.5 h-3.5" />

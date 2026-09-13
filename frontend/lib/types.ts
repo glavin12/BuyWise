@@ -275,7 +275,11 @@ export interface PaymentMethodSpending {
 export interface MonthComparison {
   first: MonthlySummary;
   second: MonthlySummary;
-  change: Record<string, Record<string, number | null>>;
+  change: {
+    income: { amount: number; display_amount: number; percent: number | null };
+    expenses: { amount: number; display_amount: number; percent: number | null };
+    net: { amount: number; display_amount: number; percent: number | null };
+  };
 }
 
 // ── Dashboard ───────────────────────────────────────────────────
