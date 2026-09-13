@@ -304,7 +304,7 @@ export default function ReportsPage() {
                     const rowMax = Math.max(Math.abs(prevDisplay), Math.abs(currDisplay), 1);
                     const prevPct = (Math.abs(prevDisplay) / rowMax) * 100;
                     const currPct = (Math.abs(currDisplay) / rowMax) * 100;
-                    const diff = comparison.change?.[row.key]?.percent_change ?? null;
+                    const diff = comparison.change?.[row.key]?.percent ?? null;
                     const isPositive = (diff ?? 0) >= 0;
                     const isGood = row.badWhenUp ? !isPositive : isPositive;
                     return (

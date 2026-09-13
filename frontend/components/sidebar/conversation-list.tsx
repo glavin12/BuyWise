@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useEffectEvent } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, MessageSquare, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -29,22 +29,20 @@ export function ConversationList({ activeId }: ConversationListProps) {
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const loadConversations = useEffectEvent(async () => {
-    try {
-      const data = await api.listConversations();
-      setConversations(data);
-    } catch (err) {
-      console.error("Failed to load conversations:", err);
-    } finally {
-      setLoading(false);
-    }
-  });
-
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      void loadConversations();
-    }, 0);
-    return () => window.clearTimeout(timer);
+    let cancelled = false;
+    api
+      .listConversations()
+      .then((data) => {
+        if (!cancelled) setConversations(data);
+      })
+      .catch((err) => console.error("Failed to load conversations:", err))
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [activeId]);
 
   const handleDelete = async (e: React.MouseEvent, id: string) => {
