@@ -48,7 +48,8 @@ export function minorToDisplay(minor: number): number {
 
 /**
  * Convert a user-entered display amount to integer minor units for API writes.
- * Uses banker's rounding to match the backend's `amount_to_minor()`.
+ * Rounds half-toward-+∞ (JS Math.round). Backend uses ROUND_HALF_UP; the two
+ * agree for non-negative amounts (which the schema enforces via ge=0).
  */
 export function displayToMinor(display: number): number {
   return Math.round(display * 100);

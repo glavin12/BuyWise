@@ -272,13 +272,19 @@ export interface PaymentMethodSpending {
   percent_of_total: number;
 }
 
+export interface MonthComparisonDelta {
+  amount: number;
+  display_amount: number;
+  percent: number | null;
+}
+
 export interface MonthComparison {
   first: MonthlySummary;
   second: MonthlySummary;
   change: {
-    income: { amount: number; display_amount: number; percent: number | null };
-    expenses: { amount: number; display_amount: number; percent: number | null };
-    net: { amount: number; display_amount: number; percent: number | null };
+    income: MonthComparisonDelta;
+    expenses: MonthComparisonDelta;
+    net: MonthComparisonDelta;
   };
 }
 

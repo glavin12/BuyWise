@@ -107,8 +107,8 @@ export default function TransactionsPage() {
       category_id: tx.category_id,
       transaction_type: tx.transaction_type,
       transaction_date: tx.transaction_date,
-      description: tx.description || "",
-      notes: tx.notes || "",
+      description: tx.description ?? null,
+      notes: tx.notes ?? null,
       cleared_status: tx.cleared_status,
     });
   };
@@ -340,7 +340,7 @@ export default function TransactionsPage() {
                               <input
                                 type="text"
                                 value={editForm.description || ""}
-                                onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))}
+                                onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value || null }))}
                                 className="mt-1 w-full rounded-lg border border-border bg-surface px-2.5 py-1.5 text-sm text-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                               />
                             </div>
