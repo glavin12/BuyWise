@@ -43,6 +43,20 @@ export default function BudgetPage() {
   const period = isCurrentMonth ? "this_month" : "last_month";
   const currency = dashboard?.currency || "INR";
 
+  // Backend /dashboard only accepts this_month/last_month, so the picker
+  // can't be allowed to land on anything else — otherwise "Ready to assign"
+  // mixes current-month budgets with a different month's income.
+  const prevMonthOfNow = now.getMonth() === 0 ? 12 : now.getMonth();
+  const prevYearOfNow = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+  const handleMonthChange = (m: number, y: number) => {
+    const isThisMonth = m === now.getMonth() + 1 && y === now.getFullYear();
+    const isLastMonth = m === prevMonthOfNow && y === prevYearOfNow;
+    if (isThisMonth || isLastMonth) {
+      setMonth(m);
+      setYear(y);
+    }
+  };
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
@@ -168,14 +182,7 @@ export default function BudgetPage() {
           >
             + Set budget
           </FilterChip>
-          <MonthSwitcher
-            month={month}
-            year={year}
-            onChange={(m, y) => {
-              setMonth(m);
-              setYear(y);
-            }}
-          />
+          <MonthSwitcher month={month} year={year} onChange={handleMonthChange} />
         </div>
       </div>
 

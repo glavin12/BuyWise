@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
+import { api } from "@/lib/api";
 
 export default function SignupPage() {
   const [email, setEmail] = useState("");
@@ -32,7 +33,7 @@ export default function SignupPage() {
     setLoading(true);
 
     const supabase = createClient();
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
     });
@@ -41,6 +42,12 @@ export default function SignupPage() {
       setError(error.message);
       setLoading(false);
       return;
+    }
+
+    if (data.session) {
+      // Create the backend profile row up front so the sidebar/settings
+      // don't show placeholders until the user happens to save a setting.
+      api.updateProfile({ onboarding_complete: false }).catch(() => {});
     }
 
     setSuccess(true);
