@@ -148,8 +148,12 @@ export const api = {
     ),
 
   // ── Payees ─────────────────────────────────────────────────────
-  listPayees: () =>
-    fetchAPI<PayeeListResponse>("/api/v1/payees"),
+  listPayees: (type?: "expense" | "income") => {
+    const params = new URLSearchParams();
+    if (type) params.set("type", type);
+    const qs = params.toString();
+    return fetchAPI<PayeeListResponse>(`/api/v1/payees${qs ? `?${qs}` : ""}`);
+  },
 
   getPayee: (id: string) =>
     fetchAPI<Payee>(`/api/v1/payees/${id}`),

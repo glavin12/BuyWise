@@ -16,14 +16,20 @@ class PayeeService:
         self.session = session
         self.payees = PayeeRepository(session)
 
-    async def create_payee(self, user_id: uuid.UUID, name: str) -> dict:
+    async def create_payee(self, user_id: uuid.UUID, name: str, type: str) -> dict:
         self._validate_name(name)
-        payee = await self.payees.create(user_id, name)
+        if type not in {"expense", "income"}:
+            raise ValueError("type must be expense or income")
+        # find_or_create makes duplicate names (same user + type) a no-op instead of a 500.
+        payee = await self.payees.find_or_create(user_id, name, type)
         await self.session.commit()
         return self._to_dict(payee)
 
-    async def list_payees(self, user_id: uuid.UUID) -> list[dict]:
-        return [self._to_dict(payee) for payee in await self.payees.list(user_id)]
+    async def list_payees(self, user_id: uuid.UUID, *, type: str | None = None) -> list[dict]:
+        return [self._to_dict(payee) for payee in await self.payees.list(user_id, type=type)]
+
+    async def seed_default_payees(self, user_id: uuid.UUID):
+        return await self.payees.seed_defaults(user_id)
 
     async def get_payee(self, user_id: uuid.UUID, payee_id: uuid.UUID) -> dict:
         payee = await self.payees.get(user_id, payee_id)
@@ -57,6 +63,7 @@ class PayeeService:
             "id": str(payee.id),
             "name": payee.name,
             "normalized_name": payee.normalized_name,
+            "type": payee.type,
             "created_at": payee.created_at.isoformat() if payee.created_at else None,
             "updated_at": payee.updated_at.isoformat() if payee.updated_at else None,
         }
