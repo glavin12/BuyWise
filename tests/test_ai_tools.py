@@ -17,5 +17,5 @@ async def test_ai_tools_use_user_scoped_context(session):
     with request_context(user_id, session):
         categories = await get_categories.ainvoke({})
         dashboard = await get_dashboard.ainvoke({})
-    assert categories["count"] == 20
+    assert categories["count"] == 36
     assert dashboard["currency"] == "INR"

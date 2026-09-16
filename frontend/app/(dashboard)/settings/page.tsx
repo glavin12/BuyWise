@@ -12,6 +12,7 @@ import { useState, useEffect, useCallback, type ButtonHTMLAttributes } from "rea
 import { Tag, Users, Pencil, Trash2, Plus, Search } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { FilterChip } from "@/components/ui/filter-chip";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -549,6 +550,7 @@ function PayeesSection() {
   const [showModal, setShowModal] = useState(false);
   const [editPayee, setEditPayee] = useState<Payee | null>(null);
   const [name, setName] = useState("");
+  const [type, setType] = useState<CategoryType>("expense");
   const [saving, setSaving] = useState(false);
 
   const fetchPayees = useCallback(async () => {
@@ -578,7 +580,7 @@ function PayeesSection() {
       if (editPayee) {
         await api.updatePayee(editPayee.id, { name: name.trim() });
       } else {
-        await api.createPayee({ name: name.trim() });
+        await api.createPayee({ name: name.trim(), type });
       }
       setShowModal(false);
       setName("");
@@ -620,6 +622,7 @@ function PayeesSection() {
             onClick={() => {
               setEditPayee(null);
               setName("");
+              setType("expense");
               setShowModal(true);
             }}
           >
@@ -643,13 +646,19 @@ function PayeesSection() {
           <div className="divide-y divide-divider">
             {filtered.map((payee) => (
               <div key={payee.id} className="flex items-center justify-between py-2.5">
-                <span className="text-sm text-primary">{payee.name}</span>
+                <span className="flex items-center gap-2 text-sm text-primary">
+                  {payee.name}
+                  <Badge variant={payee.type === "income" ? "success" : "info"}>
+                    {payee.type}
+                  </Badge>
+                </span>
                 <div className="flex items-center gap-1">
                   <button
                     type="button"
                     onClick={() => {
                       setEditPayee(payee);
                       setName(payee.name);
+                      setType(payee.type);
                       setShowModal(true);
                     }}
                     aria-label={`Edit ${payee.name}`}
@@ -686,6 +695,31 @@ function PayeesSection() {
             placeholder="Payee name..."
             onKeyDown={(e) => e.key === "Enter" && handleSave()}
           />
+          {editPayee ? (
+            <div className="space-y-1.5">
+              <label className="block text-sm font-medium text-primary">Type</label>
+              <Badge variant={type === "income" ? "success" : "info"} className="capitalize">
+                {type}
+              </Badge>
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              <label className="block text-sm font-medium text-primary">Type</label>
+              <div className="grid grid-cols-2 gap-2">
+                {(["expense", "income"] as CategoryType[]).map((t) => (
+                  <FilterChip
+                    key={t}
+                    type="button"
+                    active={type === t}
+                    onClick={() => setType(t)}
+                    className="capitalize justify-center"
+                  >
+                    {t}
+                  </FilterChip>
+                ))}
+              </div>
+            </div>
+          )}
           <Button onClick={handleSave} loading={saving} className="w-full">
             {editPayee ? "Update" : "Create"}
           </Button>
