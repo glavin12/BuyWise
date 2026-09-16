@@ -9,12 +9,17 @@
  *
  * Single-balance backend: no account selector. Each transaction is optionally
  * tagged with a payment method (cash/upi/card/bank_transfer/other).
+ *
+ * Category and Payee are both predefined + user-created, and Payee is scoped
+ * to the current transaction type (expense/income keep separate payee lists —
+ * switching type clears any payee picked under the other type).
  */
 "use client";
 
 import { useState, useRef, useEffect, useCallback, type KeyboardEvent } from "react";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
+import { Combobox } from "@/components/ui/combobox";
 import { api } from "@/lib/api";
 import { displayToMinor } from "@/lib/format";
 import { PAYMENT_METHOD_OPTIONS, categoryEmoji } from "@/lib/categories";
@@ -30,7 +35,7 @@ type QuickAddType = "expense" | "income";
 
 const INITIAL_FORM = {
   amount: "",
-  payee: "",
+  payee_id: "",
   category_id: "",
   payment_method: "" as "" | PaymentMethod,
   date: new Date().toISOString().split("T")[0],
@@ -45,25 +50,31 @@ export function QuickAddModal({ open, onClose, onAdded }: QuickAddModalProps) {
   const [form, setForm] = useState(INITIAL_FORM);
   const [categories, setCategories] = useState<Category[]>([]);
   const [payees, setPayees] = useState<Payee[]>([]);
-  const [payeeSearch, setPayeeSearch] = useState("");
-  const [showPayeeSuggestions, setShowPayeeSuggestions] = useState(false);
+  const [refDataLoading, setRefDataLoading] = useState(false);
+  const [refDataError, setRefDataError] = useState<string | null>(null);
+  const [creatingCategory, setCreatingCategory] = useState(false);
+  const [creatingPayee, setCreatingPayee] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const amountRef = useRef<HTMLInputElement>(null);
 
+  const loadReferenceData = useCallback(async () => {
+    setRefDataLoading(true);
+    setRefDataError(null);
+    const [catRes, payRes] = await Promise.allSettled([api.listCategories(), api.listPayees()]);
+    if (catRes.status === "fulfilled") setCategories(catRes.value.categories);
+    if (payRes.status === "fulfilled") setPayees(payRes.value.payees);
+    if (catRes.status === "rejected" || payRes.status === "rejected") {
+      setRefDataError("Couldn't load categories/payees.");
+    }
+    setRefDataLoading(false);
+  }, []);
+
   // Load reference data when modal opens
   useEffect(() => {
     if (!open) return;
-    const load = async () => {
-      const [catRes, payRes] = await Promise.allSettled([
-        api.listCategories(),
-        api.listPayees(),
-      ]);
-      if (catRes.status === "fulfilled") setCategories(catRes.value.categories);
-      if (payRes.status === "fulfilled") setPayees(payRes.value.payees);
-    };
-    load();
-  }, [open]);
+    loadReferenceData();
+  }, [open, loadReferenceData]);
 
   // Focus amount field when modal opens
   useEffect(() => {
@@ -79,7 +90,6 @@ export function QuickAddModal({ open, onClose, onAdded }: QuickAddModalProps) {
       payment_method: f.payment_method, // keep last-used method
       type: f.type,
     }));
-    setPayeeSearch("");
     setError(null);
     setTimeout(() => amountRef.current?.focus(), 50);
   }, []);
@@ -100,21 +110,9 @@ export function QuickAddModal({ open, onClose, onAdded }: QuickAddModalProps) {
 
     setSaving(true);
     try {
-      // Find or reference payee
-      let payee_id: string | undefined;
-      let payee_name: string | undefined;
-      if (payeeSearch) {
-        const existing = payees.find(
-          (p) => p.name.toLowerCase() === payeeSearch.toLowerCase()
-        );
-        if (existing) payee_id = existing.id;
-        else payee_name = payeeSearch;
-      }
-
       await api.createTransaction({
-        category_id: form.category_id || undefined,
-        payee_id,
-        payee_name,
+        category_id: form.category_id,
+        payee_id: form.payee_id || undefined,
         amount: displayToMinor(amountNum),
         transaction_type: form.type as TransactionType,
         payment_method: form.payment_method || undefined,
@@ -140,11 +138,43 @@ export function QuickAddModal({ open, onClose, onAdded }: QuickAddModalProps) {
     }
   };
 
-  const filteredPayees = payees.filter((p) =>
-    p.name.toLowerCase().includes(payeeSearch.toLowerCase())
-  );
+  const switchType = (type: QuickAddType) => {
+    // Category AND payee are type-scoped — stale picks from the other type
+    // (e.g. an income source left selected after flipping to Expense) must not
+    // carry over.
+    setForm((f) => ({ ...f, type, category_id: "", payee_id: "" }));
+  };
+
+  const createCategory = async (name: string) => {
+    setCreatingCategory(true);
+    setError(null);
+    try {
+      const created = await api.createCategory({ name, type: form.type });
+      setCategories((c) => (c.some((x) => x.id === created.id) ? c : [...c, created]));
+      setForm((f) => ({ ...f, category_id: created.id }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to add category");
+    } finally {
+      setCreatingCategory(false);
+    }
+  };
+
+  const createPayee = async (name: string) => {
+    setCreatingPayee(true);
+    setError(null);
+    try {
+      const created = await api.createPayee({ name, type: form.type });
+      setPayees((p) => (p.some((x) => x.id === created.id) ? p : [...p, created]));
+      setForm((f) => ({ ...f, payee_id: created.id }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to add payee");
+    } finally {
+      setCreatingPayee(false);
+    }
+  };
 
   const filteredCategories = categories.filter((c) => c.is_active && c.type === form.type);
+  const filteredPayees = payees.filter((p) => p.type === form.type);
 
   const typeOptions: { value: QuickAddType; label: string }[] = [
     { value: "expense", label: "Expense" },
@@ -160,7 +190,7 @@ export function QuickAddModal({ open, onClose, onAdded }: QuickAddModalProps) {
             <button
               key={opt.value}
               type="button"
-              onClick={() => setForm((f) => ({ ...f, type: opt.value, category_id: "" }))}
+              onClick={() => switchType(opt.value)}
               className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors cursor-pointer ${
                 form.type === opt.value
                   ? "bg-primary text-background"
@@ -193,60 +223,42 @@ export function QuickAddModal({ open, onClose, onAdded }: QuickAddModalProps) {
         </div>
 
         {/* Payee */}
-        <div className="space-y-1.5 relative">
-          <label className="block text-sm font-medium text-primary">Payee</label>
-          <input
-            type="text"
-            value={payeeSearch}
-            onChange={(e) => {
-              setPayeeSearch(e.target.value);
-              setShowPayeeSuggestions(true);
-            }}
-            onFocus={() => setShowPayeeSuggestions(true)}
-            onBlur={() => setTimeout(() => setShowPayeeSuggestions(false), 200)}
-            placeholder="Type to search or add new..."
-            className={inputClass}
-          />
-          {showPayeeSuggestions && payeeSearch && filteredPayees.length > 0 && (
-            <div className="absolute z-10 top-full mt-1 w-full bg-surface border border-border rounded-xl shadow-lg max-h-36 overflow-y-auto">
-              {filteredPayees.slice(0, 8).map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    setPayeeSearch(p.name);
-                    setShowPayeeSuggestions(false);
-                  }}
-                  className="w-full text-left px-3 py-2 text-sm text-primary hover:bg-surface-hover cursor-pointer"
-                >
-                  {p.name}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        <Combobox
+          label={<>Payee <span className="text-secondary font-normal">(optional)</span></>}
+          placeholder={`Select a${form.type === "expense" ? "n" : ""} ${form.type} payee`}
+          searchPlaceholder="Search or add a payee..."
+          value={form.payee_id}
+          onChange={(payee_id) => setForm((f) => ({ ...f, payee_id }))}
+          options={filteredPayees.map((p) => ({ value: p.id, label: p.name }))}
+          loading={refDataLoading}
+          error={refDataError}
+          onRetry={loadReferenceData}
+          emptyMessage="No payees yet — type a name to add one"
+          onCreate={createPayee}
+          creating={creatingPayee}
+          createLabel={(q) => `+ Add new payee "${q}"`}
+        />
 
         {/* Category */}
-        <div className="space-y-1.5">
-          <label className="block text-sm font-medium text-primary">
-            Category <span className="text-secondary font-normal">(Required)</span>
-          </label>
-          <select
-            value={form.category_id}
-            onChange={(e) => setForm((f) => ({ ...f, category_id: e.target.value }))}
-            className={`${inputClass} cursor-pointer`}
-          >
-            <option value="" disabled>
-              Select a category
-            </option>
-            {filteredCategories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {categoryEmoji(c.name)} {c.name}
-              </option>
-            ))}
-          </select>
-        </div>
+        <Combobox
+          label={<>Category <span className="text-secondary font-normal">(Required)</span></>}
+          placeholder="Select a category"
+          searchPlaceholder="Search or add a category..."
+          value={form.category_id}
+          onChange={(category_id) => setForm((f) => ({ ...f, category_id }))}
+          options={filteredCategories.map((c) => ({
+            value: c.id,
+            label: c.name,
+            icon: categoryEmoji(c.name),
+          }))}
+          loading={refDataLoading}
+          error={refDataError}
+          onRetry={loadReferenceData}
+          emptyMessage="No categories yet — type a name to add one"
+          onCreate={createCategory}
+          creating={creatingCategory}
+          createLabel={(q) => `+ Add new category "${q}"`}
+        />
 
         {/* Payment method */}
         <div className="space-y-1.5">

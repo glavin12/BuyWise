@@ -5,7 +5,7 @@ import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai_service.models import Profile
-from ai_service.repositories import CategoryRepository, ProfileRepository
+from ai_service.repositories import CategoryRepository, PayeeRepository, ProfileRepository
 
 
 class ProfileNotFoundError(LookupError):
@@ -23,6 +23,7 @@ class ProfileService:
         self.session = session
         self.profiles = ProfileRepository(session)
         self.categories = CategoryRepository(session)
+        self.payees = PayeeRepository(session)
 
     async def get_profile(self, user_id: uuid.UUID) -> Profile | None:
         return await self.profiles.get(user_id)
@@ -96,6 +97,7 @@ class ProfileService:
             timezone=timezone or "Asia/Kolkata",
         )
         await self.categories.seed_defaults(user_id)
+        await self.payees.seed_defaults(user_id)
         return profile
 
     async def update_profile(
