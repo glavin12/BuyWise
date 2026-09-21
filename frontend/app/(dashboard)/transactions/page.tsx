@@ -21,7 +21,7 @@ import { Modal } from "@/components/ui/modal";
 import { QuickAddModal } from "@/components/quick-add/quick-add-modal";
 import { api } from "@/lib/api";
 import { formatCurrency, formatDate, displayToMinor, minorToDisplay } from "@/lib/format";
-import { categoryStyle, categoryEmoji, paymentMethodInfo } from "@/lib/categories";
+import { categoryStyle, categoryEmoji, paymentMethodInfo, PAYMENT_METHOD_OPTIONS } from "@/lib/categories";
 import { comingSoonProps } from "@/lib/coming-soon";
 import type { Transaction, Category, TransactionUpdate, MonthlySummary } from "@/lib/types";
 
@@ -107,6 +107,7 @@ export default function TransactionsPage() {
       category_id: tx.category_id,
       transaction_type: tx.transaction_type,
       transaction_date: tx.transaction_date,
+      payment_method: tx.payment_method,
       description: tx.description ?? null,
       notes: tx.notes ?? null,
       cleared_status: tx.cleared_status,
@@ -302,7 +303,7 @@ export default function TransactionsPage() {
                     if (editingId === tx.id) {
                       return (
                         <div key={tx.id} className="mx-3 my-1.5 rounded-xl border border-primary/15 bg-surface-hover p-3.5">
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-3">
                             <div>
                               <label className="text-[10px] uppercase tracking-wider text-secondary">Amount</label>
                               <input
@@ -323,6 +324,19 @@ export default function TransactionsPage() {
                                 <option value="">None</option>
                                 {activeCategories.map((c) => (
                                   <option key={c.id} value={c.id}>{c.name}</option>
+                                ))}
+                              </select>
+                            </div>
+                            <div>
+                              <label className="text-[10px] uppercase tracking-wider text-secondary">Payment method</label>
+                              <select
+                                value={editForm.payment_method || ""}
+                                onChange={(e) => setEditForm((f) => ({ ...f, payment_method: (e.target.value || null) as TransactionUpdate["payment_method"] }))}
+                                className="mt-1 w-full rounded-lg border border-border bg-surface px-2.5 py-1.5 text-sm text-primary cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/20"
+                              >
+                                <option value="">Unspecified</option>
+                                {PAYMENT_METHOD_OPTIONS.map((o) => (
+                                  <option key={o.value} value={o.value}>{o.emoji} {o.label}</option>
                                 ))}
                               </select>
                             </div>

@@ -47,3 +47,6 @@ class ChatResponse(BaseModel):
     response: str
     conversation_id: UUID
     tool_calls: list[ToolCallInfo] = Field(default_factory=list)
+    reasoning: str | None = Field(
+        default=None, description="The model's reasoning trace, kept separate from response."
+    )

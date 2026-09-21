@@ -266,5 +266,7 @@ class DashboardResponse(BaseModel):
     display_total_budgeted: float
     remaining_budget: int
     display_remaining_budget: float
+    unassigned: int
+    display_unassigned: float
     has_budget: bool
     days_remaining_in_month: int

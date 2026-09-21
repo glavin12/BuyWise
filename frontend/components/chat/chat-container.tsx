@@ -16,6 +16,7 @@ export function ChatContainer() {
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [toolCalls, setToolCalls] = useState<ToolCall[]>([]);
+  const [reasoning, setReasoning] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [newChatStarted, setNewChatStarted] = useState(false);
   const [loadedConversationId, setLoadedConversationId] = useState<string | null>(
@@ -42,12 +43,14 @@ export function ChatContainer() {
         if (cancelled) return;
         setMessages(data.messages);
         setToolCalls([]);
+        setReasoning(null);
         setNewChatStarted(false);
       } catch (err) {
         if (cancelled) return;
         console.error("Failed to load messages:", err);
         setMessages([]);
         setToolCalls([]);
+        setReasoning(null);
         setNewChatStarted(false);
       }
       setLoadedConversationId(conversationId);
@@ -66,6 +69,7 @@ export function ChatContainer() {
   const handleSend = async (content: string) => {
     setSending(true);
     setToolCalls([]);
+    setReasoning(null);
     if (!conversationId) setNewChatStarted(true);
 
     const userMessage: Message = {
@@ -97,6 +101,7 @@ export function ChatContainer() {
 
       setMessages((prev) => [...prev, assistantMessage]);
       setToolCalls(response.tool_calls || []);
+      setReasoning(response.reasoning || null);
 
       if (!conversationId && response.conversation_id) {
         router.push(`/chat/${response.conversation_id}`);
@@ -153,18 +158,19 @@ export function ChatContainer() {
     <>
       <div className="flex-1 overflow-y-auto px-4 py-6">
         <div className="max-w-3xl mx-auto space-y-6">
-          {visibleMessages.map((msg) => (
-            <ChatMessage
-              key={msg.id}
-              message={msg}
-              toolCalls={
-                msg.role === "assistant" &&
-                visibleMessages.indexOf(msg) === visibleMessages.length - 1
-                  ? toolCalls
-                  : undefined
-              }
-            />
-          ))}
+          {visibleMessages.map((msg) => {
+            const isLastAssistant =
+              msg.role === "assistant" &&
+              visibleMessages.indexOf(msg) === visibleMessages.length - 1;
+            return (
+              <ChatMessage
+                key={msg.id}
+                message={msg}
+                toolCalls={isLastAssistant ? toolCalls : undefined}
+                reasoning={isLastAssistant ? reasoning : undefined}
+              />
+            );
+          })}
           {sending && <ComposingBubble />}
           <div ref={messagesEndRef} />
         </div>

@@ -350,6 +350,7 @@ export interface ChatResponse {
   response: string;
   conversation_id: string;
   tool_calls: ToolCall[];
+  reasoning?: string | null;
 }
 
 export interface ChatRequest {
