@@ -29,3 +29,5 @@ build/
 # Agent tool dirs
 .opencode/
 .serena/
+.claude/
+.gemini/

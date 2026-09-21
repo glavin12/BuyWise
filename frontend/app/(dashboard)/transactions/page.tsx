@@ -22,6 +22,7 @@ import { QuickAddModal } from "@/components/quick-add/quick-add-modal";
 import { api } from "@/lib/api";
 import { formatCurrency, formatDate, displayToMinor, minorToDisplay } from "@/lib/format";
 import { categoryStyle, categoryEmoji, paymentMethodInfo, PAYMENT_METHOD_OPTIONS } from "@/lib/categories";
+import { TRANSACTION_UPDATED_EVENT, emitTransactionUpdated } from "@/lib/events";
 import { comingSoonProps } from "@/lib/coming-soon";
 import type { Transaction, Category, TransactionUpdate, MonthlySummary } from "@/lib/types";
 
@@ -63,42 +64,63 @@ export default function TransactionsPage() {
   // Quick add
   const [quickAddOpen, setQuickAddOpen] = useState(false);
 
-  const fetchTransactions = useCallback(async () => {
-    setLoading(true);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+
+  const fetchTransactions = useCallback(
+    async (showSkeleton = false) => {
+      if (showSkeleton) setLoading(true);
+      try {
+        const res = await api.listTransactions({
+          category_id: filterCategory || undefined,
+          transaction_type: filterType || undefined,
+          period: "this_month",
+          limit: PAGE_SIZE,
+          offset,
+        });
+        setTransactions(res.transactions);
+        setTotal(res.total);
+      } catch (err) {
+        console.error("Failed to load transactions:", err);
+      } finally {
+        setLoading(false);
+        setIsInitialLoad(false);
+      }
+    },
+    [filterType, filterCategory, offset]
+  );
+
+  const loadSummary = useCallback(async () => {
     try {
-      const res = await api.listTransactions({
-        category_id: filterCategory || undefined,
-        transaction_type: filterType || undefined,
-        period: "this_month",
-        limit: PAGE_SIZE,
-        offset,
-      });
-      setTransactions(res.transactions);
-      setTotal(res.total);
-    } catch (err) {
-      console.error("Failed to load transactions:", err);
-    } finally {
-      setLoading(false);
+      const summaryRes = await api.monthlyAnalytics(month, year);
+      setSummary(summaryRes);
+    } catch {
+      /* summary optional */
     }
-  }, [filterType, filterCategory, offset]);
+  }, [month, year]);
 
   useEffect(() => {
-    fetchTransactions();
-  }, [fetchTransactions]);
+    fetchTransactions(isInitialLoad);
+  }, [fetchTransactions, isInitialLoad]);
+
+  // Listen for transaction changes from sidebar or other views
+  useEffect(() => {
+    const onTxUpdated = () => {
+      fetchTransactions(false);
+      loadSummary();
+    };
+    window.addEventListener(TRANSACTION_UPDATED_EVENT, onTxUpdated);
+    return () => window.removeEventListener(TRANSACTION_UPDATED_EVENT, onTxUpdated);
+  }, [fetchTransactions, loadSummary]);
 
   // Reference data + this month's totals (fixed to current month — no switcher in the mockup)
   useEffect(() => {
     const load = async () => {
-      const [catRes, summaryRes] = await Promise.allSettled([
-        api.listCategories(),
-        api.monthlyAnalytics(month, year),
-      ]);
+      const [catRes] = await Promise.allSettled([api.listCategories()]);
       if (catRes.status === "fulfilled") setCategories(catRes.value.categories);
-      if (summaryRes.status === "fulfilled") setSummary(summaryRes.value);
+      await loadSummary();
     };
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [loadSummary]);
 
   const startEdit = (tx: Transaction) => {
     setEditingId(tx.id);
@@ -125,7 +147,9 @@ export default function TransactionsPage() {
       };
       await api.updateTransaction(editingId, update);
       setEditingId(null);
-      fetchTransactions();
+      emitTransactionUpdated();
+      fetchTransactions(false);
+      loadSummary();
     } catch (err) {
       console.error("Failed to update:", err);
     } finally {
@@ -139,7 +163,9 @@ export default function TransactionsPage() {
     try {
       await api.deleteTransaction(deleteId);
       setDeleteId(null);
-      fetchTransactions();
+      emitTransactionUpdated();
+      fetchTransactions(false);
+      loadSummary();
     } catch (err) {
       console.error("Failed to delete:", err);
     } finally {
@@ -487,7 +513,14 @@ export default function TransactionsPage() {
       </Modal>
 
       {/* Quick add — mockup's "+ New" chip */}
-      <QuickAddModal open={quickAddOpen} onClose={() => setQuickAddOpen(false)} onAdded={fetchTransactions} />
+      <QuickAddModal
+        open={quickAddOpen}
+        onClose={() => setQuickAddOpen(false)}
+        onAdded={() => {
+          fetchTransactions(false);
+          loadSummary();
+        }}
+      />
     </div>
   );
 }

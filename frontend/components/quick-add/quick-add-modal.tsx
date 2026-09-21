@@ -23,6 +23,7 @@ import { Combobox } from "@/components/ui/combobox";
 import { api } from "@/lib/api";
 import { displayToMinor } from "@/lib/format";
 import { PAYMENT_METHOD_OPTIONS, categoryEmoji } from "@/lib/categories";
+import { emitTransactionUpdated } from "@/lib/events";
 import type { Category, Payee, PaymentMethod, TransactionType } from "@/lib/types";
 
 interface QuickAddModalProps {
@@ -121,6 +122,7 @@ export function QuickAddModal({ open, onClose, onAdded }: QuickAddModalProps) {
         cleared_status: "pending",
       });
 
+      emitTransactionUpdated();
       onAdded?.();
       resetForm();
       if (!reopenAfter) onClose();

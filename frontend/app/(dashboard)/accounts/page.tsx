@@ -20,6 +20,7 @@ import { TransactionRow } from "@/components/ui/transaction-row";
 import { api } from "@/lib/api";
 import { paymentMethodInfo } from "@/lib/categories";
 import { comingSoonProps } from "@/lib/coming-soon";
+import { TRANSACTION_UPDATED_EVENT } from "@/lib/events";
 import type { DashboardData, PaymentMethodSpending, Transaction } from "@/lib/types";
 
 export default function AccountsPage() {
@@ -49,26 +50,37 @@ export default function AccountsPage() {
     }
   };
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [dashRes, methodsRes, txRes] = await Promise.allSettled([
-        api.getDashboard(period),
-        api.paymentMethodAnalytics(month, year),
-        api.listTransactions({ period: "this_month", limit: 6 }),
-      ]);
-      if (dashRes.status === "fulfilled") setDashboard(dashRes.value);
-      if (methodsRes.status === "fulfilled") setMethods(methodsRes.value);
-      if (txRes.status === "fulfilled") setTransactions(txRes.value.transactions);
-    } catch (err) {
-      console.error("Failed to load balance:", err);
-    } finally {
-      setLoading(false);
-    }
-  }, [month, year, period]);
+  const load = useCallback(
+    async (showSkeleton = false) => {
+      if (showSkeleton) setLoading(true);
+      try {
+        const [dashRes, methodsRes, txRes] = await Promise.allSettled([
+          api.getDashboard(period),
+          api.paymentMethodAnalytics(month, year),
+          api.listTransactions({ period: "this_month", limit: 6 }),
+        ]);
+        if (dashRes.status === "fulfilled") setDashboard(dashRes.value);
+        if (methodsRes.status === "fulfilled") setMethods(methodsRes.value);
+        if (txRes.status === "fulfilled") setTransactions(txRes.value.transactions);
+      } catch (err) {
+        console.error("Failed to load balance:", err);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [month, year, period]
+  );
 
   useEffect(() => {
-    load();
+    load(true);
+  }, [load]);
+
+  useEffect(() => {
+    const onTxUpdated = () => {
+      load(false);
+    };
+    window.addEventListener(TRANSACTION_UPDATED_EVENT, onTxUpdated);
+    return () => window.removeEventListener(TRANSACTION_UPDATED_EVENT, onTxUpdated);
   }, [load]);
 
   const currency = dashboard?.currency || "INR";

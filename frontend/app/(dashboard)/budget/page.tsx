@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import { formatCurrency, displayToMinor } from "@/lib/format";
 import { categoryStyle, categoryEmoji } from "@/lib/categories";
+import { TRANSACTION_UPDATED_EVENT } from "@/lib/events";
 import { cn } from "@/lib/utils";
 import type { Budget, Category, DashboardData } from "@/lib/types";
 
@@ -57,26 +58,37 @@ export default function BudgetPage() {
     }
   };
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [budgetRes, catRes, dashRes] = await Promise.allSettled([
-        api.getMonthBudgets(year, month),
-        api.listCategories(),
-        api.getDashboard(period),
-      ]);
-      if (budgetRes.status === "fulfilled") setBudgets(budgetRes.value.budgets);
-      if (catRes.status === "fulfilled") setCategories(catRes.value.categories);
-      if (dashRes.status === "fulfilled") setDashboard(dashRes.value);
-    } catch (err) {
-      console.error("Failed to load budget data:", err);
-    } finally {
-      setLoading(false);
-    }
-  }, [month, year, period]);
+  const fetchData = useCallback(
+    async (showSkeleton = false) => {
+      if (showSkeleton) setLoading(true);
+      try {
+        const [budgetRes, catRes, dashRes] = await Promise.allSettled([
+          api.getMonthBudgets(year, month),
+          api.listCategories(),
+          api.getDashboard(period),
+        ]);
+        if (budgetRes.status === "fulfilled") setBudgets(budgetRes.value.budgets);
+        if (catRes.status === "fulfilled") setCategories(catRes.value.categories);
+        if (dashRes.status === "fulfilled") setDashboard(dashRes.value);
+      } catch (err) {
+        console.error("Failed to load budget data:", err);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [month, year, period]
+  );
 
   useEffect(() => {
-    fetchData();
+    fetchData(true);
+  }, [fetchData]);
+
+  useEffect(() => {
+    const onTxUpdated = () => {
+      fetchData(false);
+    };
+    window.addEventListener(TRANSACTION_UPDATED_EVENT, onTxUpdated);
+    return () => window.removeEventListener(TRANSACTION_UPDATED_EVENT, onTxUpdated);
   }, [fetchData]);
 
   const budgetedCategoryIds = new Set(budgets.map((b) => b.category_id));
@@ -92,11 +104,28 @@ export default function BudgetPage() {
   const handleBudgetEdit = async (budgetId: string, newAmountStr: string) => {
     const num = parseFloat(newAmountStr);
     if (isNaN(num) || num < 0) return;
+    const newMinor = displayToMinor(num);
+    // Optimistically update local budget row to prevent UI flicker
+    setBudgets((prev) =>
+      prev.map((b) =>
+        b.id === budgetId
+          ? {
+              ...b,
+              budgeted_amount: newMinor,
+              display_budgeted_amount: num,
+              remaining_amount: newMinor - (b.spent ?? 0),
+              display_remaining: num - (b.display_spent ?? 0),
+              percent_used: num > 0 ? ((b.display_spent ?? 0) / num) * 100 : null,
+            }
+          : b
+      )
+    );
     try {
-      await api.updateBudget(budgetId, { budgeted_amount: displayToMinor(num) });
-      fetchData();
+      await api.updateBudget(budgetId, { budgeted_amount: newMinor });
+      fetchData(false);
     } catch (err) {
       console.error("Failed to update budget:", err);
+      fetchData(false);
     }
   };
 
@@ -115,7 +144,7 @@ export default function BudgetPage() {
       setShowAddModal(false);
       setAddCategoryId("");
       setAddAmount("");
-      fetchData();
+      fetchData(false);
     } catch (err) {
       console.error("Failed to create budget:", err);
     } finally {
@@ -137,7 +166,7 @@ export default function BudgetPage() {
           budgeted_amount: budget.budgeted_amount,
         });
       }
-      fetchData();
+      fetchData(false);
     } catch (err) {
       console.error("Failed to copy budgets:", err);
     } finally {
@@ -146,11 +175,14 @@ export default function BudgetPage() {
   };
 
   const handleDelete = async (budgetId: string) => {
+    // Optimistically remove from state
+    setBudgets((prev) => prev.filter((b) => b.id !== budgetId));
     try {
       await api.deleteBudget(budgetId);
-      fetchData();
+      fetchData(false);
     } catch (err) {
       console.error("Failed to delete budget:", err);
+      fetchData(false);
     }
   };
 

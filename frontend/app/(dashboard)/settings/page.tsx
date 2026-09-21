@@ -324,8 +324,8 @@ function CategoriesSection() {
   });
   const [saving, setSaving] = useState(false);
 
-  const fetchCategories = useCallback(async () => {
-    setLoading(true);
+  const fetchCategories = useCallback(async (showSkeleton = false) => {
+    if (showSkeleton) setLoading(true);
     try {
       const res = await api.listCategories();
       setCategories(res.categories);
@@ -337,7 +337,7 @@ function CategoriesSection() {
   }, []);
 
   useEffect(() => {
-    fetchCategories();
+    fetchCategories(true);
   }, [fetchCategories]);
 
   const active = categories.filter((c) => c.is_active);
@@ -372,7 +372,7 @@ function CategoriesSection() {
         });
       }
       setShowModal(false);
-      fetchCategories();
+      fetchCategories(false);
     } catch (err) {
       console.error("Failed to save category:", err);
     } finally {
@@ -381,20 +381,26 @@ function CategoriesSection() {
   };
 
   const handleDelete = async (id: string) => {
+    setCategories((prev) => prev.filter((c) => c.id !== id));
     try {
       await api.deleteCategory(id);
-      fetchCategories();
+      fetchCategories(false);
     } catch (err) {
       console.error("Failed to delete category:", err);
+      fetchCategories(false);
     }
   };
 
   const setColor = async (cat: Category, hex: string) => {
+    setCategories((prev) =>
+      prev.map((c) => (c.id === cat.id ? { ...c, color: hex } : c))
+    );
     try {
       await api.updateCategory(cat.id, { color: hex });
-      fetchCategories();
+      fetchCategories(false);
     } catch (err) {
       console.error("Failed to update category color:", err);
+      fetchCategories(false);
     }
   };
 
@@ -553,8 +559,8 @@ function PayeesSection() {
   const [type, setType] = useState<CategoryType>("expense");
   const [saving, setSaving] = useState(false);
 
-  const fetchPayees = useCallback(async () => {
-    setLoading(true);
+  const fetchPayees = useCallback(async (showSkeleton = false) => {
+    if (showSkeleton) setLoading(true);
     try {
       const res = await api.listPayees();
       setPayees(res.payees);
@@ -566,7 +572,7 @@ function PayeesSection() {
   }, []);
 
   useEffect(() => {
-    fetchPayees();
+    fetchPayees(true);
   }, [fetchPayees]);
 
   const filtered = payees.filter((p) =>
@@ -585,7 +591,7 @@ function PayeesSection() {
       setShowModal(false);
       setName("");
       setEditPayee(null);
-      fetchPayees();
+      fetchPayees(false);
     } catch (err) {
       console.error("Failed to save payee:", err);
     } finally {
@@ -594,11 +600,13 @@ function PayeesSection() {
   };
 
   const handleDelete = async (id: string) => {
+    setPayees((prev) => prev.filter((p) => p.id !== id));
     try {
       await api.deletePayee(id);
-      fetchPayees();
+      fetchPayees(false);
     } catch (err) {
       console.error("Failed to delete payee:", err);
+      fetchPayees(false);
     }
   };
 

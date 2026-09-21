@@ -27,6 +27,7 @@ import { api } from "@/lib/api";
 import { formatMonth } from "@/lib/format";
 import { categoryStyle, categoryEmoji, paymentMethodInfo, HUES } from "@/lib/categories";
 import { comingSoonProps } from "@/lib/coming-soon";
+import { TRANSACTION_UPDATED_EVENT } from "@/lib/events";
 import type {
   MonthlySummary,
   CategorySpending,
@@ -78,35 +79,46 @@ export default function ReportsPage() {
   const prevMonth = month === 1 ? 12 : month - 1;
   const prevYear = month === 1 ? year - 1 : year;
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const monthsMeta = lastMonths(month, year, MONTHS_BACK);
-      const [historyRes, catRes, cmpRes, pmRes] = await Promise.allSettled([
-        Promise.all(
-          monthsMeta.map(({ m, y }) =>
-            api.monthlyAnalytics(m, y).catch(
-              (): MonthlySummary => ({ month: m, year: y, income: 0, expenses: 0, net: 0 })
+  const fetchData = useCallback(
+    async (showSkeleton = false) => {
+      if (showSkeleton) setLoading(true);
+      try {
+        const monthsMeta = lastMonths(month, year, MONTHS_BACK);
+        const [historyRes, catRes, cmpRes, pmRes] = await Promise.allSettled([
+          Promise.all(
+            monthsMeta.map(({ m, y }) =>
+              api.monthlyAnalytics(m, y).catch(
+                (): MonthlySummary => ({ month: m, year: y, income: 0, expenses: 0, net: 0 })
+              )
             )
-          )
-        ),
-        api.categoryAnalytics(month, year),
-        api.comparisonAnalytics(prevMonth, prevYear, month, year),
-        api.paymentMethodAnalytics(month, year),
-      ]);
-      if (historyRes.status === "fulfilled") setHistory(historyRes.value);
-      if (catRes.status === "fulfilled") setCategoryData(catRes.value);
-      if (cmpRes.status === "fulfilled") setComparison(cmpRes.value);
-      if (pmRes.status === "fulfilled") setPaymentData(pmRes.value);
-    } catch (err) {
-      console.error("Failed to load report data:", err);
-    } finally {
-      setLoading(false);
-    }
-  }, [month, year, prevMonth, prevYear]);
+          ),
+          api.categoryAnalytics(month, year),
+          api.comparisonAnalytics(prevMonth, prevYear, month, year),
+          api.paymentMethodAnalytics(month, year),
+        ]);
+        if (historyRes.status === "fulfilled") setHistory(historyRes.value);
+        if (catRes.status === "fulfilled") setCategoryData(catRes.value);
+        if (cmpRes.status === "fulfilled") setComparison(cmpRes.value);
+        if (pmRes.status === "fulfilled") setPaymentData(pmRes.value);
+      } catch (err) {
+        console.error("Failed to load report data:", err);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [month, year, prevMonth, prevYear]
+  );
 
   useEffect(() => {
-    fetchData();
+    fetchData(true);
+  }, [fetchData]);
+
+  useEffect(() => {
+    const onTxUpdated = () => {
+      fetchData(false);
+    };
+    window.addEventListener(TRANSACTION_UPDATED_EVENT, onTxUpdated);
+    return () => window.removeEventListener(TRANSACTION_UPDATED_EVENT, onTxUpdated);
   }, [fetchData]);
 
   const monthly = history[history.length - 1] ?? null;

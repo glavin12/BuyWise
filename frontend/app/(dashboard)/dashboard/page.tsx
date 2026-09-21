@@ -5,7 +5,7 @@
  */
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { Search, Bell, Receipt } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -18,6 +18,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { api } from "@/lib/api";
 import { categoryStyle, categoryEmoji, HUES } from "@/lib/categories";
 import { comingSoonProps } from "@/lib/coming-soon";
+import { TRANSACTION_UPDATED_EVENT } from "@/lib/events";
 import type { DashboardData, Goal, Transaction, Budget } from "@/lib/types";
 
 export default function DashboardPage() {
@@ -47,9 +48,9 @@ export default function DashboardPage() {
     }
   };
 
-  useEffect(() => {
-    const load = async () => {
-      setLoading(true);
+  const load = useCallback(
+    async (showSkeleton = false) => {
+      if (showSkeleton) setLoading(true);
       try {
         const [dashRes, goalsRes, txRes, budgetRes] = await Promise.allSettled([
           api.getDashboard(period),
@@ -66,9 +67,21 @@ export default function DashboardPage() {
       } finally {
         setLoading(false);
       }
+    },
+    [period, year, month]
+  );
+
+  useEffect(() => {
+    load(true);
+  }, [load]);
+
+  useEffect(() => {
+    const onTxUpdated = () => {
+      load(false);
     };
-    load();
-  }, [month, year, period]);
+    window.addEventListener(TRANSACTION_UPDATED_EVENT, onTxUpdated);
+    return () => window.removeEventListener(TRANSACTION_UPDATED_EVENT, onTxUpdated);
+  }, [load]);
 
   const currency = dashboard?.currency || "INR";
 

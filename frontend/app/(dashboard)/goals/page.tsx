@@ -67,20 +67,23 @@ export default function GoalsPage() {
   const [topUpAmount, setTopUpAmount] = useState("");
   const [contributing, setContributing] = useState(false);
 
-  const fetchGoals = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await api.listGoals(status);
-      setGoals(res.goals);
-    } catch (err) {
-      console.error("Failed to load goals:", err);
-    } finally {
-      setLoading(false);
-    }
-  }, [status]);
+  const fetchGoals = useCallback(
+    async (showSkeleton = false) => {
+      if (showSkeleton) setLoading(true);
+      try {
+        const res = await api.listGoals(status);
+        setGoals(res.goals);
+      } catch (err) {
+        console.error("Failed to load goals:", err);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [status]
+  );
 
   useEffect(() => {
-    fetchGoals();
+    fetchGoals(true);
   }, [fetchGoals]);
 
   useEffect(() => {
@@ -124,7 +127,7 @@ export default function GoalsPage() {
         priority: "medium",
         target_date: "",
       });
-      fetchGoals();
+      fetchGoals(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create goal");
     } finally {
@@ -137,15 +140,33 @@ export default function GoalsPage() {
     const num = parseFloat(topUpAmount);
     if (isNaN(num) || num <= 0) return;
     setContributing(true);
+    const addedMinor = displayToMinor(num);
+    // Optimistic local update so featured goal progress updates immediately
+    setGoals((prev) =>
+      prev.map((g) =>
+        g.id === featured.id
+          ? {
+              ...g,
+              current_amount: g.current_amount + addedMinor,
+              display_current_amount: g.display_current_amount + num,
+              progress_percent:
+                g.target_amount > 0
+                  ? Math.min(100, ((g.current_amount + addedMinor) / g.target_amount) * 100)
+                  : 0,
+            }
+          : g
+      )
+    );
     try {
       await api.updateGoal(featured.id, {
-        current_amount: featured.current_amount + displayToMinor(num),
+        current_amount: featured.current_amount + addedMinor,
       });
       setTopUpOpen(false);
       setTopUpAmount("");
-      fetchGoals();
+      fetchGoals(false);
     } catch (err) {
       console.error("Failed to add contribution:", err);
+      fetchGoals(false);
     } finally {
       setContributing(false);
     }
