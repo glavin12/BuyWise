@@ -30,6 +30,9 @@ class CategoryService:
 
     async def create_category(self, user_id: uuid.UUID, **fields) -> dict:
         self._validate(fields)
+        existing = await self.categories.find_by_name(user_id, fields["name"], fields["type"])
+        if existing is not None:
+            return self._to_dict(existing)
         category = await self.categories.create(user_id, **fields)
         await self.session.commit()
         return self._to_dict(category)

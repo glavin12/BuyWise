@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai_service.auth import CurrentUser, get_current_user
@@ -18,15 +18,15 @@ settings = get_settings()
 @limiter.limit(settings.FINANCIAL_RATE_LIMIT)
 async def create_payee(request: Request, response: Response, body: PayeeCreate, session: AsyncSession = Depends(get_async_session), current_user: CurrentUser = Depends(get_current_user)):
     try:
-        return await PayeeService(session).create_payee(current_user.id, body.name)
+        return await PayeeService(session).create_payee(current_user.id, body.name, body.type)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.get("", response_model=PayeeListResponse)
 @limiter.limit(settings.FINANCIAL_RATE_LIMIT)
-async def list_payees(request: Request, response: Response, session: AsyncSession = Depends(get_async_session), current_user: CurrentUser = Depends(get_current_user)):
-    return {"payees": await PayeeService(session).list_payees(current_user.id)}
+async def list_payees(request: Request, response: Response, type: str | None = Query(None, pattern="^(expense|income)$"), session: AsyncSession = Depends(get_async_session), current_user: CurrentUser = Depends(get_current_user)):
+    return {"payees": await PayeeService(session).list_payees(current_user.id, type=type)}
 
 
 @router.get("/{payee_id}", response_model=PayeeResponse)

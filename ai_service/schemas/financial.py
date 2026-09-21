@@ -47,6 +47,7 @@ class CategoryListResponse(BaseModel):
 
 class PayeeCreate(BaseModel):
     name: str = Field(min_length=1, max_length=255)
+    type: CategoryType
 
 
 class PayeeUpdate(BaseModel):
@@ -57,6 +58,7 @@ class PayeeResponse(BaseModel):
     id: UUID
     name: str
     normalized_name: str
+    type: CategoryType
     created_at: datetime | None = None
     updated_at: datetime | None = None
 

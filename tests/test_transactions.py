@@ -5,9 +5,9 @@ import uuid
 
 import pytest
 
-from ai_service.repositories import CategoryRepository, TransactionRepository
+from ai_service.repositories import CategoryRepository, TransactionRepository, PayeeRepository
 from ai_service.services.profile_service import ProfileService
-from ai_service.services.transaction_service import TransactionService
+from ai_service.services.transaction_service import PayeeReferenceError, TransactionService
 
 
 @pytest.mark.asyncio
@@ -65,3 +65,38 @@ async def test_transaction_crud_is_user_scoped(session):
     assert updated["amount"] == 1250
     assert updated["notes"] == "Lunch"
     assert await service.delete_transaction(user_id, uuid.UUID(created["id"]))
+
+
+@pytest.mark.asyncio
+async def test_add_transaction_creates_payee_with_matching_type(session):
+    user_id = uuid.uuid4()
+    await ProfileService(session).create_profile(user_id)
+    category = await CategoryRepository(session).find_by_name(user_id, "Salary", "income")
+    service = TransactionService(session)
+    created = await service.add_transaction(
+        user_id,
+        category_id=category.id,
+        amount=50000,
+        transaction_type="income",
+        payee_name="New Client",
+    )
+    assert created["payee"] == "New Client"
+    payee = await PayeeRepository(session).get(user_id, uuid.UUID(created["payee_id"]))
+    assert payee.type == "income"
+
+
+@pytest.mark.asyncio
+async def test_add_transaction_rejects_payee_type_mismatch(session):
+    user_id = uuid.uuid4()
+    await ProfileService(session).create_profile(user_id)
+    category = await CategoryRepository(session).find_by_name(user_id, "Salary", "income")
+    expense_payee = await PayeeRepository(session).find_or_create(user_id, "Grocer", "expense")
+    service = TransactionService(session)
+    with pytest.raises(PayeeReferenceError):
+        await service.add_transaction(
+            user_id,
+            category_id=category.id,
+            payee_id=expense_payee.id,
+            amount=100,
+            transaction_type="income",
+        )

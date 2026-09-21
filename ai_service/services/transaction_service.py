@@ -76,7 +76,7 @@ class TransactionService:
         category = await self._resolve_category(
             user_id, category_id, category_name, transaction_type
         )
-        payee = await self._resolve_payee(user_id, payee_id, payee_name)
+        payee = await self._resolve_payee(user_id, payee_id, payee_name, transaction_type)
         if transaction_type in {"expense", "income"} and category is None:
             raise CategoryNotFoundError("A category is required for expense and income transactions")
         transaction = await self.transactions.create(
@@ -153,14 +153,18 @@ class TransactionService:
             return category
         return None
 
-    async def _resolve_payee(self, user_id, payee_id, payee_name):
+    async def _resolve_payee(self, user_id, payee_id, payee_name, transaction_type):
         if payee_id is not None:
             payee = await self.payees.get(user_id, payee_id)
             if payee is None:
                 raise PayeeReferenceError("Payee not found")
+            if payee.type != transaction_type and transaction_type in {"expense", "income"}:
+                raise PayeeReferenceError("Payee type does not match transaction type")
             return payee
         if payee_name:
-            return await self.payees.find_or_create(user_id, payee_name)
+            return await self.payees.find_or_create(
+                user_id, payee_name, transaction_type if transaction_type in {"expense", "income"} else "expense"
+            )
         return None
 
     @staticmethod

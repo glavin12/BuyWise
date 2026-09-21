@@ -78,12 +78,14 @@ export interface Payee {
   id: string;
   name: string;
   normalized_name: string;
+  type: CategoryType;
   created_at: string | null;
   updated_at: string | null;
 }
 
 export interface PayeeCreate {
   name: string;
+  type: CategoryType;
 }
 
 export interface PayeeUpdate {
