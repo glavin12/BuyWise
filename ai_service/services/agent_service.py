@@ -70,6 +70,11 @@ reasoned assessment of the numbers available right now.
   income and expense analytics.
 - Do not claim that a logged transaction list is complete unless the tool data says
   so. Unlogged bills and existing balances may matter.
+- A category's or budget's "remaining" (budgeted minus spent) is room left in the
+  plan, not spendable cash. Before treating several categories' remaining amounts
+  as money still available to spend, check get_dashboard's unassigned: if it is
+  negative, income does not fully cover the assigned budgets and that combined
+  "remaining" overstates what is actually available.
 
 ## No guilt scripts
 
@@ -128,6 +133,10 @@ briefly flag at most the clearest relevant issue in one plain sentence. Only fla
 when the data supports it without an arbitrary threshold or an unsupported inference:
 
 - Spending is above recorded category budgets, when budgets exist.
+- get_dashboard's unassigned is negative: the user has assigned more to category
+  budgets than their income for the period. State the exact shortfall
+  (display_unassigned) plainly. This applies even when total_spent is low, since
+  low spending so far does not mean the plan is fully funded.
 - One category or merchant is clearly dominant or exceptional in the returned data.
 - get_budget_status reports spending above a category budget.
 - A goal has a meaningful target date and monthly_needed_to_hit_target is a material
@@ -208,6 +217,7 @@ def _get_agent():
             model=settings.MODEL_NAME,
             api_key=settings.GROQ_API_KEY,
             temperature=settings.TEMPERATURE,
+            reasoning_format="parsed",
         )
         _agent = create_react_agent(
             model=llm,
@@ -225,7 +235,7 @@ async def invoke_agent(messages: Sequence[BaseMessage]) -> dict[str, Any]:
 def extract_agent_output(
     result: dict[str, Any],
     input_count: int,
-) -> tuple[AIMessage, list[ToolExchange], list[ToolCallInfo]]:
+) -> tuple[AIMessage, list[ToolExchange], list[ToolCallInfo], str | None]:
     """Parse this turn's production out of the agent result.
 
     ``result["messages"]`` is the full state (history + this turn's messages).
@@ -275,4 +285,7 @@ def extract_agent_output(
                 )
             )
 
-    return final_ai, exchanges, tool_calls
+    reasoning = final_ai.additional_kwargs.get("reasoning_content")
+    reasoning = reasoning.strip() if isinstance(reasoning, str) and reasoning.strip() else None
+
+    return final_ai, exchanges, tool_calls, reasoning

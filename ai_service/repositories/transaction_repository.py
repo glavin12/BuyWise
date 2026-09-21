@@ -82,7 +82,7 @@ class TransactionRepository:
         if date_to is not None:
             stmt = stmt.where(Transaction.transaction_date <= date_to)
         result = await self.session.scalars(
-            stmt.order_by(Transaction.transaction_date.desc(), Transaction.id.desc())
+            stmt.order_by(Transaction.transaction_date.desc(), Transaction.created_at.desc())
             .offset(offset)
             .limit(limit)
         )

@@ -82,7 +82,7 @@ class ChatService:
         try:
             with request_context(user_id, self.session):
                 result = await invoke_agent(all_messages)
-            final_ai, tool_exchanges, tool_calls = extract_agent_output(
+            final_ai, tool_exchanges, tool_calls, reasoning = extract_agent_output(
                 result, input_count=len(all_messages)
             )
             await self.conversations.save_assistant_turn(
@@ -106,9 +106,11 @@ class ChatService:
                 error={"message": "agent execution failed"},
             )
             tool_calls = []
+            reasoning = None
 
         return ChatResponse(
             response=response,
             conversation_id=conversation_id,
             tool_calls=tool_calls,
+            reasoning=reasoning,
         )
