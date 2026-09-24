@@ -54,6 +54,15 @@ export function shiftDays(ymd: string, days: number): string {
   return toYmd(date);
 }
 
+/** Whole calendar days from `today` to `target` (negative once passed); null when either is not a real date. */
+export function daysUntil(target: string, today: string): number | null {
+  const to = parseDateOnly(target);
+  const from = parseDateOnly(today);
+  if (!to || !from) return null;
+  // Both are local midnights; rounding absorbs the 23h/25h days around daylight-saving changes.
+  return Math.round((to.getTime() - from.getTime()) / 86_400_000);
+}
+
 /** "Today" / "Yesterday" for those two days, otherwise null (the caller formats the date). */
 export function relativeDayLabel(ymd: string, today: string): "Today" | "Yesterday" | null {
   if (ymd === today) return "Today";

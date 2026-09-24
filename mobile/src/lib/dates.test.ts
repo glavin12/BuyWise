@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
+  daysUntil,
   isOverAYearAgo,
   isValidRange,
   monthKey,
@@ -83,4 +84,14 @@ test("isOverAYearAgo flags likely typos only", () => {
   assert.ok(isOverAYearAgo("2025-09-23", "2026-09-24"));
   assert.ok(!isOverAYearAgo("2025-09-24", "2026-09-24"));
   assert.ok(!isOverAYearAgo("2027-01-01", "2026-09-24")); // future dates are allowed
+});
+
+test("daysUntil counts whole calendar days, negative once passed", () => {
+  assert.equal(daysUntil("2026-09-24", "2026-09-24"), 0);
+  assert.equal(daysUntil("2026-09-25", "2026-09-24"), 1);
+  assert.equal(daysUntil("2026-12-31", "2026-09-24"), 98);
+  assert.equal(daysUntil("2026-09-20", "2026-09-24"), -4);
+  assert.equal(daysUntil("2027-03-01", "2026-03-01"), 365);
+  assert.equal(daysUntil("2026-02-31", "2026-09-24"), null);
+  assert.equal(daysUntil("2026-09-24", "junk"), null);
 });
