@@ -22,6 +22,8 @@ export type ScreenProps = {
   title?: string;
   /** Shows a back chevron in the header. */
   back?: boolean;
+  /** Runs instead of navigating back when the chevron is tapped (e.g. to close an in-screen panel). */
+  onBack?: () => void;
   /** Adds pull-to-refresh. */
   onRefresh?: () => void;
   refreshing?: boolean;
@@ -33,7 +35,7 @@ export type ScreenProps = {
   insetBottom?: boolean;
 };
 
-function goBack() {
+export function goBack() {
   if (router.canGoBack()) router.back();
   else router.replace("/");
 }
@@ -42,6 +44,7 @@ export function Screen({
   children,
   title,
   back,
+  onBack,
   onRefresh,
   refreshing = false,
   scroll = true,
@@ -60,7 +63,7 @@ export function Screen({
       <View style={styles.header}>
         {back ? (
           <Pressable
-            onPress={goBack}
+            onPress={onBack ?? goBack}
             hitSlop={12}
             accessibilityRole="button"
             accessibilityLabel="Go back"
