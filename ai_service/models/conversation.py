@@ -91,6 +91,16 @@ class Message(Base):
             "created_at",
             "id",
         ),
+        # Exactly-once sends: unique per user (a key is never shared across
+        # users) and only among live rows, matching get_by_idempotency_key().
+        Index(
+            "ix_messages_user_idempotency_key",
+            "user_id",
+            "idempotency_key",
+            unique=True,
+            postgresql_where=text("idempotency_key IS NOT NULL AND deleted_at IS NULL"),
+            sqlite_where=text("idempotency_key IS NOT NULL AND deleted_at IS NULL"),
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(

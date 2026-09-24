@@ -39,10 +39,13 @@ class GoalRepository:
             return None
         for field, value in fields.items():
             setattr(goal, field, value)
-        if goal.current_amount >= goal.target_amount:
-            goal.status = "completed"
-        elif goal.status == "completed":
-            goal.status = "active"
+        # Progress only auto-toggles completed/active; an explicit status (e.g.
+        # archiving a finished goal) and archived goals are left alone.
+        if "status" not in fields and goal.status != "archived":
+            if goal.current_amount >= goal.target_amount:
+                goal.status = "completed"
+            elif goal.status == "completed":
+                goal.status = "active"
         await self.session.flush()
         return goal
 

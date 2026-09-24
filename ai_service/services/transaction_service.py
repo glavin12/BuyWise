@@ -9,6 +9,7 @@ from ai_service.models import Transaction
 from ai_service.repositories import (
     CategoryRepository,
     PayeeRepository,
+    ProfileRepository,
     TransactionRepository,
 )
 from ai_service.schemas.financial import TransactionResponse
@@ -33,6 +34,7 @@ class TransactionService:
         self.transactions = TransactionRepository(session)
         self.categories = CategoryRepository(session)
         self.payees = PayeeRepository(session)
+        self.profiles = ProfileRepository(session)
 
     async def list_transactions(self, user_id: uuid.UUID, **filters) -> dict:
         period = filters.pop("period", None)
@@ -79,12 +81,16 @@ class TransactionService:
         payee = await self._resolve_payee(user_id, payee_id, payee_name, transaction_type)
         if transaction_type in {"expense", "income"} and category is None:
             raise CategoryNotFoundError("A category is required for expense and income transactions")
+        if currency is None:
+            # Default to the user's profile currency (the ledger is single-currency).
+            profile = await self.profiles.get(user_id)
+            currency = profile.currency if profile else "INR"
         transaction = await self.transactions.create(
             user_id,
             category_id=category.id if category else None,
             payee_id=payee.id if payee else None,
             amount=amount,
-            currency=currency or "INR",
+            currency=currency,
             transaction_type=transaction_type,
             payment_method=payment_method,
             transaction_date=transaction_date or date.today(),
@@ -119,8 +125,20 @@ class TransactionService:
                 raise PayeeReferenceError("Payee not found")
         merged_type = fields.get("transaction_type", current.transaction_type)
         merged_category = fields.get("category_id", current.category_id)
-        if merged_type in {"expense", "income"} and merged_category is None:
-            raise CategoryNotFoundError("A category is required for expense and income transactions")
+        merged_payee = fields.get("payee_id", current.payee_id)
+        if merged_type in {"expense", "income"}:
+            if merged_category is None:
+                raise CategoryNotFoundError("A category is required for expense and income transactions")
+            # Same type rules as create. Only when one of these three changed:
+            # an unrelated edit must not be blocked by a row that predates them.
+            if fields.keys() & {"transaction_type", "category_id", "payee_id"}:
+                category = await self.categories.get(user_id, merged_category)
+                if category is not None and category.type != merged_type:
+                    raise CategoryNotFoundError("Category type does not match transaction type")
+                if merged_payee is not None:
+                    payee = await self.payees.get(user_id, merged_payee)
+                    if payee is not None and payee.type != merged_type:
+                        raise PayeeReferenceError("Payee type does not match transaction type")
         transaction = await self.transactions.update(user_id, transaction_id, **fields)
         await self.session.commit()
         return self._transaction_to_dict(transaction)

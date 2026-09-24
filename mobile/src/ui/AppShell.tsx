@@ -6,6 +6,7 @@ import { useOnline } from "@/lib/network";
 
 import { Text } from "./Text";
 import { theme } from "./theme";
+import { ToastHost } from "./toast";
 
 /** C1: persistent banner while the device has no connection. Clears itself on reconnect (C2). */
 function OfflineBanner() {
@@ -28,6 +29,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     <View style={styles.shell}>
       <OfflineBanner />
       <View style={styles.content}>{children}</View>
+      <ToastHost />
     </View>
   );
 }

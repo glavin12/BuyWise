@@ -57,15 +57,15 @@ Repositories never trust an owner ID from an LLM or request body. Services valid
 `POST /api/v1/chat` is orchestrated by `ChatService.send_message`:
 
 1. Verify the Supabase JWT and obtain `CurrentUser.id`.
-2. Replay a completed idempotent send when its key already exists.
+2. If the idempotency key already exists for this user: replay a completed send, return HTTP 409 while its agent turn is still running, or retry a failed send on the same message and conversation.
 3. Create or load an owner-scoped conversation.
 4. Persist the user message and derive a title when needed.
 5. Build lightweight profile and UTC-date context.
 6. Load the capped recent message history and rebuild LangChain messages.
-7. Run the ReAct agent inside `request_context(user_id, session)`.
+7. Run the ReAct agent inside `request_context(user_id, session)`, bounded to 60 s and 12 graph steps.
 8. Parse assistant tool calls, tool results, and final text.
 9. Persist the complete assistant turn in order in one commit.
-10. On provider failure, persist a failed assistant row and return the existing apology response contract.
+10. On provider failure or timeout, roll the session back (a tool may have left it mid-transaction), persist a failed assistant row, and return the existing apology response contract.
 
 Tool calls are stored structurally in `messages.tool_calls`; tool rows reference `tool_call_id`. `db_messages_to_langchain()` validates pairing before an external model call.
 

@@ -2,10 +2,10 @@ import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 
-import { api } from "@/lib/api";
-import { formatCurrency, formatDate } from "@/lib/format";
-import { profileQuery } from "@/lib/queries";
-import type { DashboardData, Transaction } from "@/lib/types";
+import { userMessage } from "@/lib/api";
+import { formatCurrency } from "@/lib/format";
+import { dashboardQuery, profileQuery, recentTransactionsQuery, type DashboardPeriod } from "@/lib/queries";
+import type { DashboardData } from "@/lib/types";
 import { useRefetchStaleOnFocus } from "@/lib/useRefetchStaleOnFocus";
 import { useAuth } from "@/providers/AuthProvider";
 import {
@@ -22,9 +22,10 @@ import {
   Skeleton,
   Stack,
   Text,
+  TransactionRow,
 } from "@/ui";
 
-type Period = "this_month" | "last_month";
+type Period = DashboardPeriod;
 
 const PERIODS = [
   { label: "This month", value: "this_month" },
@@ -48,28 +49,6 @@ function budgetLine(d: DashboardData): { text: string; tone: "default" | "negati
     return { text: `${formatCurrency(Math.abs(d.display_remaining_budget), d.currency)} over budget`, tone: "negative" };
   }
   return { text: `${formatCurrency(d.display_remaining_budget, d.currency)} left`, tone: "default" };
-}
-
-function RecentRow({ tx, fallbackCurrency }: { tx: Transaction; fallbackCurrency: string }) {
-  const title = tx.payee || tx.description || tx.category || "Transaction";
-  const subtitle = [tx.category, formatDate(tx.transaction_date)].filter(Boolean).join(" · ");
-  const isExpense = tx.transaction_type === "expense";
-
-  return (
-    <Row justify="between" gap="md">
-      <Stack gap="xs" grow>
-        <Text numberOfLines={1}>{title}</Text>
-        <Text variant="caption" tone="muted" numberOfLines={1}>
-          {subtitle}
-        </Text>
-      </Stack>
-      <Amount
-        value={isExpense ? -tx.display_amount : tx.display_amount}
-        currency={tx.currency || fallbackCurrency}
-        signed={tx.transaction_type !== "starting_balance"}
-      />
-    </Row>
-  );
 }
 
 function DashboardSkeleton() {
@@ -106,14 +85,8 @@ export default function DashboardScreen() {
   const [period, setPeriod] = useState<Period>("this_month");
   const [refreshing, setRefreshing] = useState(false);
 
-  const dashboard = useQuery({
-    queryKey: ["dashboard", period],
-    queryFn: () => api.getDashboard(period),
-  });
-  const recent = useQuery({
-    queryKey: ["transactions", { limit: 3 }],
-    queryFn: () => api.listTransactions({ limit: 3 }),
-  });
+  const dashboard = useQuery(dashboardQuery(period));
+  const recent = useQuery(recentTransactionsQuery);
   const profile = useQuery(profileQuery);
   useRefetchStaleOnFocus();
 
@@ -135,7 +108,7 @@ export default function DashboardScreen() {
       <Screen insetBottom={false}>
         <ErrorState
           title="BuyWise is temporarily unavailable"
-          message={dashboard.error.message}
+          message={userMessage(dashboard.error, "load your dashboard")}
           onRetry={() => dashboard.refetch()}
         />
       </Screen>
@@ -214,7 +187,12 @@ export default function DashboardScreen() {
         {recent.data ? (
           recent.data.transactions.length > 0 ? (
             recent.data.transactions.map((tx) => (
-              <RecentRow key={tx.id} tx={tx} fallbackCurrency={data?.currency ?? "INR"} />
+              <TransactionRow
+                key={tx.id}
+                tx={tx}
+                fallbackCurrency={data?.currency ?? "INR"}
+                onPress={(id) => router.push(`/transaction/${id}`)}
+              />
             ))
           ) : (
             // D1: brand-new user with no transactions.

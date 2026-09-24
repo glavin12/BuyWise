@@ -35,11 +35,12 @@ class MessageRepository:
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def create(self, message: MessageCreate) -> Message:
+    async def create(self, message: MessageCreate) -> tuple[Message, bool]:
         """Insert a message, enforcing idempotency via the unique index.
 
-        A conflicting idempotency_key (e.g. a concurrent retry) is caught by the
-        unique index rather than a check-then-insert; the existing row is returned.
+        Returns ``(row, created)``. A conflicting (user_id, idempotency_key), e.g.
+        a concurrent retry, is caught by the unique index rather than a
+        check-then-insert; the existing row is returned with ``created=False``.
         """
         row = Message(
             conversation_id=message.conversation_id,
@@ -55,18 +56,25 @@ class MessageRepository:
             completion_tokens=message.completion_tokens,
             total_tokens=message.total_tokens,
         )
-        self.session.add(row)
         try:
+            # add() must happen inside the savepoint: beginning one flushes any
+            # pending rows, and a conflict there would fail the whole transaction
+            # instead of just the savepoint.
             async with self.session.begin_nested():
+                self.session.add(row)
                 await self.session.flush()
         except IntegrityError:
+            # Only an idempotency conflict is recoverable; any other integrity
+            # error (e.g. a bad conversation FK) must surface, not be swallowed.
+            if message.idempotency_key is None:
+                raise
             existing = await self.get_by_idempotency_key(
                 message.user_id, message.idempotency_key
             )
             if existing is not None:
-                return existing
+                return existing, False
             raise
-        return row
+        return row, True
 
     async def get_by_idempotency_key(
         self,
@@ -80,6 +88,36 @@ class MessageRepository:
                 Message.deleted_at.is_(None),
             )
         )
+
+    async def load_turn(self, user_message: Message) -> list[Message]:
+        """Rows the agent saved for ``user_message``: everything after it, up to
+        the next user message. Empty while the agent is still running."""
+        # Compare timestamps inside the DB (not against a bound Python datetime)
+        # so the anchor row is always included whatever the storage precision.
+        anchor = (
+            select(Message.created_at).where(Message.id == user_message.id).scalar_subquery()
+        )
+        rows = await self.session.scalars(
+            select(Message)
+            .where(
+                Message.conversation_id == user_message.conversation_id,
+                Message.user_id == user_message.user_id,
+                Message.deleted_at.is_(None),
+                Message.created_at >= anchor,
+            )
+            .order_by(Message.created_at.asc(), Message.id.asc())
+            .limit(200)  # a turn is bounded by the agent's recursion limit
+        )
+        turn: list[Message] = []
+        seen = False
+        for row in rows:
+            if row.id == user_message.id:
+                seen = True
+            elif seen:
+                if row.role == MessageRole.USER:
+                    break
+                turn.append(row)
+        return turn
 
     async def load_recent(
         self,

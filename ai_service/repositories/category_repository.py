@@ -106,6 +106,9 @@ class CategoryRepository:
                 value = value.strip()
             setattr(category, field, value)
         await self.session.flush()
+        # The UPDATE's server-side onupdate expires updated_at; reload it here
+        # because a lazy load later, in async code, raises MissingGreenlet (a 500).
+        await self.session.refresh(category)
         return category
 
     async def delete(self, user_id: uuid.UUID, category_id: uuid.UUID) -> bool:

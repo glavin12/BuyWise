@@ -2,6 +2,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { StyleSheet, View } from "react-native";
 
 import { Button } from "./Button";
+import { Screen, goBack } from "./Screen";
 import { Text } from "./Text";
 import { theme } from "./theme";
 
@@ -58,6 +59,21 @@ export function ErrorState({
       </Text>
       <Button title="Try again" onPress={onRetry} />
     </View>
+  );
+}
+
+/** A whole screen for a link that points at nothing: a malformed id, or a row deleted elsewhere. */
+export function NotFoundScreen({ title, what }: { title: string; what: string }) {
+  return (
+    <Screen title={title} back>
+      <EmptyState
+        icon="alert-circle-outline"
+        title={`${what} not found`}
+        message="It may have been deleted."
+        actionLabel="Go back"
+        onAction={goBack}
+      />
+    </Screen>
   );
 }
 

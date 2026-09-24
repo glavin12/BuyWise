@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai_service.models import Profile
@@ -48,19 +49,29 @@ class ProfileService:
         onboarding_complete: bool = False,
         timezone: str | None = None,
     ) -> Profile:
-        profile = await self._create_profile(
-            user_id,
-            full_name=full_name,
-            currency=currency,
-            income_type=income_type,
-            salary_day=salary_day,
-            savings_target_percent=savings_target_percent,
-            investment_style=investment_style,
-            budget_alerts=budget_alerts,
-            onboarding_complete=onboarding_complete,
-            timezone=timezone,
-        )
-        await self.session.commit()
+        try:
+            profile = await self._create_profile(
+                user_id,
+                full_name=full_name,
+                currency=currency,
+                income_type=income_type,
+                salary_day=salary_day,
+                savings_target_percent=savings_target_percent,
+                investment_style=investment_style,
+                budget_alerts=budget_alerts,
+                onboarding_complete=onboarding_complete,
+                timezone=timezone,
+            )
+            await self.session.commit()
+        except IntegrityError:
+            # A concurrent first request created the profile: first login is
+            # idempotent, so hand back the winner's row.
+            # ponytail: the loser's payload is not re-applied; only two first
+            # requests racing (e.g. parallel GET /profile) can lose it.
+            await self.session.rollback()
+            profile = await self.profiles.get(user_id)
+            if profile is None:
+                raise
         return profile
 
     async def ensure_profile(self, user_id: uuid.UUID) -> Profile:

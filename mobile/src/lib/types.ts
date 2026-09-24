@@ -60,9 +60,9 @@ export interface CategoryCreate {
   color?: string | null;
 }
 
+// A category's type is fixed once created; the API ignores it on update.
 export interface CategoryUpdate {
   name?: string;
-  type?: CategoryType;
   icon?: string | null;
   color?: string | null;
 }

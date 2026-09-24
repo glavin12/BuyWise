@@ -1,5 +1,6 @@
 import { isAuthRetryableFetchError } from "@supabase/supabase-js";
 
+import { ApiError, isNotFound, MSG, userMessage } from "./errors";
 import { supabase } from "./supabase";
 import type {
   Budget,
@@ -42,31 +43,10 @@ if (!API_BASE) {
   throw new Error("Missing EXPO_PUBLIC_API_URL. Copy .env.example to .env.local and fill it in.");
 }
 
+export { ApiError, isNotFound, userMessage };
+
 const CRUD_TIMEOUT_MS = 15_000; // C4
 const CHAT_TIMEOUT_MS = 60_000; // AI1: Groq tool chains can legitimately take 30s+
-
-// User-facing wording for failures (C5-C9). Raw server bodies are never shown for 5xx.
-const MSG = {
-  network: "Can't reach BuyWise right now. Check your connection and try again.",
-  timeout: "The request took too long. Please try again.",
-  expired: "Your session has expired. Please log in again.",
-  rateLimited: "Too many requests. Please wait a moment.",
-  server: "Something went wrong on our end. Please try again.",
-  malformed: "Unexpected response from the server. Please try again.",
-  invalid: "Some details look invalid. Please check them and try again.",
-};
-
-/** `status` is 0 when no HTTP response was received (offline, DNS, timeout). */
-export class ApiError extends Error {
-  status: number;
-
-  constructor(status: number, message: string) {
-    super(message);
-    Object.setPrototypeOf(this, ApiError.prototype); // keeps `instanceof` working when Error is transpiled
-    this.name = "ApiError";
-    this.status = status;
-  }
-}
 
 async function currentToken(): Promise<string | null> {
   // getSession() refreshes an expired access token on its own (L3).
@@ -98,7 +78,7 @@ function refreshToken(staleToken: string): Promise<string | null> {
   return refreshing;
 }
 
-type RawResponse = { status: number; body: string };
+type RawResponse = { status: number; body: string; retryAfter?: number };
 
 async function send(
   path: string,
@@ -119,7 +99,8 @@ async function send(
       signal: controller.signal,
     });
     // Read the body inside the timeout too, so a stalled body cannot hang forever.
-    return { status: res.status, body: await res.text() };
+    const retryAfter = Number.parseInt(res.headers.get("Retry-After") ?? "", 10);
+    return { status: res.status, body: await res.text(), retryAfter: retryAfter > 0 ? retryAfter : undefined };
   } catch (e) {
     const aborted = e instanceof Error && e.name === "AbortError";
     throw new ApiError(0, aborted ? MSG.timeout : MSG.network);
@@ -128,8 +109,8 @@ async function send(
   }
 }
 
-function errorFor({ status, body }: RawResponse): ApiError {
-  if (status === 429) return new ApiError(status, MSG.rateLimited);
+function errorFor({ status, body, retryAfter }: RawResponse): ApiError {
+  if (status === 429) return new ApiError(status, MSG.rateLimited, retryAfter);
   if (status >= 500) return new ApiError(status, MSG.server);
   let detail: unknown;
   try {
@@ -139,7 +120,7 @@ function errorFor({ status, body }: RawResponse): ApiError {
   }
   // FastAPI sends a string `detail` for HTTPException and a list for 422 validation.
   if (typeof detail === "string" && detail) return new ApiError(status, detail);
-  return new ApiError(status, status === 422 ? MSG.invalid : `Request failed (${status}).`);
+  return new ApiError(status, MSG.invalid);
 }
 
 async function fetchAPI<T>(

@@ -1,5 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { Pressable, StyleSheet, View, type ColorValue } from "react-native";
+import { Pressable, StyleSheet, Text as RNText, View, type ColorValue } from "react-native";
 
 import { theme } from "./theme";
 
@@ -10,11 +10,26 @@ export const stackScreenOptions = {
   contentStyle: { backgroundColor: theme.color.background },
 };
 
+/** Forms and pickers open over the screen that launched them (slide up, swipe or back to close). */
+export const sheetScreenOptions = { presentation: "modal" } as const;
+
+// M26: tab labels keep following the system text size, capped so a very large
+// setting cannot make the bar overflow (instead of switching scaling off).
+function TabLabel({ color, children }: { color: ColorValue; children: string }) {
+  return (
+    <RNText maxFontSizeMultiplier={1.3} numberOfLines={1} style={{ color, fontSize: 11, textAlign: "center" }}>
+      {children}
+    </RNText>
+  );
+}
+
 export const tabScreenOptions = {
   headerShown: false,
   tabBarActiveTintColor: theme.color.accent,
   tabBarInactiveTintColor: theme.color.textMuted,
-  tabBarAllowFontScaling: false, // P6
+  tabBarLabel: ({ color, children }: { color: ColorValue; children: string }) => (
+    <TabLabel color={color}>{children}</TabLabel>
+  ),
   tabBarStyle: { backgroundColor: theme.color.surface, borderTopColor: theme.color.border },
 };
 

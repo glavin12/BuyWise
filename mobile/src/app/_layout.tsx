@@ -7,7 +7,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { queryClient } from "@/lib/queryClient";
 import { AuthProvider, useAuth } from "@/providers/AuthProvider";
-import { AppShell, ErrorBoundary, stackScreenOptions } from "@/ui";
+import { AppShell, ErrorBoundary, sheetScreenOptions, stackScreenOptions } from "@/ui";
 
 // Keep the native splash up until the stored session has been read.
 SplashScreen.preventAutoHideAsync();
@@ -31,7 +31,9 @@ function RootNavigator() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="settings" />
         <Stack.Screen name="reports" />
-        <Stack.Screen name="add-transaction" options={{ presentation: "modal" }} />
+        <Stack.Screen name="add-transaction" options={sheetScreenOptions} />
+        <Stack.Screen name="transaction/[id]" />
+        <Stack.Screen name="transaction/[id]/edit" />
       </Stack.Protected>
       <Stack.Protected guard={!signedIn}>
         <Stack.Screen name="(auth)" />

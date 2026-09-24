@@ -120,11 +120,13 @@ Protected chat and account routes:
 - `GET /api/v1/analytics/categories`
 - `GET /api/v1/analytics/comparison`
 
-The development-only `POST /api/v1/dev/token` helper is registered only when `ENVIRONMENT=development`.
+The development-only `POST /api/v1/dev/token` helper and the interactive API docs (`/docs`, `/redoc`, `/openapi.json`) exist only when `ENVIRONMENT=development`. `ENVIRONMENT` defaults to `production`, so a deploy that forgets it fails closed; set `ENVIRONMENT=development` in your local `.env`.
+
+Constraint conflicts (`IntegrityError`, e.g. renaming a payee to an existing name) are returned as HTTP 409 with a generic body by a global handler in `main.py`.
 
 ## Chat And AI Tools
 
-`ChatService` persists the user message, builds lightweight profile/time context, reloads capped history, invokes the ReAct agent, and persists tool calls, tool results, and the final assistant message atomically. Idempotency is enforced by the messages partial unique index.
+`ChatService` persists the user message, builds lightweight profile/time context, reloads capped history, invokes the ReAct agent, and persists tool calls, tool results, and the final assistant message atomically. Idempotency is enforced by the messages unique index on `(user_id, idempotency_key)` (live rows only): a completed send is replayed, a send whose agent turn is still running returns HTTP 409, and a failed send can be retried with the same key. One agent turn is capped at 60 s and 12 graph steps, chat messages at 4000 characters, and the LLM client at 45 s / 4096 tokens.
 
 Registered financial tools are:
 
@@ -143,6 +145,8 @@ Registered financial tools are:
 - `get_categories`
 - `calculator`
 
+`calculator` parses expressions with `ast` (numbers, `+ - * / // % **` and parentheses only; values within ±1e15, exponents within ±100, 200 characters). It never calls `eval`.
+
 The system prompt is `SYSTEM_PROMPT` in `ai_service/services/agent_service.py`. It must describe the current tool names and ledger semantics.
 
 ## Database And Migrations
@@ -150,11 +154,13 @@ The system prompt is `SYSTEM_PROMPT` in `ai_service/services/agent_service.py`. 
 The repository now contains a clean rebuild:
 
 - `001_baseline.py` drops no existing data itself but creates the complete application schema on a fresh database.
+- `002_payee_types_and_predefined_data.py` adds `payees.type` and backfills default categories and payees.
+- `003_security_hardening.py` revokes the `anon` and `authenticated` roles' table privileges (the Supabase Data API is not a supported access path; the backend connects as the table owner) and makes the messages idempotency index per user.
 - The old seven migrations are deleted from the repository history.
 
 The baseline creates `profiles`, `conversations`, `messages`, `accounts`, `categories`, `payees`, `transactions`, `budget_entries`, and `goals`, plus indexes, constraints, enums, and RLS policies. It is intentionally destructive when used as a reset strategy. Do not apply it to a database containing data that must be preserved.
 
-The current Alembic head is `001`.
+The current Alembic head is `003`.
 
 ## Development Commands
 
@@ -167,7 +173,7 @@ uv run python -m compileall ai_service alembic
 uv run pytest tests/ -v
 ```
 
-Use `DATABASE_URL` or `SUPABASE_DATABASE_URL`; PostgreSQL URLs are normalized to `postgresql+asyncpg://`. The interactive API docs are at `http://localhost:8000/docs`.
+Use `DATABASE_URL` or `SUPABASE_DATABASE_URL`; PostgreSQL URLs are normalized to `postgresql+asyncpg://`. The interactive API docs are at `http://localhost:8000/docs` when `ENVIRONMENT=development`.
 
 ## Documentation
 

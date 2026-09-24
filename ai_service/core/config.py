@@ -7,9 +7,11 @@ class Settings(BaseSettings):
 
     # Runtime environment.
     # Controls registration of development-only utilities ONLY (e.g. /dev/*
-    # routes). Must never branch business logic, auth, DB queries, or AI
-    # behavior. Valid values: development | testing | staging | production.
-    ENVIRONMENT: str = "development"
+    # routes and the interactive API docs). Must never branch business logic,
+    # auth, DB queries, or AI behavior. Valid values: development | testing |
+    # staging | production. Defaults to production so a deploy that forgets the
+    # variable fails closed; set ENVIRONMENT=development locally (.env.example).
+    ENVIRONMENT: str = "production"
 
     # Groq
     GROQ_API_KEY: str = ""

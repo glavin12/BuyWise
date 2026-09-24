@@ -7,6 +7,7 @@ langgraph
 pydantic-settings
 python-dotenv
 sqlalchemy
+tzdata
 alembic
 asyncpg
 uuid-utils

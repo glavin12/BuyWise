@@ -15,10 +15,11 @@ export function Amount({ value, currency = "INR", signed, tone, ...rest }: Amoun
   const text = (signed && v > 0 ? "+" : "") + formatCurrency(v, currency);
   const resolved = tone ?? (v < 0 ? "negative" : signed && v > 0 ? "positive" : "default");
 
-  // P6: fixed size (scaled fonts break financial layouts) and one line that
-  // shrinks to fit, so a very large amount (F6) never wraps or overflows.
+  // P6/M26: text scaling stays on for accessibility but is capped so a scaled
+  // amount cannot break a financial layout, and it is one line that shrinks to
+  // fit, so a very large amount (F6) never wraps or overflows.
   return (
-    <Text numberOfLines={1} adjustsFontSizeToFit allowFontScaling={false} tone={resolved} {...rest}>
+    <Text numberOfLines={1} adjustsFontSizeToFit maxFontSizeMultiplier={1.3} tone={resolved} {...rest}>
       {text}
     </Text>
   );

@@ -5,6 +5,7 @@ The agent receives LangChain message objects only. Persistence stays in the
 repository/service layers.
 """
 
+import asyncio
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any
@@ -200,6 +201,14 @@ Tools understand only this_month and last_month.
 
 _agent = None
 
+# Hard bounds on one chat turn (AI cost and DB-session hold time). A turn that
+# exceeds either takes the graceful-failure path in ChatService.
+# ponytail: the request holds its DB session during the LLM call, so with the
+# default pool (5 + 10) ~15 slow chats stall every route; the timeout bounds it.
+# Move the LLM call outside the session if that ever bites.
+AGENT_TIMEOUT_SECONDS = 60
+AGENT_RECURSION_LIMIT = 12  # graph steps (~5 tool rounds); LangGraph's default is 25
+
 
 @dataclass
 class ToolExchange:
@@ -218,6 +227,9 @@ def _get_agent():
             api_key=settings.GROQ_API_KEY,
             temperature=settings.TEMPERATURE,
             reasoning_format="parsed",
+            timeout=45,
+            max_retries=1,
+            max_tokens=4096,
         )
         _agent = create_react_agent(
             model=llm,
@@ -229,7 +241,13 @@ def _get_agent():
 
 async def invoke_agent(messages: Sequence[BaseMessage]) -> dict[str, Any]:
     agent = _get_agent()
-    return await agent.ainvoke({"messages": list(messages)})
+    return await asyncio.wait_for(
+        agent.ainvoke(
+            {"messages": list(messages)},
+            config={"recursion_limit": AGENT_RECURSION_LIMIT},
+        ),
+        timeout=AGENT_TIMEOUT_SECONDS,
+    )
 
 
 def extract_agent_output(

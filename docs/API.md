@@ -1,6 +1,6 @@
 # API Reference
 
-The FastAPI application is defined in `ai_service/main.py`. Interactive documentation is available at `http://localhost:8000/docs`.
+The FastAPI application is defined in `ai_service/main.py`. Interactive documentation is available at `http://localhost:8000/docs` only when `ENVIRONMENT=development`; `/docs`, `/redoc`, and `/openapi.json` return 404 otherwise (the default is `production`).
 
 ## Authentication
 
@@ -13,6 +13,29 @@ Authorization: Bearer <supabase_access_token>
 The backend validates the token against Supabase JWKS, issuer, audience, and expiry. The verified `sub` claim becomes `CurrentUser.id`. No endpoint accepts `user_id` in a body, path, or query parameter.
 
 Errors use FastAPI's `{"detail": "..."}` shape. Authentication errors are HTTP 401 with `WWW-Authenticate: Bearer`.
+
+| status | meaning |
+|---|---|
+| 400 | a business rule failed (unknown category, category/payee type differs from the transaction type, ...) |
+| 409 | a database constraint conflict, for example renaming a payee or category to a name that exists: `{"detail": "This conflicts with an existing record."}`; on `POST /api/v1/chat`, `{"detail": "Still processing this message"}` |
+| 422 | the body or query failed validation (see the limits below) |
+| 429 | rate limit exceeded |
+
+## Input Limits
+
+| field | rule |
+|---|---|
+| transaction `description` / `notes` | at most 500 / 2000 characters |
+| goal `description` | at most 1000 characters |
+| goal `priority` | `low`, `medium`, or `high` |
+| goal `goal_type` | `emergency_fund`, `purchase`, `vacation`, `investment`, `debt_repayment`, `education`, `retirement`, or `custom` |
+| profile `currency` | three uppercase letters (ISO 4217), e.g. `INR` |
+| profile `timezone` | an IANA name known to the server, e.g. `Asia/Kolkata` |
+| category `color` | `#RRGGBB` |
+| category `icon` | at most 32 characters (a keyword such as `public-transit`, or an emoji) |
+| chat `message` / `idempotency_key` | at most 4000 / 128 characters |
+
+A category's `type` is fixed at creation: `PATCH /api/v1/categories/{id}` ignores it.
 
 ## Money Contract
 
@@ -54,6 +77,8 @@ Category deletion is a soft deactivation. Payee deletion is hard delete and tran
 | GET | `/api/v1/transactions/{transaction_id}` | get one owned transaction |
 | PATCH | `/api/v1/transactions/{transaction_id}` | update owned transaction fields |
 | DELETE | `/api/v1/transactions/{transaction_id}` | hard delete owned transaction |
+
+`currency` defaults to the profile currency. Changing `transaction_type`, `category_id`, or `payee_id` on `PATCH` must leave the category (and payee) type equal to the transaction type, otherwise the API returns 400. Lists are ordered by date, then creation time, then id, so offset pages never duplicate or skip rows.
 
 GET filters are `account_id`, `category_id`, `payee_id`, `transaction_type`, `cleared_status`, `date_from`, `date_to`, `period`, `limit`, and `offset`. `transaction_type` accepts `expense`, `income`, `transfer`, and `starting_balance`; `period` accepts `this_month` and `last_month`.
 
@@ -104,11 +129,11 @@ Analytics returns integer minor units. Expense and income totals exclude transfe
 - `PATCH /api/v1/goals/{goal_id}`
 - `GET /api/v1/dashboard?period=this_month|last_month`
 
-Goals support optional category linkage and manual progress. Reaching `target_amount` marks the goal completed.
+Goals support optional category linkage and manual progress. Reaching `target_amount` marks the goal completed, and dropping below it reactivates it. An explicit `status` is respected (so a completed goal can be archived), and an archived goal is never changed by progress updates.
 
 ## Chat And Development Token
 
-`POST /api/v1/chat` retains the existing conversation and idempotency semantics. Its AI tools use the same account, category, transaction, budget, analytics, and goal services as the HTTP API.
+`POST /api/v1/chat` sends a message. With an `idempotency_key` the send is exactly-once per user: a completed send is replayed, a retry that arrives while the first is still running gets `409 Still processing this message` (the agent and its write tools run once), and a send that failed can be retried with the same key. One agent turn is limited to 60 seconds. Its AI tools use the same account, category, transaction, budget, analytics, and goal services as the HTTP API.
 
 `POST /api/v1/dev/token` is available only under `ENVIRONMENT=development`; it relays a password grant to Supabase Auth and is not registered in other environments.
 
