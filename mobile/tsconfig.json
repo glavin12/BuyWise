@@ -2,6 +2,10 @@
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "strict": true,
+    // `npm test` runs src/lib/*.test.ts with Node's built-in type stripping, which
+    // needs explicit .ts extensions in relative imports.
+    "allowImportingTsExtensions": true,
+    "types": ["node"], // node:test / node:assert typings for those tests (TypeScript 6 no longer auto-includes @types/*)
     "paths": {
       "@/*": [
         "./src/*"

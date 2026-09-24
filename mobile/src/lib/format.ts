@@ -7,6 +7,8 @@
  * These helpers format the `display_*` float values returned by the API.
  */
 
+import { parseDateOnly } from "./dates";
+
 const LOCALE_MAP: Record<string, string> = {
   INR: "en-IN",
   USD: "en-US",
@@ -47,25 +49,15 @@ export function minorToDisplay(minor: number): number {
 }
 
 /**
- * Convert a user-entered display amount to integer minor units for API writes.
- * Rounds half-toward-+∞ (JS Math.round). Backend uses ROUND_HALF_UP; the two
- * agree for non-negative amounts (which the schema enforces via ge=0).
- */
-export function displayToMinor(display: number): number {
-  return Math.round(display * 100);
-}
-
-/**
  * Format a date string to a short locale display.
  */
 export function formatDate(
   dateStr: string,
   style: "short" | "medium" | "long" = "short"
 ): string {
-  // A bare "YYYY-MM-DD" is a calendar DATE. new Date() would read it as UTC
-  // midnight and can show the previous day west of UTC, so build it locally.
-  const ymd = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
-  const d = ymd ? new Date(+ymd[1], +ymd[2] - 1, +ymd[3]) : new Date(dateStr);
+  // A bare "YYYY-MM-DD" is a calendar DATE: parse it locally (new Date() would
+  // read it as UTC midnight and can show the previous day west of UTC).
+  const d = parseDateOnly(dateStr) ?? new Date(dateStr);
   if (isNaN(d.getTime())) return dateStr;
 
   const options: Intl.DateTimeFormatOptions =
@@ -84,13 +76,6 @@ export function formatDate(
 export function formatMonth(month: number, year: number): string {
   const d = new Date(year, month - 1);
   return d.toLocaleDateString("en-US", { month: "long", year: "numeric" });
-}
-
-/**
- * Get the YYYY-MM string for a month/year pair.
- */
-export function toMonthKey(month: number, year: number): string {
-  return `${year}-${String(month).padStart(2, "0")}`;
 }
 
 /**
