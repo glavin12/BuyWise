@@ -7,10 +7,13 @@ import {
   type QueryClient,
 } from "@tanstack/react-query";
 
+import { useState } from "react";
+
 import { api } from "./api";
-import { findInPages } from "./ledger";
+import { monthKey, monthShift, type MonthYear } from "./dates";
+import { findInPages, planBudgetCopy } from "./ledger";
 import { suggestedCategory, type PickedCategory } from "./transactionForm";
-import type { CategoryType, TransactionType, TransactionsResponse } from "./types";
+import type { CategoryType, Goal, TransactionType, TransactionsResponse } from "./types";
 
 // Every query the app makes is declared here, and every screen reads server data
 // through these options or the hooks below, never through `api` directly. The
@@ -131,10 +134,87 @@ export const payeesQuery = (type: CategoryType) =>
     staleTime: FIVE_MINUTES,
   });
 
+// ── Budgets ─────────────────────────────────────────────────────
+
+export const monthBudgetsQuery = ({ month, year }: MonthYear) =>
+  queryOptions({
+    queryKey: ["budgets", monthKey(month, year)],
+    queryFn: () => api.getMonthBudgets(year, month),
+  });
+
+/** The month's income and spending in minor units: "ready to assign" is worked out from the income. */
+export const monthIncomeQuery = ({ month, year }: MonthYear) =>
+  queryOptions({
+    queryKey: ["analytics", "monthly", monthKey(month, year)],
+    queryFn: () => api.monthlyAnalytics(month, year),
+  });
+
+/**
+ * Returns a function that works out what copying the previous month's budgets
+ * into `to` would do (see planBudgetCopy). Both months are read fresh: what is
+ * already set "now" must come from the server, not a cache, or a budget set on
+ * another device would be overwritten. Writes nothing.
+ */
+export function usePlanBudgetCopy() {
+  const queryClient = useQueryClient();
+  return async (to: MonthYear, activeExpenseIds: ReadonlySet<string>) => {
+    const from = monthShift(to.month, to.year, -1);
+    const [last, current] = await Promise.all([
+      queryClient.fetchQuery({ ...monthBudgetsQuery(from), staleTime: 0 }),
+      queryClient.fetchQuery({ ...monthBudgetsQuery(to), staleTime: 0 }),
+    ]);
+    return { from, lastMonth: last.budgets, plan: planBudgetCopy(last.budgets, current.budgets, activeExpenseIds) };
+  };
+}
+
+// ── Goals ───────────────────────────────────────────────────────
+
+/** The two lists the app shows. Archiving is the removal path, so archived goals are never listed. */
+export type GoalList = "active" | "completed";
+export const GOAL_LISTS: readonly GoalList[] = ["active", "completed"];
+
+export const goalsQuery = (status: GoalList) =>
+  queryOptions({
+    queryKey: ["goals", status],
+    queryFn: () => api.listGoals(status),
+  });
+
+/**
+ * One goal, found in the cached lists (the API has no GET by id), so a goal opens
+ * instantly from the list; opening one cold fetches both lists. `missing` means
+ * both lists answered and it is in neither (archived elsewhere, or a stale link).
+ */
+export function useGoal(id: string) {
+  const active = useQuery(goalsQuery("active"));
+  const completed = useQuery(goalsQuery("completed"));
+  const goal = active.data?.goals.find((g) => g.id === id) ?? completed.data?.goals.find((g) => g.id === id);
+  const settled = active.isSuccess && completed.isSuccess && !active.isFetching && !completed.isFetching;
+  return {
+    goal,
+    missing: !goal && settled,
+    error: goal ? null : (active.error ?? completed.error),
+    /** A refresh failed while an older copy of the goal is still on screen. */
+    stale: !!goal && (active.isError || completed.isError),
+    refetch: () => Promise.all([active.refetch(), completed.refetch()]),
+  };
+}
+
+/**
+ * useGoal for a form: once found, the goal stays the same object. A save can move
+ * the goal from one list to the other, and the form built from it must not be torn
+ * down (losing its state, such as the "goal reached" panel) when that happens.
+ */
+export function useOpenedGoal(id: string) {
+  const lookup = useGoal(id);
+  const [opened, setOpened] = useState<Goal>();
+  if (lookup.goal && !opened) setOpened(lookup.goal);
+  return { ...lookup, goal: opened ?? lookup.goal };
+}
+
 // ── Invalidation ────────────────────────────────────────────────
 
 export type Change =
-  | { kind: "transaction" }
+  | { kind: "transaction" | "budget" | "goal" }
   | { kind: "category" | "payee"; type: CategoryType };
 
 /**
@@ -148,6 +228,12 @@ export function invalidateAfter(queryClient: QueryClient, change: Change): Promi
     case "transaction":
       // A transaction moves balances, budgets' spent/remaining and every report.
       return Promise.all([invalidate(["transactions"]), invalidate(["dashboard"]), invalidate(["budgets"]), invalidate(["analytics"])]);
+    case "budget":
+      // Every month's list (only the one on screen refetches), and the Dashboard's remaining / unassigned.
+      return Promise.all([invalidate(["budgets"]), invalidate(["dashboard"])]);
+    case "goal":
+      // Both lists: a save can move a goal from Active to Achieved and back. The Dashboard shows the active count.
+      return Promise.all([invalidate(["goals"]), invalidate(["dashboard"])]);
     case "category":
       return invalidate(["categories", change.type]);
     case "payee":

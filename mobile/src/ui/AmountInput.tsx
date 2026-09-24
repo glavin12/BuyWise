@@ -14,6 +14,7 @@ export function AmountInput({
   value,
   onChange,
   currency,
+  label,
   error,
   autoFocus,
   ref,
@@ -21,6 +22,8 @@ export function AmountInput({
   value: string;
   onChange: (text: string) => void;
   currency: string;
+  /** Defaults to "Amount (INR)"; say what the amount is when a screen has more than one. */
+  label?: string;
   error?: string | null;
   autoFocus?: boolean;
   ref?: Ref<TextInput>;
@@ -28,7 +31,7 @@ export function AmountInput({
   return (
     <Input
       ref={ref}
-      label={`Amount (${currency})`}
+      label={label ?? `Amount (${currency})`}
       value={value}
       onChangeText={(text) => onChange(sanitizeAmountInput(text))}
       keyboardType="decimal-pad"

@@ -46,6 +46,18 @@ export function sanitizeAmountInput(text: string): string {
   return `${integer}.${rest.join("").slice(0, MAX_DECIMALS)}`;
 }
 
+/**
+ * For fields where 0 makes no sense (a contribution, a budget): the amount in
+ * minor units, or the sentence that says what is wrong with the text.
+ */
+export function parsePositiveAmount(text: string): { minor: number; error: null } | { minor: null; error: string } {
+  if (text.trim() === "") return { minor: null, error: "Enter an amount." };
+  const minor = parseAmountToMinor(text);
+  if (minor === null) return { minor: null, error: "Enter a valid amount, like 500 or 500.50." };
+  if (minor === 0) return { minor: null, error: "The amount must be more than 0." };
+  return { minor, error: null };
+}
+
 /** Integer minor units -> the text an amount field shows ("250", "250.50", "0.05"), by integer math. */
 export function minorToAmountText(minor: number): string {
   const whole = Math.trunc(minor / 100);

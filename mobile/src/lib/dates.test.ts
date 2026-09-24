@@ -2,11 +2,14 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
+  currentMonth,
+  daysUntil,
   isOverAYearAgo,
   isValidRange,
   monthKey,
   monthShift,
   parseDateOnly,
+  parseMonthYear,
   rangeFor,
   relativeDayLabel,
   shiftDays,
@@ -83,4 +86,31 @@ test("isOverAYearAgo flags likely typos only", () => {
   assert.ok(isOverAYearAgo("2025-09-23", "2026-09-24"));
   assert.ok(!isOverAYearAgo("2025-09-24", "2026-09-24"));
   assert.ok(!isOverAYearAgo("2027-01-01", "2026-09-24")); // future dates are allowed
+});
+
+test("daysUntil counts whole calendar days, negative once passed", () => {
+  assert.equal(daysUntil("2026-09-24", "2026-09-24"), 0);
+  assert.equal(daysUntil("2026-09-25", "2026-09-24"), 1);
+  assert.equal(daysUntil("2026-12-31", "2026-09-24"), 98);
+  assert.equal(daysUntil("2026-09-20", "2026-09-24"), -4);
+  assert.equal(daysUntil("2027-03-01", "2026-03-01"), 365);
+  assert.equal(daysUntil("2026-02-31", "2026-09-24"), null);
+  assert.equal(daysUntil("2026-09-24", "junk"), null);
+});
+
+test("currentMonth is the local calendar month", () => {
+  assert.deepEqual(currentMonth(new Date(2026, 0, 31, 23, 59)), { month: 1, year: 2026 });
+  assert.deepEqual(currentMonth(new Date(2026, 11, 1, 0, 1)), { month: 12, year: 2026 });
+});
+
+test("parseMonthYear accepts only a month the backend allows (route params are untrusted text)", () => {
+  assert.deepEqual(parseMonthYear("8", "2026"), { month: 8, year: 2026 });
+  assert.deepEqual(parseMonthYear("08", "2026"), { month: 8, year: 2026 });
+  assert.deepEqual(parseMonthYear("12", "2020"), { month: 12, year: 2020 });
+  assert.deepEqual(parseMonthYear("1", "2100"), { month: 1, year: 2100 });
+  for (const [month, year] of [["0", "2026"], ["13", "2026"], ["8", "2019"], ["8", "2101"], ["8", "26"], ["a", "2026"], ["8", "2026x"], ["-1", "2026"], ["", ""]]) {
+    assert.equal(parseMonthYear(month, year), null, `${month}/${year}`);
+  }
+  assert.equal(parseMonthYear(undefined, "2026"), null);
+  assert.equal(parseMonthYear(["8"], "2026"), null); // a repeated query param arrives as an array
 });

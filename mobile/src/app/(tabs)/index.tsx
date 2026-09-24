@@ -222,7 +222,7 @@ export default function DashboardScreen() {
         <Button
           title={goalCount > 0 ? `${goalCount} active goal${goalCount === 1 ? "" : "s"} →` : "No goals yet — add one →"}
           variant="link"
-          onPress={() => router.push("/budget")}
+          onPress={() => router.push("/goals")}
         />
       ) : null}
       <Button title="View reports →" variant="link" onPress={() => router.push("/reports")} />

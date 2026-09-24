@@ -1,10 +1,25 @@
 import { useMutation, useQueryClient, type InfiniteData, type QueryClient } from "@tanstack/react-query";
 
-import { api, isNotFound } from "./api";
-import { mapPages } from "./ledger";
-import { invalidateAfter, transactionDetailKey } from "./queries";
+import { api, isNotFound, stopsBatch } from "./api";
+import { copyBudgets } from "./budget";
+import type { MonthYear } from "./dates";
+import { placeGoal } from "./goals";
+import { mapPages, type BudgetCopyPlan } from "./ledger";
+import { GOAL_LISTS, goalsQuery, invalidateAfter, transactionDetailKey } from "./queries";
 import { applyPatch } from "./transactionForm";
-import type { CategoryCreate, PayeeCreate, Transaction, TransactionCreate, TransactionUpdate, TransactionsResponse } from "./types";
+import type {
+  BudgetCreate,
+  CategoryCreate,
+  Goal,
+  GoalCreate,
+  GoalsListResponse,
+  GoalUpdate,
+  PayeeCreate,
+  Transaction,
+  TransactionCreate,
+  TransactionUpdate,
+  TransactionsResponse,
+} from "./types";
 
 // Every write the app makes. Screens never call `api` themselves; they call
 // these, which also own cache updates and invalidation. Buttons that trigger a
@@ -112,6 +127,99 @@ export function useCreatePayee() {
     mutationFn: (data: PayeeCreate) => api.createPayee(data), // idempotent: find-or-create by name
     onSuccess: (payee) => {
       void invalidateAfter(queryClient, { kind: "payee", type: payee.type });
+    },
+  });
+}
+
+// ── Budgets ─────────────────────────────────────────────────────
+// These invalidate on settle, not just on success: a 404 (deleted on another
+// device) is also a reason for the month's list to refresh.
+
+export function useSetBudget() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: BudgetCreate) => api.setBudget(body), // an upsert: replaces a budget already set for that category and month
+    onSettled: () => {
+      void invalidateAfter(queryClient, { kind: "budget" });
+    },
+  });
+}
+
+export function useUpdateBudget() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, budgeted_amount }: { id: string; budgeted_amount: number }) => api.updateBudget(id, { budgeted_amount }),
+    onSettled: () => {
+      void invalidateAfter(queryClient, { kind: "budget" });
+    },
+  });
+}
+
+export function useDeleteBudget() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.deleteBudget(id),
+    onSettled: () => {
+      void invalidateAfter(queryClient, { kind: "budget" });
+    },
+  });
+}
+
+/**
+ * Runs a planned "copy from last month" one request at a time (which stays under
+ * the API's per-minute limit). It never rejects: what was done, what failed and
+ * what was never tried comes back as a CopyRun for the summary.
+ */
+export function useCopyBudgets() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ plan, to }: { plan: BudgetCopyPlan; to: MonthYear }) =>
+      copyBudgets(
+        plan.copy,
+        (item) => api.setBudget({ category_id: item.category_id, month: to.month, year: to.year, budgeted_amount: item.budgeted_amount }),
+        stopsBatch
+      ),
+    onSettled: () => {
+      void invalidateAfter(queryClient, { kind: "budget" });
+    },
+  });
+}
+
+// ── Goals ───────────────────────────────────────────────────────
+
+/**
+ * Writes a goal the server just returned into both cached lists, so the next
+ * screen (and a second contribution, which adds to the cached total) starts from
+ * the new numbers instead of waiting for the refetch. An archived goal is left
+ * for that refetch: dropping it here would make the screen it was archived from
+ * flash "not found" while it slides away.
+ */
+function seedGoal(queryClient: QueryClient, goal: Goal) {
+  if (goal.status === "archived") return;
+  for (const status of GOAL_LISTS) {
+    queryClient.setQueryData<GoalsListResponse>(goalsQuery(status).queryKey, (list) => (list ? placeGoal(list, goal, status) : list));
+  }
+}
+
+export function useCreateGoal() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: GoalCreate) => api.createGoal(body),
+    onSuccess: (goal) => seedGoal(queryClient, goal),
+    onSettled: () => {
+      void invalidateAfter(queryClient, { kind: "goal" });
+    },
+  });
+}
+
+/** Contribute, edit and archive are all a PATCH; the goal it returns (with its new status) is the truth. */
+export function useUpdateGoal() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: GoalUpdate }) => api.updateGoal(id, patch),
+    onSuccess: (goal) => seedGoal(queryClient, goal),
+    onSettled: () => {
+      void invalidateAfter(queryClient, { kind: "goal" });
     },
   });
 }

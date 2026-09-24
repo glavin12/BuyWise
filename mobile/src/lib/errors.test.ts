@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { ApiError, isNotFound, MSG, userMessage } from "./errors.ts";
+import { ApiError, isNotFound, MSG, stopsBatch, userMessage } from "./errors.ts";
 
 test("a backend explanation for a rejected request is shown with the action", () => {
   const err = new ApiError(400, "Category not found");
@@ -52,4 +52,10 @@ test("isNotFound is true only for a 404 ApiError", () => {
   assert.equal(isNotFound(new ApiError(400, "x")), false);
   assert.equal(isNotFound(new Error("404")), false);
   assert.equal(isNotFound(null), false);
+});
+
+test("stopsBatch is true only for failures every remaining item would hit too", () => {
+  for (const status of [0, 401, 429]) assert.equal(stopsBatch(new ApiError(status, "x")), true, String(status));
+  for (const status of [400, 404, 409, 422, 500]) assert.equal(stopsBatch(new ApiError(status, "x")), false, String(status));
+  assert.equal(stopsBatch(new Error("boom")), false);
 });

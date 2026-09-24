@@ -216,14 +216,27 @@ export interface Goal {
   status: string;
 }
 
+// The values the API accepts (its DB constraint and schema): anything else is a 422.
+export type GoalType =
+  | "emergency_fund"
+  | "purchase"
+  | "vacation"
+  | "investment"
+  | "debt_repayment"
+  | "education"
+  | "retirement"
+  | "custom";
+export type GoalPriority = "low" | "medium" | "high";
+export type GoalStatus = "active" | "completed" | "archived";
+
 export interface GoalCreate {
   title: string;
   category_id?: string | null;
   description?: string | null;
   target_amount: number;
   current_amount?: number;
-  goal_type?: string | null;
-  priority?: string | null;
+  goal_type?: GoalType | null;
+  priority?: GoalPriority | null;
   target_date?: string | null;
 }
 
@@ -233,10 +246,10 @@ export interface GoalUpdate {
   description?: string | null;
   target_amount?: number;
   current_amount?: number;
-  goal_type?: string | null;
-  priority?: string | null;
+  goal_type?: GoalType | null;
+  priority?: GoalPriority | null;
   target_date?: string | null;
-  status?: "active" | "completed" | "archived";
+  status?: GoalStatus;
 }
 
 export interface GoalsListResponse {

@@ -49,6 +49,15 @@ export function minorToDisplay(minor: number): number {
 }
 
 /**
+ * Format an integer minor-unit total that was computed on the phone (ready to
+ * assign, a contribution preview): summed as integers, divided once, here.
+ * Values the API sends already come with a `display_*` field; use that instead.
+ */
+export function formatMinor(minor: number, currency = "INR"): string {
+  return formatCurrency(minorToDisplay(minor), currency);
+}
+
+/**
  * Format a date string to a short locale display.
  */
 export function formatDate(

@@ -46,12 +46,35 @@ export function monthKey(month: number, year: number): string {
   return `${year}-${pad2(month)}`;
 }
 
+/** The device-local calendar month right now. */
+export function currentMonth(now: Date = new Date()): MonthYear {
+  return { month: now.getMonth() + 1, year: now.getFullYear() };
+}
+
+/** Route params ("8", "2026") -> a month the backend accepts, or null: a URL is untrusted text. */
+export function parseMonthYear(month: unknown, year: unknown): MonthYear | null {
+  if (typeof month !== "string" || typeof year !== "string") return null;
+  if (!/^\d{1,2}$/.test(month) || !/^\d{4}$/.test(year)) return null;
+  const parsed = { month: Number(month), year: Number(year) };
+  const valid = parsed.month >= 1 && parsed.month <= 12 && parsed.year >= MIN_YEAR && parsed.year <= MAX_YEAR;
+  return valid ? parsed : null;
+}
+
 /** "YYYY-MM-DD" shifted by whole days (local calendar arithmetic). */
 export function shiftDays(ymd: string, days: number): string {
   const date = parseDateOnly(ymd);
   if (!date) return ymd;
   date.setDate(date.getDate() + days);
   return toYmd(date);
+}
+
+/** Whole calendar days from `today` to `target` (negative once passed); null when either is not a real date. */
+export function daysUntil(target: string, today: string): number | null {
+  const to = parseDateOnly(target);
+  const from = parseDateOnly(today);
+  if (!to || !from) return null;
+  // Both are local midnights; rounding absorbs the 23h/25h days around daylight-saving changes.
+  return Math.round((to.getTime() - from.getTime()) / 86_400_000);
 }
 
 /** "Today" / "Yesterday" for those two days, otherwise null (the caller formats the date). */
