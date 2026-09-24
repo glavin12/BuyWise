@@ -3,7 +3,20 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, ForeignKey, Integer, JSON, BigInteger, Text, func, text
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    CheckConstraint,
+    Date,
+    DateTime,
+    ForeignKey,
+    Integer,
+    JSON,
+    Text,
+    UniqueConstraint,
+    func,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import Uuid
 
@@ -64,6 +77,7 @@ class Profile(Base):
 class Category(Base):
     __tablename__ = "categories"
     __table_args__ = (
+        UniqueConstraint("user_id", "name", "type", name="uq_categories_user_name_type"),
         CheckConstraint("type IN ('expense', 'income')", name="categories_type_check"),
         CheckConstraint("length(name) > 0", name="categories_name_not_empty_check"),
     )
@@ -91,6 +105,9 @@ class Category(Base):
 class Payee(Base):
     __tablename__ = "payees"
     __table_args__ = (
+        UniqueConstraint(
+            "user_id", "normalized_name", "type", name="uq_payees_user_normalized_name_type"
+        ),
         CheckConstraint("length(name) > 0", name="payees_name_not_empty_check"),
         CheckConstraint("type IN ('expense', 'income')", name="payees_type_check"),
     )

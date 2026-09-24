@@ -18,6 +18,10 @@ class ConversationNotFoundError(LookupError):
     """Raised when a requested conversation does not exist for the user."""
 
 
+class MessageInProgressError(RuntimeError):
+    """Raised when a send with the same idempotency key is still being processed."""
+
+
 class ConversationService:
     """Coordinates short-term conversation persistence.
 
@@ -84,8 +88,9 @@ class ConversationService:
         user_id: uuid.UUID,
         content: str,
         idempotency_key: str,
-    ) -> Message:
-        message = await self.messages.create(
+    ) -> tuple[Message, bool]:
+        """Persist the user's message; ``created`` is False when the key already existed."""
+        message, created = await self.messages.create(
             MessageCreate(
                 conversation_id=conversation_id,
                 user_id=user_id,
@@ -95,9 +100,10 @@ class ConversationService:
                 idempotency_key=idempotency_key,
             )
         )
-        await self.conversations.touch(conversation_id)
+        if created:
+            await self.conversations.touch(conversation_id)
         await self.session.commit()
-        return message
+        return message, created
 
     async def save_assistant_turn(
         self,
@@ -120,72 +126,68 @@ class ConversationService:
             content = "I'm sorry, I encountered an error processing your request. Please try again."
             if ai_message is not None and ai_message.content:
                 content = _as_text(ai_message.content)
-            saved.append(
-                await self.messages.create(
+            row, _ = await self.messages.create(
+                MessageCreate(
+                    conversation_id=conversation_id,
+                    user_id=user_id,
+                    role=MessageRole.ASSISTANT,
+                    content=content,
+                    status=MessageStatus.FAILED,
+                    message_metadata=error,
+                )
+            )
+            saved.append(row)
+        else:
+            for exchange in tool_exchanges or []:
+                tool_ai = exchange.ai_message
+                row, _ = await self.messages.create(
                     MessageCreate(
                         conversation_id=conversation_id,
                         user_id=user_id,
                         role=MessageRole.ASSISTANT,
-                        content=content,
-                        status=MessageStatus.FAILED,
-                        message_metadata=error,
+                        content=_as_text(tool_ai.content) if tool_ai.content else "",
+                        tool_calls=[
+                            {
+                                "name": tc.get("name"),
+                                "args": tc.get("args", {}),
+                                "id": tc.get("id"),
+                            }
+                            for tc in tool_ai.tool_calls
+                        ],
+                        status=MessageStatus.COMPLETED,
                     )
                 )
-            )
-        else:
-            for exchange in tool_exchanges or []:
-                tool_ai = exchange.ai_message
-                saved.append(
-                    await self.messages.create(
+                saved.append(row)
+                for tool_message in exchange.tool_messages:
+                    row, _ = await self.messages.create(
                         MessageCreate(
                             conversation_id=conversation_id,
                             user_id=user_id,
-                            role=MessageRole.ASSISTANT,
-                            content=_as_text(tool_ai.content) if tool_ai.content else "",
-                            tool_calls=[
-                                {
-                                    "name": tc.get("name"),
-                                    "args": tc.get("args", {}),
-                                    "id": tc.get("id"),
-                                }
-                                for tc in tool_ai.tool_calls
-                            ],
+                            role=MessageRole.TOOL,
+                            content=str(tool_message.content),
+                            tool_call_id=tool_message.tool_call_id,
                             status=MessageStatus.COMPLETED,
                         )
                     )
-                )
-                for tool_message in exchange.tool_messages:
-                    saved.append(
-                        await self.messages.create(
-                            MessageCreate(
-                                conversation_id=conversation_id,
-                                user_id=user_id,
-                                role=MessageRole.TOOL,
-                                content=str(tool_message.content),
-                                tool_call_id=tool_message.tool_call_id,
-                                status=MessageStatus.COMPLETED,
-                            )
-                        )
-                    )
+                    saved.append(row)
 
             content = _as_text(ai_message.content) if ai_message is not None else ""
             usage: dict = {}
             if ai_message is not None:
                 usage = getattr(ai_message, "usage_metadata", None) or {}
-            saved.append(
-                await self.messages.create(
-                    MessageCreate(
-                        conversation_id=conversation_id,
-                        user_id=user_id,
-                        role=MessageRole.ASSISTANT,
-                        content=content,
-                        status=MessageStatus.COMPLETED,
-                        prompt_tokens=usage.get("input_tokens"),
-                        completion_tokens=usage.get("output_tokens"),
-                        total_tokens=usage.get("total_tokens"),
-                    )
+            row, _ = await self.messages.create(
+                MessageCreate(
+                    conversation_id=conversation_id,
+                    user_id=user_id,
+                    role=MessageRole.ASSISTANT,
+                    content=content,
+                    status=MessageStatus.COMPLETED,
+                    prompt_tokens=usage.get("input_tokens"),
+                    completion_tokens=usage.get("output_tokens"),
+                    total_tokens=usage.get("total_tokens"),
                 )
             )
+            saved.append(row)
 
         await self.conversations.touch(conversation_id, increment=len(saved))
         await self.session.commit()
@@ -214,45 +216,32 @@ class ConversationService:
             raise ConversationNotFoundError("Conversation not found")
         return await self.messages.load_all(conversation_id, user_id, cursor=cursor, limit=limit)
 
-    async def get_idempotent_result(
+    async def get_by_idempotency_key(
         self,
         user_id: uuid.UUID,
         idempotency_key: str,
-    ) -> ChatResponse | None:
-        """Replay a previously completed send, if one exists for this key."""
-        user_message = await self.messages.get_by_idempotency_key(user_id, idempotency_key)
-        if user_message is None:
-            return None
+    ) -> Message | None:
+        return await self.messages.get_by_idempotency_key(user_id, idempotency_key)
 
-        history = await self.messages.load_all(user_message.conversation_id, user_id)
-        index = next(
-            (i for i, m in enumerate(history) if m.id == user_message.id),
-            None,
-        )
-        if index is None:
-            return None
+    async def replay(self, user_message: Message) -> ChatResponse | None:
+        """The stored result of an earlier send of ``user_message``.
 
-        # Only this send's turn: the rows after the user message, up to the next
-        # user message.
-        turn: list[Message] = []
-        for row in history[index + 1 :]:
-            if row.role == MessageRole.USER:
-                break
-            turn.append(row)
+        Returns the response when that send completed, or ``None`` when it failed
+        (so the client may retry with the same key). Raises
+        ``MessageInProgressError`` while its agent turn has not been saved yet.
+        """
+        turn = await self.messages.load_turn(user_message)
         if not turn:
-            return None
+            # ponytail: "running" is inferred from the unanswered user message, so
+            # a process that dies mid-turn leaves its key answering 409 forever
+            # (clients mint a new key per send). Add an age cutoff if that bites.
+            raise MessageInProgressError("Still processing this message")
 
-        final = None
-        for row in reversed(turn):
-            if row.role == MessageRole.ASSISTANT:
-                final = row
-                break
-        if final is None:
-            return None
+        final = next((row for row in reversed(turn) if row.role == MessageRole.ASSISTANT), None)
         # Exactly-once applies to completed sends only. A failed turn (e.g. an
         # agent error) must be retryable with the same key — replaying it would
         # return the apology forever.
-        if final.status != MessageStatus.COMPLETED:
+        if final is None or final.status != MessageStatus.COMPLETED:
             return None
 
         tool_calls: list[ToolCallInfo] = []

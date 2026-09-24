@@ -17,14 +17,18 @@ class ChatRequest(BaseModel):
     ``get_current_user``); this body intentionally carries no ``user_id``.
     """
 
-    message: str = Field(..., min_length=1, description="The user's message")
+    message: str = Field(
+        ..., min_length=1, max_length=4000, description="The user's message"
+    )
     conversation_id: UUID | None = Field(
         None, description="Conversation ID. Auto-generated if not provided."
     )
     idempotency_key: str | None = Field(
         None,
+        max_length=128,
         description="Client-generated key for exactly-once sends. If a send with "
-        "this key already completed, its prior result is returned instead.",
+        "this key already completed, its prior result is returned instead; while "
+        "it is still running the request fails with 409.",
     )
 
     @field_validator("conversation_id", "idempotency_key", mode="before")

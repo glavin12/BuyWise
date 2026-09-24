@@ -28,7 +28,7 @@ uv run alembic upgrade head
 uv run uvicorn ai_service.main:app --reload
 ```
 
-Open http://localhost:8000/docs for the interactive API docs.
+Open http://localhost:8000/docs for the interactive API docs. They (and the `/dev/token` helper) exist only with `ENVIRONMENT=development` in your `.env`; the default is `production`, which serves neither.
 
 ## Project layout
 

@@ -13,20 +13,37 @@ CategoryType = Literal["expense", "income"]
 TransactionType = Literal["expense", "income", "starting_balance"]
 PaymentMethod = Literal["cash", "upi", "bank_transfer", "card", "other"]
 ClearedStatus = Literal["pending", "cleared"]
+# Mirrors the goals_goal_type_check DB constraint.
+GoalType = Literal[
+    "emergency_fund",
+    "purchase",
+    "vacation",
+    "investment",
+    "debt_repayment",
+    "education",
+    "retirement",
+    "custom",
+]
+GoalPriority = Literal["low", "medium", "high"]
+
+# Clients paint these straight into styles, so only accept a plain #RRGGBB.
+_HEX_COLOR = r"^#[0-9A-Fa-f]{6}$"
 
 
 class CategoryCreate(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     type: CategoryType
-    icon: str | None = Field(default=None, max_length=100)
-    color: str | None = Field(default=None, max_length=30)
+    icon: str | None = Field(default=None, max_length=32)  # keyword or emoji
+    color: str | None = Field(default=None, pattern=_HEX_COLOR)
 
 
 class CategoryUpdate(BaseModel):
+    """A category's ``type`` is fixed once created: flipping it would leave
+    existing transactions and budgets pointing at the wrong kind."""
+
     name: str | None = Field(default=None, min_length=1, max_length=100)
-    type: CategoryType | None = None
-    icon: str | None = Field(default=None, max_length=100)
-    color: str | None = Field(default=None, max_length=30)
+    icon: str | None = Field(default=None, max_length=32)
+    color: str | None = Field(default=None, pattern=_HEX_COLOR)
 
 
 class CategoryResponse(BaseModel):
@@ -76,8 +93,8 @@ class TransactionCreate(BaseModel):
     transaction_type: TransactionType
     payment_method: PaymentMethod | None = None
     transaction_date: date = Field(default_factory=date.today)
-    description: str | None = None
-    notes: str | None = None
+    description: str | None = Field(default=None, max_length=500)
+    notes: str | None = Field(default=None, max_length=2000)
     cleared_status: ClearedStatus = "pending"
 
 
@@ -89,8 +106,8 @@ class TransactionUpdate(BaseModel):
     transaction_type: TransactionType | None = None
     payment_method: PaymentMethod | None = None
     transaction_date: date | None = None
-    description: str | None = None
-    notes: str | None = None
+    description: str | None = Field(default=None, max_length=500)
+    notes: str | None = Field(default=None, max_length=2000)
     cleared_status: ClearedStatus | None = None
 
 
@@ -167,22 +184,22 @@ class BudgetMonthResponse(BaseModel):
 class GoalCreate(BaseModel):
     title: str = Field(min_length=1, max_length=255)
     category_id: UUID | None = None
-    description: str | None = None
+    description: str | None = Field(default=None, max_length=1000)
     target_amount: int = Field(gt=0)
     current_amount: int = Field(default=0, ge=0)
-    goal_type: str | None = None
-    priority: str | None = None
+    goal_type: GoalType | None = None
+    priority: GoalPriority | None = None
     target_date: date | None = None
 
 
 class GoalUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=255)
     category_id: UUID | None = None
-    description: str | None = None
+    description: str | None = Field(default=None, max_length=1000)
     target_amount: int | None = Field(default=None, gt=0)
     current_amount: int | None = Field(default=None, ge=0)
-    goal_type: str | None = None
-    priority: str | None = None
+    goal_type: GoalType | None = None
+    priority: GoalPriority | None = None
     target_date: date | None = None
     status: Literal["active", "completed", "archived"] | None = None
 

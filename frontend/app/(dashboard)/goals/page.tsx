@@ -405,6 +405,7 @@ export default function GoalsPage() {
             onChange={(e) => setCreateForm((f) => ({ ...f, description: e.target.value }))}
             placeholder="What's this goal for?"
             rows={2}
+            maxLength={1000}
           />
 
           <div className="grid grid-cols-2 gap-3">

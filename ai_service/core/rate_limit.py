@@ -12,11 +12,11 @@ settings = get_settings()
 
 
 def _get_rate_limit_key(request: Request) -> str:
-    """Build a throttling key; this is never used for authorization."""
-    user_id = request.headers.get("X-User-ID", "").strip()
-    if user_id:
-        return f"user:{hashlib.sha256(user_id.encode()).hexdigest()[:32]}"
+    """Build a throttling key; this is never used for authorization.
 
+    Only server-verifiable inputs are used: a client-chosen header such as
+    ``X-User-ID`` would let a caller mint a fresh bucket on every request.
+    """
     auth_header = request.headers.get("Authorization", "")
     scheme, _, token = auth_header.partition(" ")
     if scheme.lower() == "bearer" and token:

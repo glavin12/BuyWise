@@ -2,12 +2,23 @@ from __future__ import annotations
 
 import uuid
 from datetime import date
+from typing import get_args
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai_service.models import Goal
 from ai_service.repositories import CategoryRepository, GoalRepository
+from ai_service.schemas.financial import GoalPriority, GoalType
 from ai_service.utils.financial import days_remaining_in_month, minor_to_amount
+
+
+def _validate_goal_fields(goal_type: str | None, priority: str | None) -> None:
+    """Shared by the HTTP API and the AI tools; an invalid goal_type would
+    otherwise reach the DB CHECK constraint and surface as a 500."""
+    if goal_type is not None and goal_type not in get_args(GoalType):
+        raise ValueError(f"goal_type must be one of: {', '.join(get_args(GoalType))}")
+    if priority is not None and priority not in get_args(GoalPriority):
+        raise ValueError(f"priority must be one of: {', '.join(get_args(GoalPriority))}")
 
 
 class GoalNotFoundError(LookupError):
@@ -41,6 +52,7 @@ class GoalService:
             raise ValueError("title is required")
         if target_amount <= 0 or current_amount < 0:
             raise ValueError("goal amounts are invalid")
+        _validate_goal_fields(goal_type, priority)
         if category_id is not None:
             category = await self.categories.get(user_id, category_id)
             if category is None or not category.is_active:
@@ -65,6 +77,7 @@ class GoalService:
             raise ValueError("current_amount must be non-negative")
         if "target_amount" in fields and fields["target_amount"] <= 0:
             raise ValueError("target_amount must be positive")
+        _validate_goal_fields(fields.get("goal_type"), fields.get("priority"))
         if "category_id" in fields and fields["category_id"] is not None:
             category = await self.categories.get(user_id, fields["category_id"])
             if category is None or not category.is_active:

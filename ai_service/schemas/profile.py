@@ -1,10 +1,18 @@
 from __future__ import annotations
 
 from datetime import datetime
+from functools import cache
 from typing import Literal
 from uuid import UUID
+from zoneinfo import available_timezones
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+
+@cache
+def _timezones() -> frozenset[str]:
+    # Needs tz data: system zoneinfo, or the ``tzdata`` package on Windows/slim images.
+    return frozenset(available_timezones())
 
 
 class ProfileRead(BaseModel):
@@ -30,7 +38,8 @@ class ProfileUpdate(BaseModel):
     """Fields accepted from the onboarding/settings form. All optional."""
 
     full_name: str | None = Field(None, max_length=255)
-    currency: str | None = Field(None, max_length=10)
+    # ISO 4217 code: clients feed it to Intl.NumberFormat, which throws on junk.
+    currency: str | None = Field(None, pattern=r"^[A-Z]{3}$")
     income_type: Literal[
         "salaried", "freelancer", "business_owner", "retired", "other"
     ] | None = None
@@ -40,3 +49,10 @@ class ProfileUpdate(BaseModel):
     savings_target_percent: int | None = Field(None, ge=0, le=100)
     investment_style: Literal["conservative", "moderate", "aggressive"] | None = None
     budget_alerts: bool | None = None
+
+    @field_validator("timezone")
+    @classmethod
+    def _known_timezone(cls, value: str | None) -> str | None:
+        if value is not None and value not in _timezones():
+            raise ValueError("Unknown timezone; use an IANA name such as Asia/Kolkata")
+        return value

@@ -304,6 +304,7 @@ export function QuickAddModal({ open, onClose, onAdded }: QuickAddModalProps) {
             value={form.description}
             onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
             placeholder="Add a note..."
+            maxLength={500}
             className={inputClass}
           />
         </div>

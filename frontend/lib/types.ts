@@ -62,7 +62,6 @@ export interface CategoryCreate {
 
 export interface CategoryUpdate {
   name?: string;
-  type?: CategoryType;
   icon?: string | null;
   color?: string | null;
 }

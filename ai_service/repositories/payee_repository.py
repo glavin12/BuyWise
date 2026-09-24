@@ -84,6 +84,8 @@ class PayeeRepository:
         payee.name = clean_name
         payee.normalized_name = clean_name.lower()
         await self.session.flush()
+        # Reload the server-updated updated_at (a lazy load later would raise MissingGreenlet).
+        await self.session.refresh(payee)
         return payee
 
     async def delete(self, user_id: uuid.UUID, payee_id: uuid.UUID) -> bool:

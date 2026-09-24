@@ -359,9 +359,9 @@ function CategoriesSection() {
     setSaving(true);
     try {
       if (editCat) {
+        // A category's type is fixed once created (the API ignores it on update).
         await api.updateCategory(editCat.id, {
           name: form.name.trim(),
-          type: form.type,
           icon: form.icon || null,
         });
       } else {
@@ -523,8 +523,9 @@ function CategoriesSection() {
                   key={t}
                   type="button"
                   active={form.type === t}
+                  disabled={!!editCat}
                   onClick={() => setForm((f) => ({ ...f, type: t }))}
-                  className="capitalize justify-center"
+                  className="capitalize justify-center disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {t}
                 </FilterChip>

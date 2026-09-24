@@ -82,7 +82,13 @@ class TransactionRepository:
         if date_to is not None:
             stmt = stmt.where(Transaction.transaction_date <= date_to)
         result = await self.session.scalars(
-            stmt.order_by(Transaction.transaction_date.desc(), Transaction.created_at.desc())
+            # id is a unique tiebreaker: without it rows sharing a date and
+            # created_at may swap between pages, duplicating or skipping rows.
+            stmt.order_by(
+                Transaction.transaction_date.desc(),
+                Transaction.created_at.desc(),
+                Transaction.id.desc(),
+            )
             .offset(offset)
             .limit(limit)
         )

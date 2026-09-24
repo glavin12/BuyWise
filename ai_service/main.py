@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+from sqlalchemy.exc import IntegrityError
 
 from ai_service.auth import AuthError
 from ai_service.core.config import get_settings
@@ -47,11 +48,18 @@ async def lifespan(app: FastAPI):
     logger.info("BuyWise AI Service shutting down...")
 
 
+settings = get_settings()
+
+# The API docs and schema are a map of the attack surface: development only.
+_docs = settings.is_development
 app = FastAPI(
     title="BuyWise AI Service",
     description="AI-first personal finance assistant",
     version="0.1.0",
     lifespan=lifespan,
+    docs_url="/docs" if _docs else None,
+    redoc_url="/redoc" if _docs else None,
+    openapi_url="/openapi.json" if _docs else None,
 )
 
 # CORS: frontend uses Authorization: Bearer, not cookies, so credentials are
@@ -82,6 +90,20 @@ async def auth_error_handler(request: Request, exc: AuthError) -> JSONResponse:
     )
 
 
+@app.exception_handler(IntegrityError)
+async def integrity_error_handler(request: Request, exc: IntegrityError) -> JSONResponse:
+    """A DB constraint conflict (duplicate name, racing insert) is the client's
+    conflict, not a server fault. The session dependency has already rolled back
+    (its ``async with`` closes the session as the exception propagates); the
+    driver message is never echoed because it carries SQL and row values.
+    """
+    logger.warning("Integrity conflict on %s %s", request.method, request.url.path)
+    return JSONResponse(
+        status_code=409,
+        content={"detail": "This conflicts with an existing record."},
+    )
+
+
 # Register routers
 app.include_router(health.router)
 app.include_router(chat.router)
@@ -98,7 +120,6 @@ app.include_router(analytics.router)
 # environment, so these routes return 404 (not 401) in staging/production.
 # The ENVIRONMENT flag controls ONLY this registration; it never branches
 # business logic, auth, DB queries, or AI behavior.
-settings = get_settings()
 if settings.is_development:
     from ai_service.routers import dev
 

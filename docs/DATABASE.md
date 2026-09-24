@@ -23,7 +23,7 @@ Stores authenticated chat conversations with `user_id`, optional title, message 
 
 ### `messages`
 
-Stores conversation messages with `conversation_id`, `user_id`, enum `role` (`user`, `assistant`, `system`, `tool`), content, JSONB tool calls, tool-call ID, enum `status`, idempotency key, metadata, token counts, timestamps, and soft-delete timestamp. A partial unique index on non-null `idempotency_key` enforces exactly-once sends. The conversation FK is `ON DELETE RESTRICT`.
+Stores conversation messages with `conversation_id`, `user_id`, enum `role` (`user`, `assistant`, `system`, `tool`), content, JSONB tool calls, tool-call ID, enum `status`, idempotency key, metadata, token counts, timestamps, and soft-delete timestamp. A partial unique index `ix_messages_user_idempotency_key` on `(user_id, idempotency_key)`, limited to rows where the key is non-null and `deleted_at` is null, enforces exactly-once sends per user (a key is never shared across users). The conversation FK is `ON DELETE RESTRICT`.
 
 ### `accounts`
 
@@ -43,7 +43,7 @@ Categories are user-owned. Columns are `id`, `user_id`, `name`, `type` (`expense
 
 ### `payees`
 
-Columns are `id`, `user_id`, `name`, `normalized_name`, and timestamps. `(user_id, normalized_name)` is unique. `normalized_name` is lowercase trimmed text used by `find_or_create()`.
+Columns are `id`, `user_id`, `name`, `normalized_name`, `type` (`expense` or `income`), and timestamps. `(user_id, normalized_name, type)` is unique; violating it (for example renaming a payee to an existing name) is returned by the API as HTTP 409. `normalized_name` is lowercase trimmed text used by `find_or_create()`.
 
 ### `transactions`
 
@@ -89,13 +89,21 @@ Columns are `id`, `user_id`, nullable `category_id`, title, description, `target
 
 RLS is enabled on every public application table. Policies use `TO authenticated` and `(select auth.uid()) = user_id` (or `id` for profiles). Update policies include both `USING` and `WITH CHECK`; child tables use their denormalized `user_id`.
 
-RLS is defense in depth, not the service security boundary. Every repository query still filters by the authenticated owner. New tables in the Supabase public schema may also require explicit Data API grants because Supabase no longer exposes newly created tables automatically.
+RLS is defense in depth, not the service security boundary. Every repository query still filters by the authenticated owner.
+
+The Supabase Data API (`/rest/v1/...`) is not a supported access path: the Supabase URL and anon key ship inside the web and mobile bundles, and both clients use Supabase for authentication only. Migration `003` therefore runs `REVOKE ALL ... FROM anon, authenticated` on every application table, so a signed-in user cannot write tables directly and skip backend validation (for example by pointing a transaction at another user's category). The backend connects as the table owner, which the revoke does not affect. New tables must not be granted to those roles. Verify with:
+
+```sql
+select has_table_privilege('authenticated', 'public.transactions', 'INSERT');  -- must be false, for every app table
+```
 
 ## Migrations
 
 | revision | description |
 |---|---|
 | `001` | complete fresh schema, indexes, checks, enums, and RLS |
+| `002` | `payees.type`, plus backfill of default categories and payees |
+| `003` | revoke `anon`/`authenticated` table privileges; per-user messages idempotency index |
 
 ```bash
 uv run alembic heads
