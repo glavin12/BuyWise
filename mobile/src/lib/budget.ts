@@ -37,6 +37,12 @@ export function budgetProgress(budget: Pick<Budget, "budgeted_amount" | "spent">
   };
 }
 
+/** "₹1,200 left · 60% used" or "Over by ₹500 · 125% used": the words carry the meaning, colour only reinforces it. */
+export function budgetStatusText(progress: BudgetProgress, money: (minor: number) => string): string {
+  const head = progress.over ? `Over by ${money(progress.overBy)}` : `${money(progress.left)} left`;
+  return progress.usedPercent === null ? head : `${head} · ${progress.usedPercent}% used`;
+}
+
 /** Active expense categories that have no budget yet this month. */
 export function unbudgetedCategories(categories: readonly Category[], budgets: readonly Pick<Budget, "category_id">[]): Category[] {
   const budgeted = new Set(budgets.map((budget) => budget.category_id));

@@ -3,7 +3,7 @@
 React Native (Expo SDK 57, Expo Router) client for the BuyWise FastAPI + Supabase backend.
 Phase 1: auth, session persistence, API client, 5-tab shell, Dashboard.
 Phase 2: Transactions (list, quick add, detail, edit, delete).
-Phase 3: Budget and Goals.
+Phase 3: Budget (per-month budgets, ready to assign, copy from last month) and Goals (create, contribute, edit, archive).
 
 The rules every change follows are in [`../BUYWISE_MOBILE_GUIDE.md`](../BUYWISE_MOBILE_GUIDE.md).
 
@@ -29,15 +29,16 @@ Notes:
 `npx tsc --noEmit`, `npx expo lint`, `npm test`, `npx expo-doctor`
 
 `npm test` runs the pure logic in `src/lib/*.test.ts` (money parsing, dates, ledger grouping and
-diffing, the transaction form, error wording) with Node's built-in test runner. Those modules are
+diffing, the transaction form, budget and goal maths, error wording) with Node's built-in test runner. Those modules are
 import-free (or import siblings with an explicit `.ts` extension) so they need no test framework.
 
 ## Layout
 
-- `src/app/`: Expo Router routes (`(auth)`, `(tabs)`, `settings`, `reports`, `add-transaction`, `transaction/[id]`)
+- `src/app/`: Expo Router routes (`(auth)`, `(tabs)`, `settings`, `reports`, `add-transaction`, `transaction/[id]`,
+  `budget/set`, `goals/`)
 - `src/lib/`: everything that is not UI
   - `api.ts`: the typed API client (screens never call it directly) and `errors.ts`: how a failure becomes friendly text
   - `queries.ts` / `mutations.ts`: the only way screens read and write server data, including cache keys and invalidation
-  - `money.ts`, `dates.ts`, `ledger.ts`, `transactionForm.ts`: pure logic with tests
+  - `money.ts`, `dates.ts`, `ledger.ts`, `transactionForm.ts`, `budget.ts`, `goals.ts`: pure logic with tests
 - `src/providers/`: `AuthProvider`
 - `src/ui/`: greybox primitives. Only this folder reads `theme.ts`, so the real design can replace it without touching screens.

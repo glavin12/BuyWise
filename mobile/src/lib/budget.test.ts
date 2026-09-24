@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { budgetProgress, copyBudgets, copySummary, isArchivedBudget, readyToAssign, unbudgetedCategories } from "./budget.ts";
+import { budgetProgress, budgetStatusText, copyBudgets, copySummary, isArchivedBudget, readyToAssign, unbudgetedCategories } from "./budget.ts";
 import type { BudgetCopyItem } from "./ledger.ts";
 import type { Category } from "./types";
 
@@ -94,4 +94,12 @@ test("copySummary reads 'Copied 8 · skipped 2 · failed 1' and notes an early s
     copySummary({ copied: 2, failed: 1, notTried: 3, stopped: true }, 0),
     "Copied 2 · skipped 0 · failed 1 · 3 not tried (stopped early)"
   );
+});
+
+test("budgetStatusText says over or left in words, with the true percent", () => {
+  const money = (minor: number) => `$${minor / 100}`;
+  assert.equal(budgetStatusText(budgetProgress({ budgeted_amount: 100000, spent: 60000 }), money), "$400 left · 60% used");
+  assert.equal(budgetStatusText(budgetProgress({ budgeted_amount: 40000, spent: 50000 }), money), "Over by $100 · 125% used");
+  assert.equal(budgetStatusText(budgetProgress({ budgeted_amount: 500, spent: 500 }), money), "$0 left · 100% used");
+  assert.equal(budgetStatusText(budgetProgress({ budgeted_amount: 0, spent: 300 }), money), "Over by $3"); // no budget to divide by, so no percent
 });

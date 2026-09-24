@@ -34,6 +34,12 @@ function RootNavigator() {
         <Stack.Screen name="add-transaction" options={sheetScreenOptions} />
         <Stack.Screen name="transaction/[id]" />
         <Stack.Screen name="transaction/[id]/edit" />
+        <Stack.Screen name="budget/set" options={sheetScreenOptions} />
+        <Stack.Screen name="goals/index" />
+        <Stack.Screen name="goals/[id]" />
+        <Stack.Screen name="goals/new" options={sheetScreenOptions} />
+        <Stack.Screen name="goals/[id]/contribute" options={sheetScreenOptions} />
+        <Stack.Screen name="goals/[id]/edit" options={sheetScreenOptions} />
       </Stack.Protected>
       <Stack.Protected guard={!signedIn}>
         <Stack.Screen name="(auth)" />

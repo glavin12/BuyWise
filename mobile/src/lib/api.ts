@@ -1,6 +1,6 @@
 import { isAuthRetryableFetchError } from "@supabase/supabase-js";
 
-import { ApiError, isNotFound, MSG, userMessage } from "./errors";
+import { ApiError, isNotFound, MSG, stopsBatch, userMessage } from "./errors";
 import { supabase } from "./supabase";
 import type {
   Budget,
@@ -43,7 +43,7 @@ if (!API_BASE) {
   throw new Error("Missing EXPO_PUBLIC_API_URL. Copy .env.example to .env.local and fill it in.");
 }
 
-export { ApiError, isNotFound, userMessage };
+export { ApiError, isNotFound, stopsBatch, userMessage };
 
 const CRUD_TIMEOUT_MS = 15_000; // C4
 const CHAT_TIMEOUT_MS = 60_000; // AI1: Groq tool chains can legitimately take 30s+

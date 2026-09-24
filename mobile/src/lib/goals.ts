@@ -6,7 +6,7 @@
 import { daysUntil } from "./dates.ts";
 import { diffFields } from "./ledger.ts";
 import { minorToAmountText, parseAmountToMinor } from "./money.ts";
-import type { Goal, GoalCreate, GoalPriority, GoalType, GoalUpdate } from "./types";
+import type { Goal, GoalCreate, GoalPriority, GoalsListResponse, GoalType, GoalUpdate } from "./types";
 
 export const GOAL_TITLE_MAX = 255; // backend GoalCreate.title
 export const GOAL_DESCRIPTION_MAX = 1000; // backend GoalCreate.description
@@ -53,6 +53,22 @@ export function percentOf(current: number, target: number): number {
 export function contributionPreview(current: number, target: number, contribution: number) {
   const total = current + contribution;
   return { total, percent: percentOf(total, target), achieves: total >= target };
+}
+
+/**
+ * A cached goals list after `goal` was saved: the goal is in the list for its
+ * status (replaced in place, or added) and out of every other list. That keeps
+ * the next screen, and a second contribution, on the new numbers straight away.
+ */
+export function placeGoal(list: GoalsListResponse, goal: Goal, listStatus: string): GoalsListResponse {
+  const without = list.goals.filter((g) => g.id !== goal.id);
+  const goals =
+    goal.status !== listStatus
+      ? without
+      : list.goals.some((g) => g.id === goal.id)
+        ? list.goals.map((g) => (g.id === goal.id ? goal : g))
+        : [...without, goal];
+  return { ...list, goals, count: goals.length };
 }
 
 /** True exactly when a save moved the goal from active to completed (the only time to celebrate). */

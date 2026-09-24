@@ -10,11 +10,12 @@ import {
   goalDraftKey,
   goalEditPatch,
   justAchieved,
+  placeGoal,
   percentOf,
   toGoalCreate,
   validateGoalDraft,
 } from "./goals.ts";
-import type { Goal } from "./types";
+import type { Goal, GoalsListResponse } from "./types";
 
 function goal(extra: Partial<Goal> = {}): Goal {
   return {
@@ -131,4 +132,28 @@ test("goalDraftKey ignores whitespace-only edits", () => {
   const g = goal();
   assert.equal(goalDraftKey(goalDraftFromGoal(g)), goalDraftKey({ ...goalDraftFromGoal(g), title: "Emergency fund  " }));
   assert.notEqual(goalDraftKey(goalDraftFromGoal(g)), goalDraftKey({ ...goalDraftFromGoal(g), target: "1" }));
+});
+
+test("placeGoal puts a saved goal in the list for its status and out of the others", () => {
+  const list = (status: string, goals: Goal[]): GoalsListResponse => ({ status, count: goals.length, goals });
+  const a = goal({ id: "a" });
+  const b = goal({ id: "b" });
+
+  // updated in place: same position, new numbers
+  const raised = goal({ id: "a", current_amount: 5 });
+  assert.deepEqual(placeGoal(list("active", [a, b]), raised, "active").goals, [raised, b]);
+
+  // reached its target: leaves Active, joins Achieved
+  const done = goal({ id: "a", status: "completed" });
+  assert.deepEqual(placeGoal(list("active", [a, b]), done, "active"), list("active", [b]));
+  assert.deepEqual(placeGoal(list("completed", [b]), done, "completed").goals, [b, done]);
+
+  // raised its target again: leaves Achieved, joins Active
+  const reopened = goal({ id: "a", status: "active" });
+  assert.equal(placeGoal(list("completed", [done]), reopened, "completed").count, 0);
+
+  // archived: in no list
+  const archived = goal({ id: "a", status: "archived" });
+  assert.equal(placeGoal(list("active", [a, b]), archived, "active").count, 1);
+  assert.equal(placeGoal(list("completed", [done]), archived, "completed").count, 0);
 });

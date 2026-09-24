@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { minorToAmountText, parseAmountToMinor, sanitizeAmountInput, sumMinor } from "./money.ts";
+import { minorToAmountText, parseAmountToMinor, parsePositiveAmount, sanitizeAmountInput, sumMinor } from "./money.ts";
 
 test("minorToAmountText shows minor units as field text and round-trips through the parser", () => {
   assert.equal(minorToAmountText(25000), "250");
@@ -68,4 +68,15 @@ test("sanitizeAmountInput keeps pasted text inside what parseAmountToMinor accep
     const clean = sanitizeAmountInput(pasted);
     assert.ok(clean === "" || parseAmountToMinor(clean) !== null, `"${pasted}" -> "${clean}"`);
   }
+});
+
+test("parsePositiveAmount gives minor units, or the reason the text is not usable", () => {
+  assert.deepEqual(parsePositiveAmount("500"), { minor: 50000, error: null });
+  assert.deepEqual(parsePositiveAmount("0,5"), { minor: 50, error: null });
+  assert.equal(parsePositiveAmount("").error, "Enter an amount.");
+  assert.equal(parsePositiveAmount("   ").error, "Enter an amount.");
+  assert.equal(parsePositiveAmount("0").error, "The amount must be more than 0.");
+  assert.equal(parsePositiveAmount("0.00").error, "The amount must be more than 0.");
+  assert.equal(parsePositiveAmount("1.005").error, "Enter a valid amount, like 500 or 500.50.");
+  assert.equal(parsePositiveAmount("-5").minor, null);
 });

@@ -51,3 +51,11 @@ export function userMessage(err: unknown, action: string): string {
 export function isNotFound(err: unknown): boolean {
   return err instanceof ApiError && err.status === 404;
 }
+
+/**
+ * A failure every remaining item of a batch would hit too (offline or timed out,
+ * signed out, rate limited): stop the batch instead of failing the rest one by one.
+ */
+export function stopsBatch(err: unknown): boolean {
+  return err instanceof ApiError && (err.status === 0 || err.status === 401 || err.status === 429);
+}

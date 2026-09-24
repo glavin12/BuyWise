@@ -46,6 +46,20 @@ export function monthKey(month: number, year: number): string {
   return `${year}-${pad2(month)}`;
 }
 
+/** The device-local calendar month right now. */
+export function currentMonth(now: Date = new Date()): MonthYear {
+  return { month: now.getMonth() + 1, year: now.getFullYear() };
+}
+
+/** Route params ("8", "2026") -> a month the backend accepts, or null: a URL is untrusted text. */
+export function parseMonthYear(month: unknown, year: unknown): MonthYear | null {
+  if (typeof month !== "string" || typeof year !== "string") return null;
+  if (!/^\d{1,2}$/.test(month) || !/^\d{4}$/.test(year)) return null;
+  const parsed = { month: Number(month), year: Number(year) };
+  const valid = parsed.month >= 1 && parsed.month <= 12 && parsed.year >= MIN_YEAR && parsed.year <= MAX_YEAR;
+  return valid ? parsed : null;
+}
+
 /** "YYYY-MM-DD" shifted by whole days (local calendar arithmetic). */
 export function shiftDays(ymd: string, days: number): string {
   const date = parseDateOnly(ymd);
