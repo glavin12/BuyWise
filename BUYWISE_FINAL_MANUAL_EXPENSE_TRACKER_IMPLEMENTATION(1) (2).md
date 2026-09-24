@@ -1,5 +1,10 @@
 # BuyWise — Final Manual Expense Tracker Implementation Plan
 
+> **Historical plan, superseded.** Written before accounts and transfers were removed
+> (2026-09-10). It still describes accounts, transfers and an account-based ledger, which
+> the code no longer has. Do not treat it as a source of truth: see `AGENTS.md` and
+> `docs/`.
+
 ## 0. Purpose
 
 Build the **production-quality manual financial tracker foundation** for BuyWise.

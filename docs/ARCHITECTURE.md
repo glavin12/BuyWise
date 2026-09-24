@@ -30,27 +30,24 @@ Repositories never trust an owner ID from an LLM or request body. Services valid
 
 ## Financial Services
 
-- `ProfileService`: profile CRUD and first-profile initialization.
-- `AccountService`: account CRUD, default Cash account, starting balance rows, and balances.
+- `ProfileService`: profile CRUD and first-profile initialization (seeds default categories and payees).
 - `CategoryService`: user-owned category CRUD and default seeding.
 - `PayeeService`: normalized payee CRUD.
 - `TransactionService`: ledger CRUD, ownership validation, filters, and serialization.
-- `TransferService`: atomic paired transfer creation/deletion.
 - `BudgetService`: per-category monthly budget upsert, status, and CRUD.
 - `AnalyticsService`: monthly summary, category spending, comparison, and AI-facing breakdowns.
 - `GoalService`: category-linked goals and manual progress completion.
-- `DashboardService`: composition of profile, accounts, analytics, budgets, and goals.
+- `DashboardService`: composition of profile, the running balance, analytics, budgets, and goals.
 
 ## Ledger Invariants
 
 - All amounts are non-negative integer minor units.
-- Expenses and income require an owned category of the matching type.
-- A transfer creates exactly two rows with the same group ID and opposite directions.
+- Expenses and income require an owned category of the matching type; starting balances do not.
+- There are no accounts and no transfers. Each user has one balance: `starting_balance + income - expense`.
 - Starting balances are ledger rows but are never counted as income or expenses.
-- Transfer rows are never counted as income or expenses.
-- Account balance sign logic is `starting_balance + income - expense + transfer(in) - transfer(out)`.
-- Split child rows are excluded from aggregate queries; parent/child persistence is extensible but split creation is not exposed yet.
-- Every financial query includes `user_id` and, where applicable, owned account/category/payee references.
+- Each transaction has an optional `payment_method` (`cash`, `upi`, `bank_transfer`, `card`, `other`).
+- Split child rows are excluded from the balance and from aggregate queries; parent/child persistence is extensible but split creation is not exposed yet.
+- Every financial query includes `user_id` and, where applicable, owned category/payee references.
 
 ## Chat Lifecycle
 
@@ -75,7 +72,7 @@ Tool calls are stored structurally in `messages.tool_calls`; tool rows reference
 
 ## AI Tools
 
-Registered tools are `get_dashboard`, `get_accounts`, `get_profile`, `get_recent_transactions`, `add_transaction`, `get_spending_breakdown`, `get_income_summary`, `get_budget_status`, `set_category_budget`, `get_financial_goals`, `add_goal`, `update_goal_progress`, `get_categories`, and `calculator`.
+Registered tools are `get_dashboard`, `get_profile`, `get_recent_transactions`, `add_transaction`, `get_spending_breakdown`, `get_income_summary`, `get_budget_status`, `set_category_budget`, `get_financial_goals`, `add_goal`, `update_goal_progress`, `get_categories`, and `calculator`.
 
 AI-facing display amounts are converted to minor units before service calls. Tool return values remain structured; natural-language explanation belongs to the agent.
 

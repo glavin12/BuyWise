@@ -43,19 +43,11 @@ API write requests use integer minor units. For INR, `1050` means `INR 10.50`. R
 
 ## Profile Initialization
 
-`GET /api/v1/profile` returns the authenticated profile. `POST /api/v1/profile` creates or partially updates it. The first profile creation also seeds 20 user-owned categories and an active `Cash` account.
+`GET /api/v1/profile` returns the authenticated profile and creates a default one on first read. `POST /api/v1/profile` creates or partially updates it (422 when the body has no fields). Profile creation seeds 36 user-owned categories (29 expense, 7 income) and 36 payees (20 expense, 16 income). There are no accounts.
 
-## Accounts
+## Balance And Payment Methods
 
-| method | path | behavior |
-|---|---|---|
-| POST | `/api/v1/accounts` | create account; optional `starting_balance` creates a starting-balance ledger row |
-| GET | `/api/v1/accounts` | list active accounts with ledger balances |
-| GET | `/api/v1/accounts/{account_id}` | get one owned active account |
-| PATCH | `/api/v1/accounts/{account_id}` | update name, type, or currency |
-| DELETE | `/api/v1/accounts/{account_id}` | deactivate account |
-
-Account balances include starting balances, income, expenses, and signed transfer sides.
+There are no accounts or transfers. Each user has one running balance, `income + starting balances - expenses`, returned as `current_balance` by `GET /api/v1/dashboard`. A transaction can carry an optional `payment_method`: `cash`, `upi`, `bank_transfer`, `card`, or `other`. Spending by payment method is available from `GET /api/v1/analytics/payment-methods`.
 
 ## Categories And Payees
 
@@ -66,7 +58,7 @@ Account balances include starting balances, income, expenses, and signed transfe
 | POST/GET | `/api/v1/payees` | create or list owned payees |
 | GET/PATCH/DELETE | `/api/v1/payees/{payee_id}` | get, rename, or delete one payee |
 
-Category deletion is a soft deactivation. Payee deletion is hard delete and transaction `payee_id` becomes null.
+Category deletion is a soft deactivation, and category lists hide deactivated rows. Payee deletion is hard delete and transaction `payee_id` becomes null. `POST /api/v1/categories` returns the existing category when an active one with the same name and type exists, and `POST /api/v1/payees` returns the existing payee for the same normalized name and type.
 
 ## Transactions
 
@@ -78,27 +70,23 @@ Category deletion is a soft deactivation. Payee deletion is hard delete and tran
 | PATCH | `/api/v1/transactions/{transaction_id}` | update owned transaction fields |
 | DELETE | `/api/v1/transactions/{transaction_id}` | hard delete owned transaction |
 
-`currency` defaults to the profile currency. Changing `transaction_type`, `category_id`, or `payee_id` on `PATCH` must leave the category (and payee) type equal to the transaction type, otherwise the API returns 400. Lists are ordered by date, then creation time, then id, so offset pages never duplicate or skip rows.
+`currency` defaults to the profile currency. Expenses and income require a category of the matching type (a `starting_balance` does not), `payment_method` is optional, and `payee_name` finds or creates a payee. Changing `transaction_type`, `category_id`, or `payee_id` on `PATCH` must leave the category (and payee) type equal to the transaction type, otherwise the API returns 400. Lists are ordered by date, then creation time, then id, so offset pages never duplicate or skip rows.
 
-GET filters are `account_id`, `category_id`, `payee_id`, `transaction_type`, `cleared_status`, `date_from`, `date_to`, `period`, `limit`, and `offset`. `transaction_type` accepts `expense`, `income`, `transfer`, and `starting_balance`; `period` accepts `this_month` and `last_month`.
+GET filters are `category_id`, `payee_id`, `transaction_type`, `cleared_status`, `date_from`, `date_to`, `period`, `limit` (1 to 100, default 20), and `offset`. `transaction_type` accepts `expense`, `income`, and `starting_balance`; `period` accepts `this_month` and `last_month`.
 
 Example create request:
 
 ```json
 {
-  "account_id": "00000000-0000-0000-0000-000000000001",
   "category_id": "00000000-0000-0000-0000-000000000002",
   "payee_name": "Local Cafe",
   "amount": 1250,
   "transaction_type": "expense",
+  "payment_method": "upi",
   "transaction_date": "2026-08-11",
   "cleared_status": "cleared"
 }
 ```
-
-## Transfers
-
-`POST /api/v1/transfers` creates two linked transfer rows atomically. It requires `from_account_id`, `to_account_id`, positive minor-unit `amount`, optional date, and optional description. `DELETE /api/v1/transfers/{transfer_group_id}` removes both owned sides atomically. Transfers require matching account currencies and are excluded from income/expense totals.
 
 ## Budgets
 
@@ -118,9 +106,10 @@ Example create request:
 |---|---|---|
 | GET | `/api/v1/analytics/monthly` | `month`, `year` |
 | GET | `/api/v1/analytics/categories` | `month`, `year` |
+| GET | `/api/v1/analytics/payment-methods` | `month`, `year` |
 | GET | `/api/v1/analytics/comparison` | `month1`, `year1`, `month2`, `year2` |
 
-Analytics returns integer minor units. Expense and income totals exclude transfers, starting balances, and split child rows. Month comparison includes signed amount and percentage changes; percentage is null when the previous value is zero.
+Analytics returns integer minor units. Expense and income totals exclude starting balances and split child rows. `month` is 1 to 12 and `year` is 2020 to 2100. `payment-methods` groups the month's expenses by `payment_method` (null for untagged rows) and includes each method's `percent_of_total`. Month comparison includes signed amount and percentage changes; percentage is null when the previous value is zero.
 
 ## Goals And Dashboard
 
@@ -133,7 +122,7 @@ Goals support optional category linkage and manual progress. Reaching `target_am
 
 ## Chat And Development Token
 
-`POST /api/v1/chat` sends a message. With an `idempotency_key` the send is exactly-once per user: a completed send is replayed, a retry that arrives while the first is still running gets `409 Still processing this message` (the agent and its write tools run once), and a send that failed can be retried with the same key. One agent turn is limited to 60 seconds. Its AI tools use the same account, category, transaction, budget, analytics, and goal services as the HTTP API.
+`POST /api/v1/chat` sends a message. With an `idempotency_key` the send is exactly-once per user: a completed send is replayed, a retry that arrives while the first is still running gets `409 Still processing this message` (the agent and its write tools run once), and a send that failed can be retried with the same key. Without an `idempotency_key` the server generates one, so every send is new. "Still running" is inferred from an unanswered user message, so a turn whose process died leaves its key answering 409; clients should send a fresh key per send. One agent turn is limited to 60 seconds. Its AI tools use the same category, transaction, budget, analytics, and goal services as the HTTP API.
 
 `POST /api/v1/dev/token` is available only under `ENVIRONMENT=development`; it relays a password grant to Supabase Auth and is not registered in other environments.
 
