@@ -7,7 +7,7 @@ The PostgreSQL/Supabase schema is defined by the clean Alembic baseline in `alem
 - Financial primary keys use PostgreSQL `gen_random_uuid()` with an application-side UUID default in ORM tests and non-Postgres environments.
 - Conversation and message IDs are UUIDv7 generated in Python, with a database fallback.
 - Owner IDs are UUIDs derived from the verified Supabase JWT subject.
-- Financial amounts are `BIGINT` minor units. Amount sign is represented by transaction type and, for transfers, `transfer_direction`.
+- Financial amounts are `BIGINT` minor units. Amount sign is represented by transaction type.
 - Timestamp columns use `timestamptz`; transaction dates use calendar `DATE` without timezone.
 - All user-owned tables have an index on `user_id` or an equivalent composite index.
 
@@ -25,25 +25,13 @@ Stores authenticated chat conversations with `user_id`, optional title, message 
 
 Stores conversation messages with `conversation_id`, `user_id`, enum `role` (`user`, `assistant`, `system`, `tool`), content, JSONB tool calls, tool-call ID, enum `status`, idempotency key, metadata, token counts, timestamps, and soft-delete timestamp. A partial unique index `ix_messages_user_idempotency_key` on `(user_id, idempotency_key)`, limited to rows where the key is non-null and `deleted_at` is null, enforces exactly-once sends per user (a key is never shared across users). The conversation FK is `ON DELETE RESTRICT`.
 
-### `accounts`
-
-| column | type | rules |
-|---|---|---|
-| `id` | uuid | PK |
-| `user_id` | uuid | FK `profiles.id` `CASCADE` |
-| `name` | text | required, non-empty |
-| `account_type` | text | `checking`, `savings`, `cash`, `credit_card` |
-| `currency` | text | default `INR` |
-| `is_active` | boolean | default `true`; deactivation is the API delete behavior |
-| `created_at`, `updated_at` | timestamptz | required |
-
 ### `categories`
 
-Categories are user-owned. Columns are `id`, `user_id`, `name`, `type` (`expense` or `income`), optional `icon` and `color`, `is_active`, and timestamps. `(user_id, name, type)` is unique. Profile creation seeds 20 defaults per user; there are no global `is_system` categories.
+Categories are user-owned. Columns are `id`, `user_id`, `name`, `type` (`expense` or `income`), optional `icon` and `color`, `is_active`, and timestamps. `(user_id, name, type)` is unique. Profile creation seeds 36 defaults per user (29 expense, 7 income; `DEFAULT_CATEGORIES`); there are no global `is_system` categories.
 
 ### `payees`
 
-Columns are `id`, `user_id`, `name`, `normalized_name`, `type` (`expense` or `income`), and timestamps. `(user_id, normalized_name, type)` is unique; violating it (for example renaming a payee to an existing name) is returned by the API as HTTP 409. `normalized_name` is lowercase trimmed text used by `find_or_create()`.
+Columns are `id`, `user_id`, `name`, `normalized_name`, `type` (`expense` or `income`), and timestamps. `(user_id, normalized_name, type)` is unique; violating it (for example renaming a payee to an existing name) is returned by the API as HTTP 409. `normalized_name` is lowercase trimmed text used by `find_or_create()`. Profile creation seeds 36 predefined payees (20 expense, 16 income; `PREDEFINED_PAYEES`), and migration `002` backfills existing profiles additively.
 
 ### `transactions`
 
@@ -53,28 +41,26 @@ The ledger source of truth:
 |---|---|---|
 | `id` | uuid | PK |
 | `user_id` | uuid | FK `profiles.id` `CASCADE` |
-| `account_id` | uuid | required FK `accounts.id` `RESTRICT` |
 | `category_id` | uuid | nullable FK `categories.id` `RESTRICT` |
 | `payee_id` | uuid | nullable FK `payees.id` `SET NULL` |
 | `amount` | bigint | non-negative minor units |
 | `currency` | text | default `INR` |
-| `transaction_type` | text | `expense`, `income`, `transfer`, `starting_balance` |
+| `transaction_type` | text | `expense`, `income`, `starting_balance` |
+| `payment_method` | text | nullable; `cash`, `upi`, `bank_transfer`, `card`, or `other` |
 | `transaction_date` | date | default current date |
 | `description`, `notes` | text | nullable |
 | `cleared_status` | text | `pending` or `cleared` |
-| `transfer_group_id` | uuid | required for transfers |
-| `transfer_direction` | text | transfer-only `in` or `out` |
 | `parent_transaction_id` | uuid | nullable self-FK `CASCADE` for future splits |
 | timestamps | timestamptz | required |
 
-Expense and income rows require a category. Transfers require a group and direction. Non-transfer rows cannot carry a transfer direction. Parent rows are excluded from analytical aggregates when split children are present.
+Every row except a `starting_balance` requires a category (`transactions_category_required_check`), and `payment_method` is limited to the five values above (`transactions_payment_method_check`). Split child rows (`parent_transaction_id` set) are excluded from the balance and from analytical aggregates; split creation is not exposed yet.
 
-Indexes cover `user_id`, `account_id`, `category_id`, `payee_id`, `transaction_date`, `(user_id, transaction_date)`, `(user_id, transaction_type)`, and non-null `transfer_group_id`.
+Indexes cover `user_id`, `category_id`, `payee_id`, `transaction_date`, `(user_id, transaction_date)`, `(user_id, transaction_type)`, and `parent_transaction_id`.
 
-Account balance sign logic is:
+The balance is one number per user, with no accounts table:
 
 ```text
-starting_balance + income - expense + transfer(in) - transfer(out)
+starting_balance + income - expense
 ```
 
 ### `budget_entries`

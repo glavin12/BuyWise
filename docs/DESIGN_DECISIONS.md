@@ -12,17 +12,17 @@ All persisted and service-layer money uses `BIGINT` minor units. Decimal convers
 
 Categories belong to a user and are seeded when the profile is created. This permits safe customization and prevents a category ID from crossing user boundaries. The previous shared `is_system` model and seed rows are removed.
 
-## 4. Accounts are first-class ledger owners
+## 4. One balance and a payment method, not accounts
 
-Transactions attach to accounts rather than directly to a profile. Account balances are derived from the ledger, not stored. Profile creation creates a default Cash account so manual entry works immediately.
+Transactions belong directly to the user; there are no accounts. The balance is derived from the ledger, not stored (`starting_balance + income - expense`), and it is one number per user. Each transaction can carry an optional `payment_method` (`cash`, `upi`, `bank_transfer`, `card`, `other`), so spending can still be reported by how it was paid (`GET /api/v1/analytics/payment-methods`). This replaced the earlier multi-account model on 2026-09-10 (commit `76ea069`); the intent was one balance instead of several accounts, while keeping payment-method reporting.
 
-## 5. Explicit transfer direction
+## 5. No transfers
 
-The two-sided transfer design requires `transfer_direction` in addition to `transfer_group_id`. Without an `in`/`out` marker, two positive transfer amounts cannot produce correct account balances. Transfer creation and deletion are atomic.
+Two-sided transfer rows (`transfer_group_id`, `transfer_direction`) were removed together with accounts. `transaction_type` is `expense`, `income`, or `starting_balance`.
 
 ## 6. Starting balances are transactions
 
-Opening balances use `transaction_type='starting_balance'` so account balances remain ledger-derived. Starting balances are explicitly excluded from income and expense analytics.
+Opening balances use `transaction_type='starting_balance'` so the balance remains ledger-derived. Starting balances are explicitly excluded from income and expense analytics.
 
 ## 7. Category budgets replace monthly plans
 

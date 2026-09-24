@@ -2,7 +2,7 @@
 
 AI-first personal finance assistant. The AI understands the user's financial situation, uses tools to retrieve real data, and provides accurate financial help — with persistent conversation memory.
 
-**Status:** Manual expense tracker foundation shipped — account-based ledger, user-owned categories/payees, integer money, budgets, analytics, goals, transfers, persistent AI chat, and user-scoped access control.
+**Status:** Manual expense tracker foundation shipped — single-balance ledger with a per-transaction payment method, user-owned categories/payees, integer money, budgets, analytics, goals, persistent AI chat, and user-scoped access control. Two clients use this API: the Expo app in `mobile/` and the Next.js app in `frontend/` (their status is in `AGENTS.md`).
 
 ## Stack
 
@@ -46,11 +46,13 @@ ai_service/
 └── utils/           DB rows → LangChain messages, month/period helpers
 alembic/             reversible migrations
 docs/                architecture, database, API, design decisions
+mobile/              Expo / React Native client
+frontend/            Next.js web client
 ```
 
 ## Documentation
 
-- `AGENTS.md` — the operating manual (entry point for AI coding agents)
+- `AGENTS.md` and `CLAUDE.md` — the operating manual, identical copies (entry point for AI coding agents)
 - `docs/ARCHITECTURE.md` — layers, chat lifecycle, repository contracts
 - `docs/DATABASE.md` — schema, indexes, enums, migrations
 - `docs/API.md` — endpoint + schema reference, idempotency semantics

@@ -5,6 +5,14 @@ frontend consistent as it's built out for review and basic testing. It is not a 
 spec — it's the set of decisions that stop every screen from being designed from
 scratch.
 
+> **Status (2026-09-24):** this is the original web UX plan. It was written before
+> accounts and transfers were removed (2026-09-10) and before the colorful-cream
+> reskin (2026-09-13). The account and transfer parts below have been updated for the
+> single-balance backend. The visual system in §4 (palette, typography, spacing) is
+> still the original plan, not the shipped look: the real tokens are in
+> `frontend/app/globals.css` and `frontend/components/ui/`. Where this file and the
+> code differ, the code wins.
+
 Scope note: this is an **MVP review build**. It's for internal/user testing of the
 manual expense tracking flow, not a production launch. Where the "right" answer would
 take real design/eng time (native mobile, animation polish, offline mode), this doc
@@ -63,9 +71,9 @@ do, but they don't apply here.
 ```
 Sidebar (persistent, desktop) / Bottom nav (mobile, MVP-lite)
 ├── Dashboard          → GET /api/v1/dashboard
-├── Transactions        → GET/POST /api/v1/transactions, /transfers
+├── Transactions        → GET/POST /api/v1/transactions
 ├── Budget (YYYY-MM)    → GET/POST /api/v1/budgets
-├── Accounts            → GET/POST /api/v1/accounts
+├── Balance (/accounts) → GET /api/v1/dashboard, /api/v1/analytics/payment-methods
 ├── Goals               → GET/POST /api/v1/goals
 ├── Reports             → GET /api/v1/analytics/*
 ├── Chat                → POST /api/v1/chat, /api/v1/conversations
@@ -76,7 +84,7 @@ Sidebar (persistent, desktop) / Bottom nav (mobile, MVP-lite)
 ```
 
 Persistent chrome:
-- **Left sidebar** (collapses to icon rail under ~1024px) with the seven primary
+- **Left sidebar** (collapses to icon rail under ~1024px) with the eight primary
   sections above.
 - **Global quick-add button** (`+ Add transaction`), always visible top-right of the
   content area, opens a modal — never navigates away from the current screen.
@@ -104,11 +112,10 @@ color carries real meaning here, not just brand decoration.
 | `--positive` | Income, under-budget, goal progress | green |
 | `--negative` | Expenses shown as reducing balance, over-budget | red — used for *status*, not for every expense row |
 | `--warning` | Nearing budget limit, unfunded category | amber |
-| `--neutral-transfer` | Transfers | a desaturated tone distinct from both income and expense so transfers never get misread as either |
 
 Rule: don't color every expense row red. YNAB and Copilot both keep the transaction
 list in neutral text and reserve red/green for *status* (over budget, under budget,
-account balance sign) — coloring every row destroys the signal.
+balance sign) — coloring every row destroys the signal.
 
 ### Typography
 
@@ -135,7 +142,7 @@ account balance sign) — coloring every row destroys the signal.
 
 The Monarch-style "everything at a glance" screen. Top to bottom:
 
-1. **Header row**: total balance across active accounts, month switcher, quick-add.
+1. **Header row**: current balance (the single ledger balance), month switcher, quick-add.
 2. **This month at a glance**: three stat cards — Income, Expenses, Left to Spend —
    using `--positive` / `--negative` / neutral respectively.
 3. **Budget snapshot**: top 3–5 categories closest to their limit, each a thin
@@ -151,18 +158,15 @@ prompt — "Add your first transaction to see your spending here" — with the q
 button front and center. Never show a dashboard full of zeros as the first thing a new
 user sees.
 
-### 5.2 Transactions (`/api/v1/transactions`, `/api/v1/transfers`)
+### 5.2 Transactions (`/api/v1/transactions`)
 
 - A single dense, sortable, filterable table: date, payee, category (as a colored
-  tag), account, amount (right-aligned, tabular figures).
+  tag), payment method, amount (right-aligned, tabular figures).
 - Filter bar: date range (defaults to current month, reuses the month switcher
-  pattern), account, category, type (income/expense/transfer).
+  pattern), category, type (income/expense).
 - Row click opens an **inline edit**, not a page navigation — editing a transaction
   shouldn't lose your place in the list. Copilot and Monarch both do this; it's the
   single biggest thing that makes a transaction list feel fast instead of tedious.
-- Transfers render as a single logical row (both legs of the `transfer_group_id`
-  collapsed into one line with a transfer icon), not as two separate rows that look
-  like duplicate transactions.
 - Bulk select + bulk categorize/delete is a nice-to-have, not MVP-required — skip it
   for the review build unless testers ask for it.
 
@@ -173,8 +177,8 @@ every transaction is typed in by hand.
 
 - Fields, in tab order: Amount, Payee (autocomplete against existing payees, allows
   free text for new ones), Category (searchable dropdown, grouped like the budget
-  envelope groups), Account, Date (defaults to today), Type toggle
-  (Expense/Income/Transfer — Transfer swaps Category for a "To account" field).
+  envelope groups), Payment method (optional), Date (defaults to today), Type toggle
+  (Expense/Income). The payee list follows the selected type.
 - `Enter` submits and reopens a blank form (for rapid multi-entry); `Esc` closes.
 - Amount field accepts plain numbers and converts client-side to minor units only at
   submit time, using the same rounding rule as `amount_to_minor()` — never do
@@ -196,14 +200,13 @@ This is the YNAB-inspired screen and the one worth the most design care.
   action saves re-entering the same numbers every period, which matters a lot for a
   manual-only app.
 
-### 5.5 Accounts, Categories, Payees, Goals
+### 5.5 Balance, Categories, Payees, Goals
 
 These are CRUD-on-a-list screens and should all reuse the same list/table + modal-form
 pattern rather than each getting a bespoke layout:
 
-- **Accounts**: name, type, current balance (computed, not user-entered), active
-  toggle. Deactivating (not deleting) is the primary "remove" action, matching how the
-  backend treats `active` accounts in balance calculation.
+- **Balance** (route `/accounts`): the current balance (computed, not user-entered),
+  spending by payment method for the month, and recent activity. Nothing is entered here.
 - **Categories**: grouped list, inline rename, archive instead of hard-delete where
   the category has transaction history.
 - **Payees**: simple searchable list; mostly exists as an autocomplete source for
@@ -231,8 +234,8 @@ Three tabs, one per backend endpoint — resist merging them into one mega-chart
 - Conversation list is secondary; most sessions are one-off, so default to a fresh
   conversation rather than surfacing history first.
 - When the agent uses a tool (e.g. `add_transaction`), show a small structured
-  confirmation card in the chat thread ("Added ₹450 expense — Groceries, Cash
-  account") instead of just the raw text reply — this reuses the transaction row
+  confirmation card in the chat thread ("Added ₹450 expense — Groceries, paid by
+  cash") instead of just the raw text reply — this reuses the transaction row
   component from §5.2 at small size, so it looks like the rest of the app instead of
   like a chatbot bolted on.
 
@@ -304,7 +307,5 @@ Call these out so nobody spends review-build time on them:
 - Do budgets need a rollover indicator (unspent amount carrying to next month), or is
   that a v2 feature? Affects whether the Budget screen (§5.4) needs a "rolled over"
   badge now or later.
-- Should transfers between accounts show up in the Reports screens at all, or are they
-  correctly excluded everywhere the way analytics currently excludes them?
-- Goal cards (§5.5) — do we need a "contribute from account X" action wired to a real
-  transaction, or is `update_goal_progress` purely a manual number for now?
+- Goal cards (§5.5) — do we need a "contribute" action wired to a real transaction, or
+  is `update_goal_progress` purely a manual number for now?
