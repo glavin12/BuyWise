@@ -145,7 +145,7 @@ class MessageRepository:
         cursor: datetime | None = None,
         limit: int = 100,
     ) -> list[Message]:
-        """Chronological page of messages for UI display."""
+        """The newest ``limit`` messages (older than ``cursor``), in chronological order."""
         stmt = select(Message).where(
             Message.conversation_id == conversation_id,
             Message.user_id == user_id,
@@ -153,9 +153,9 @@ class MessageRepository:
         )
         if cursor is not None:
             stmt = stmt.where(Message.created_at < cursor)
-        stmt = stmt.order_by(Message.created_at.asc(), Message.id.asc()).limit(limit)
+        stmt = stmt.order_by(Message.created_at.desc(), Message.id.desc()).limit(limit)
         result = await self.session.scalars(stmt)
-        return list(result)
+        return list(reversed(list(result)))
 
     async def update_status(
         self,

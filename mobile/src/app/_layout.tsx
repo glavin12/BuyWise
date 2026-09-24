@@ -40,6 +40,8 @@ function RootNavigator() {
         <Stack.Screen name="goals/new" options={sheetScreenOptions} />
         <Stack.Screen name="goals/[id]/contribute" options={sheetScreenOptions} />
         <Stack.Screen name="goals/[id]/edit" options={sheetScreenOptions} />
+        <Stack.Screen name="conversations/index" />
+        <Stack.Screen name="conversations/[id]" />
       </Stack.Protected>
       <Stack.Protected guard={!signedIn}>
         <Stack.Screen name="(auth)" />

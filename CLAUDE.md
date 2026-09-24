@@ -20,8 +20,8 @@ Verified against the code on 2026-09-24. Update this section in the same change 
 
 | Part | State | Checks (2026-09-24) |
 |---|---|---|
-| Backend | Everything under [HTTP API](#http-api) is implemented, with 13 AI tools and migrations 001 to 003 | `pytest tests`: 70 passing |
-| Mobile | Phases 1 to 3 done: auth, Dashboard, Transactions, Budget, Goals. Not built: real design (1.5), AI chat (4), Reports and full Settings (5). Details: `mobile/AGENTS.md` | 75 unit tests passing; `tsc` and lint clean |
+| Backend | Everything under [HTTP API](#http-api) is implemented, with 13 AI tools and migrations 001 to 003 | `pytest tests`: 71 passing (2026-09-25) |
+| Mobile | Phases 1 to 4 done: auth, Dashboard, Transactions, Budget, Goals, AI chat. Not built: real design (1.5), Reports and full Settings (5). Details: `mobile/AGENTS.md` | 80 unit tests passing; `tsc` and lint clean (2026-09-25) |
 | Web | Every sidebar screen exists (see below) | `tsc` clean; `npm run lint` reports 24 errors; no tests |
 
 ### Web app (`frontend/`)
@@ -151,6 +151,7 @@ Protected routes:
 
 Behavior clients rely on:
 
+- `GET /conversations/{id}/messages` returns the newest `limit` messages in chronological order; `cursor` (a timestamp) returns the page older than it.
 - `GET /transactions` filters are `category_id`, `payee_id`, `transaction_type`, `cleared_status`, `date_from`, `date_to`, `period`, `limit` (1 to 100, default 20), and `offset`. Results are newest first.
 - `POST /budgets` is an upsert per category, month, and year, and only an active expense category can be budgeted.
 - `POST /categories` returns the existing row when an active category with that name and type exists. `DELETE /categories/{id}` archives (`is_active=false`) and category lists hide archived rows. Payee deletion is a hard delete and `transactions.payee_id` becomes null.

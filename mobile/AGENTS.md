@@ -19,7 +19,7 @@ Verified against the code on 2026-09-24. Phase names come from the README and co
 | 1.5 | Real visual design; `src/ui/theme.ts` is a "greybox" placeholder it replaces | Not built |
 | 2 | Transactions: list, quick add, detail, edit, delete | Done |
 | 3 | Budget (per month) and Goals | Done |
-| 4 | AI chat | Not built: the Chat tab is a placeholder |
+| 4 | AI chat | Done: new chat on the Chat tab, History, open and delete a conversation |
 | 5 | Reports and full Settings | Not built: placeholders |
 
 ### Screens (`src/app/`)
@@ -34,12 +34,13 @@ Verified against the code on 2026-09-24. Phase names come from the README and co
 | `(tabs)/budget`, `budget/set` | Month switcher, "ready to assign", per-category progress, set / edit / delete, copy from last month | Done |
 | `goals/index`, `goals/new`, `goals/[id]`, `goals/[id]/contribute`, `goals/[id]/edit` | Active / achieved lists, create, contribute (celebration when reached), edit, archive | Done |
 | `settings` | Email, name, Sign out | Partial |
-| `(tabs)/chat` | "Coming in Phase 4" | Placeholder |
+| `(tabs)/chat` | A new chat (header: History, New chat). Markdown replies, tool cards and "Thinking" on the reply that just arrived, 4 suggestions, retry a failed send, long-press copies text | Done |
+| `conversations/index`, `conversations/[id]` | History grouped Today / This week / Older (long-press deletes); an existing thread, which continues in place | Done |
 | `reports` | "Coming in Phase 5" | Placeholder |
 
 ### Backend calls
 
-`src/lib/api.ts` wraps 34 calls; screens use 19 of them, always through `queries.ts` / `mutations.ts`. Written but not used by any screen yet: `chat`, `listConversations`, `getMessages`, `deleteConversation`, `updateProfile`, `getCategory`, `updateCategory`, `deleteCategory`, `getPayee`, `updatePayee`, `deletePayee`, `getBudget`, `categoryAnalytics`, `paymentMethodAnalytics`, `comparisonAnalytics`.
+`src/lib/api.ts` wraps 34 calls; screens use 23 of them, always through `queries.ts` / `mutations.ts`. Written but not used by any screen yet: `updateProfile`, `getCategory`, `updateCategory`, `deleteCategory`, `getPayee`, `updatePayee`, `deletePayee`, `getBudget`, `categoryAnalytics`, `paymentMethodAnalytics`, `comparisonAnalytics`.
 
 ### Not set up
 
@@ -47,11 +48,11 @@ No `eas.json`. No `android.package` or `ios.bundleIdentifier` in `app.json`. Lig
 
 ### Baseline
 
-2026-09-24: `npm test` 75 passing; `npx tsc --noEmit` and `npx expo lint` clean.
+2026-09-25: `npm test` 80 passing; `npx tsc --noEmit` and `npx expo lint` clean.
 
 ## Stack
 
-Expo SDK 57 (`expo ~57.0.24`), React Native 0.86.3, React 19.2.3 with the React Compiler on, Expo Router with typed routes, TypeScript `strict`, TanStack Query 5 for server state, `@supabase/supabase-js` for authentication only, `expo-secure-store` for the session, NetInfo for connectivity, Ionicons for icons. See `package.json` for the rest. The package manager is npm (`package-lock.json`).
+Expo SDK 57 (`expo ~57.0.24`), React Native 0.86.3, React 19.2.3 with the React Compiler on, Expo Router with typed routes, TypeScript `strict`, TanStack Query 5 for server state, `@supabase/supabase-js` for authentication only, `expo-secure-store` for the session, NetInfo for connectivity, Ionicons for icons, `@ronradtke/react-native-markdown-display` (pure JS, runs in Expo Go) for chat replies, imported only by `src/ui/Markdown.tsx`. See `package.json` for the rest. The package manager is npm (`package-lock.json`).
 
 ## Commands
 
@@ -72,7 +73,7 @@ Run tests, typecheck and lint before declaring any task done. New logic in `src/
 
 - `src/app/`: Expo Router routes. Every file is a screen and `_layout.tsx` files define navigators; keep non-route code out of it. The signed-in / signed-out route guard (`Stack.Protected`) is in `src/app/_layout.tsx`.
 - `src/ui/`: primitives (`Screen`, `Button`, `Card`, `Text`, `Input`, `Amount`, `TransactionEditor`, ...). It is the only code that reads `theme.ts`; screens import from `@/ui`, which does not export the theme.
-- `src/lib/`: everything that is not UI. `api.ts` (typed client), `queries.ts` and `mutations.ts` (the only way screens read and write server data, including cache keys and invalidation), `errors.ts`, `types.ts`, `network.ts`, `queryClient.ts`, `supabase.ts`, `format.ts`, `labels.ts`, and pure logic with a `*.test.ts` beside it: `money`, `dates`, `ledger`, `transactionForm`, `budget`, `goals`, `errors`, `ids`.
+- `src/lib/`: everything that is not UI. `api.ts` (typed client), `queries.ts` and `mutations.ts` (the only way screens read and write server data, including cache keys and invalidation), `errors.ts`, `types.ts`, `network.ts`, `queryClient.ts`, `supabase.ts`, `format.ts`, `labels.ts`, and pure logic with a `*.test.ts` beside it: `money`, `dates`, `ledger`, `transactionForm`, `budget`, `goals`, `errors`, `ids`, `chat`.
 - `src/providers/AuthProvider.tsx`: session, `signIn` / `signUp` / `signOut`, the "session expired" notice.
 - Alias `@/*` maps to `src/*`.
 
@@ -103,7 +104,7 @@ The API lives in `../ai_service/` (details in `../AGENTS.md`). `src/lib/types.ts
 - **Goals** have no GET-by-id and no DELETE. The app finds a goal in the cached Active / Achieved lists, and archiving (`PATCH status=archived`) is the removal path. The server sets `status` to `completed` when `current_amount >= target_amount`, and back to `active` if it drops below, unless a `status` is sent or the goal is archived. Contributing sends `current_amount = cached + amount` (there is no atomic contribute endpoint), so two devices contributing at the same moment lose one; this is deliberate and marked with `ponytail:` in `goals/[id]/contribute.tsx`.
 - **Transactions list:** `limit` 1 to 100 (the app uses 20), `offset`, and filters `transaction_type`, `category_id`, `payee_id`, `cleared_status`, `date_from`, `date_to`, `period`.
 - **Limits and failures:** the API rate-limits per access token, or per IP when there is none (defaults in `ai_service/core/config.py`: 60 per minute for financial routes, 30 for profile, 20 for chat), and a 429 carries `Retry-After`. A 409 is a conflict (duplicate or racing insert); a 401 carries `WWW-Authenticate: Bearer`.
-- **Chat (Phase 4; the client pieces exist but no screen uses them):** `api.chat` (60 s timeout), `listConversations`, `getMessages`, `deleteConversation`, the types `ChatRequest`, `ChatResponse`, `Conversation`, `Message`, `ToolCall`, and `MSG.busy` for a 409 "Still processing". A message is at most 4000 characters and an agent turn can take up to 60 s. Send a fresh `idempotency_key` per send: the server infers "still running" from an unanswered message, so a crashed turn can leave its key answering 409 forever.
+- **Chat:** `api.chat` (60 s timeout), `listConversations` (History shows the 50 newest), `getMessages` and `deleteConversation`; `MSG.busy` is the 409 "Still processing". A message is at most 4000 characters and an agent turn can take up to 60 s. Each new send gets a fresh `idempotency_key` (`newIdempotencyKey`), and a retry of a failed send reuses its key: the server replays a finished send, answers 409 while it is still running and reruns a failed one. `getMessages` returns the newest page in chronological order; the app asks for 500 rows and has no "Load earlier" (`ponytail:` in `queries.ts`). History rows carry no tool calls and reasoning is not stored, so tool cards and "Thinking" show only on the reply that just arrived. `useSendMessage` writes both messages into the thread's cache in the hook options (so they land even if the user left the screen), then invalidates `conversation` plus whatever the reply's tools changed (`changesFromTools`: transactions, payees, budgets, goals). History won't delete a conversation whose reply is still on its way.
 
 ## Environment and running
 
