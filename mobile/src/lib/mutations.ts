@@ -1,15 +1,19 @@
-import { useMutation, useQueryClient, type InfiniteData, type QueryClient } from "@tanstack/react-query";
+import { useMutation, useMutationState, useQueryClient, type InfiniteData, type QueryClient } from "@tanstack/react-query";
 
 import { api, isNotFound, stopsBatch } from "./api";
 import { copyBudgets } from "./budget";
+import { changesFromTools } from "./chat";
 import type { MonthYear } from "./dates";
 import { placeGoal } from "./goals";
 import { mapPages, type BudgetCopyPlan } from "./ledger";
-import { GOAL_LISTS, goalsQuery, invalidateAfter, transactionDetailKey } from "./queries";
+import { conversationsQuery, GOAL_LISTS, goalsQuery, invalidateAfter, messagesQuery, transactionDetailKey } from "./queries";
 import { applyPatch } from "./transactionForm";
 import type {
   BudgetCreate,
   CategoryCreate,
+  Conversation,
+  ConversationHistory,
+  Message,
   Goal,
   GoalCreate,
   GoalsListResponse,
@@ -220,6 +224,83 @@ export function useUpdateGoal() {
     onSuccess: (goal) => seedGoal(queryClient, goal),
     onSettled: () => {
       void invalidateAfter(queryClient, { kind: "goal" });
+    },
+  });
+}
+
+// ── Chat ────────────────────────────────────────────────────────
+
+/** A retry sends the same `idempotencyKey`: the server replays a finished send and reruns a failed one. */
+export type SendVars = { message: string; conversationId?: string; idempotencyKey: string };
+
+const localMessage = (id: string, role: Message["role"], content: string): Message => ({
+  id,
+  role,
+  content,
+  tool_call_id: null,
+  status: "completed",
+  created_at: new Date().toISOString(),
+});
+
+/** Adds a row to a thread's cache (creating it for a new conversation), once per id. */
+function appendMessage(queryClient: QueryClient, conversationId: string, message: Message) {
+  queryClient.setQueryData<ConversationHistory>(messagesQuery(conversationId).queryKey, (history) => {
+    const messages = history?.messages ?? [];
+    if (messages.some((m) => m.id === message.id)) return history;
+    return { conversation_id: conversationId, messages: [...messages, message] };
+  });
+}
+
+/**
+ * The cache writes live here, not in `mutate(..., { onSuccess })`, so they still
+ * happen if the user leaves the thread while the AI is thinking (AI5).
+ */
+export function useSendMessage() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationKey: ["chat"],
+    mutationFn: ({ message, conversationId, idempotencyKey }: SendVars) =>
+      api.chat({ message, conversation_id: conversationId, idempotency_key: idempotencyKey }),
+    onMutate: async ({ message, conversationId, idempotencyKey }) => {
+      if (!conversationId) return;
+      await queryClient.cancelQueries({ queryKey: messagesQuery(conversationId).queryKey });
+      appendMessage(queryClient, conversationId, localMessage(`sent-${idempotencyKey}`, "user", message));
+    },
+    onSuccess: (response, { message, idempotencyKey }) => {
+      const id = response.conversation_id;
+      appendMessage(queryClient, id, localMessage(`sent-${idempotencyKey}`, "user", message)); // a new conversation had no cache yet
+      appendMessage(queryClient, id, localMessage(`reply-${idempotencyKey}`, "assistant", response.response));
+      void invalidateAfter(queryClient, { kind: "conversation" });
+      for (const change of changesFromTools(response.tool_calls)) void invalidateAfter(queryClient, change);
+    },
+  });
+}
+
+/** Conversations with a send in flight, from any screen (AI7: History won't delete them). */
+export function usePendingChatIds(): string[] {
+  return useMutationState({
+    filters: { mutationKey: ["chat"], status: "pending" },
+    select: (mutation) => (mutation.state.variables as SendVars | undefined)?.conversationId ?? "",
+  }).filter(Boolean);
+}
+
+export function useDeleteConversation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.deleteConversation(id),
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: conversationsQuery.queryKey, exact: true });
+      const previous = queryClient.getQueryData<Conversation[]>(conversationsQuery.queryKey);
+      queryClient.setQueryData<Conversation[]>(conversationsQuery.queryKey, (list) => list?.filter((c) => c.id !== id));
+      return { previous };
+    },
+    onError: (error, _id, context) => {
+      if (isNotFound(error)) return; // already gone: the delete's goal is met
+      if (context) queryClient.setQueryData(conversationsQuery.queryKey, context.previous);
+    },
+    onSettled: (_data, _error, id) => {
+      queryClient.removeQueries({ queryKey: messagesQuery(id).queryKey });
+      void invalidateAfter(queryClient, { kind: "conversation" });
     },
   });
 }

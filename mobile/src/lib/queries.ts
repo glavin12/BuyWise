@@ -211,11 +211,27 @@ export function useOpenedGoal(id: string) {
   return { ...lookup, goal: opened ?? lookup.goal };
 }
 
+// ── Chat ────────────────────────────────────────────────────────
+
+// ponytail: History lists the 50 most recent conversations (the API default); page it if someone needs older ones.
+export const conversationsQuery = queryOptions({
+  queryKey: ["conversations"],
+  queryFn: () => api.listConversations(),
+});
+
+export const messagesQuery = (id: string) =>
+  queryOptions({
+    queryKey: ["conversations", id, "messages"],
+    // ponytail: the newest 500 rows (the server maximum, about 100 turns) and no "Load earlier"; add cursor paging past that.
+    queryFn: () => api.getMessages(id, 500),
+  });
+
 // ── Invalidation ────────────────────────────────────────────────
 
 export type Change =
   | { kind: "transaction" | "budget" | "goal" }
-  | { kind: "category" | "payee"; type: CategoryType };
+  | { kind: "category" | "payee"; type: CategoryType }
+  | { kind: "conversation" };
 
 /**
  * Marks stale everything a write can affect, and refetches what is on screen.
@@ -238,5 +254,8 @@ export function invalidateAfter(queryClient: QueryClient, change: Change): Promi
       return invalidate(["categories", change.type]);
     case "payee":
       return invalidate(["payees", change.type]);
+    case "conversation":
+      // The History list and, by prefix, every cached thread (their server rows replace optimistic ones).
+      return invalidate(["conversations"]);
   }
 }
