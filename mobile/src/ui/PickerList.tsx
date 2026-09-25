@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { FlatList, Pressable, StyleSheet } from "react-native";
+import { useEffect, useState } from "react";
+import { BackHandler, FlatList, Pressable, StyleSheet } from "react-native";
 
 import { userMessage } from "@/lib/errors";
 
@@ -48,6 +48,15 @@ export function PickerList({
 }) {
   const [query, setQuery] = useState("");
   const [createError, setCreateError] = useState<string | null>(null);
+
+  // N3: Android back closes the chooser first instead of leaving the screen under it.
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
+      onClose();
+      return true;
+    });
+    return () => subscription.remove();
+  }, [onClose]);
 
   const name = query.trim();
   const needle = name.toLowerCase();

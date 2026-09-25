@@ -21,7 +21,7 @@ import {
   goBack,
   hapticSuccess,
   NotFoundScreen,
-  ProgressBar,
+  ProgressRing,
   Screen,
   showToast,
   Skeleton,
@@ -70,7 +70,9 @@ function GoalDetail({ id }: { id: string }) {
   const percent = percentOf(goal.current_amount, goal.target_amount);
   const due = achieved ? null : countdown(goal.target_date, todayLocal());
   const priority = priorityLabel(goal.priority);
-  const details = [goalTypeLabel(goal.goal_type), priority ? `${priority} priority` : undefined].filter(Boolean).join(" · ");
+  const details = [goalTypeLabel(goal.goal_type), priority ? `${priority} priority` : undefined, goal.category ?? undefined]
+    .filter(Boolean)
+    .join(" · ");
 
   const refresh = async () => {
     if (refreshing) return;
@@ -121,7 +123,7 @@ function GoalDetail({ id }: { id: string }) {
       <Card>
         <Amount variant="display" value={goal.display_current_amount} currency={currency} />
         <Text tone="muted">{`of ${money(goal.display_target_amount)} · ${percent}%`}</Text>
-        <ProgressBar percent={percent} tone={achieved ? "positive" : "accent"} label={`${goal.title} progress`} />
+        <ProgressRing percent={percent} tone={achieved ? "positive" : "accent"} label={`${goal.title} progress`} />
         {achieved ? null : <Text>{`${money(goal.display_remaining_amount)} to go`}</Text>}
         {goal.target_date ? <Text tone="muted">{`Target date ${formatDate(goal.target_date, "medium")}`}</Text> : null}
         {due ? <Text tone={due.overdue ? "negative" : "muted"}>{due.label}</Text> : null}

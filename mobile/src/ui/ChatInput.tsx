@@ -1,4 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
+import type { Ref } from "react";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
 
 import { useOnline } from "@/lib/network";
@@ -14,11 +15,14 @@ export function ChatInput({
   onChangeText,
   onSend,
   busy,
+  inputRef,
 }: {
   value: string;
   onChangeText: (text: string) => void;
   onSend: () => void;
   busy: boolean;
+  /** Forwarded to the TextInput so a caller (e.g. a prefill chip) can focus it. */
+  inputRef?: Ref<TextInput>;
 }) {
   const online = useOnline();
   const inactive = !online || busy || value.trim() === "";
@@ -26,6 +30,7 @@ export function ChatInput({
   return (
     <View style={styles.bar}>
       <TextInput
+        ref={inputRef}
         style={styles.input}
         value={value}
         onChangeText={onChangeText}

@@ -5,6 +5,7 @@ import type { TextInput } from "react-native";
 
 import { userMessage } from "@/lib/api";
 import { todayLocal } from "@/lib/dates";
+import { formatMinor } from "@/lib/format";
 import { useCreateCategory, useCreateTransaction } from "@/lib/mutations";
 import { categoriesQuery, payeesQuery, profileQuery, useSuggestCategory } from "@/lib/queries";
 import {
@@ -57,7 +58,9 @@ export default function AddTransactionModal() {
       return; // the failure is shown by the error banner
     }
     hapticSuccess();
-    showToast(`${draft.type === "income" ? "Income" : "Expense"} added`);
+    const amountText = formatMinor(amount, profile.data?.currency);
+    const categoryName = draft.category?.name ?? "";
+    showToast(draft.type === "income" ? `${amountText} income added to ${categoryName}` : `${amountText} added to ${categoryName}`);
     if (another) {
       const next = afterSaveAndAddAnother(draft);
       setDraft(next);

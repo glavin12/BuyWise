@@ -134,6 +134,33 @@ test("goalDraftKey ignores whitespace-only edits", () => {
   assert.notEqual(goalDraftKey(goalDraftFromGoal(g)), goalDraftKey({ ...goalDraftFromGoal(g), target: "1" }));
 });
 
+test("category id flows through create, the edit diff, and clearing", () => {
+  const withCategory = { ...emptyGoalDraft(), title: "Car", target: "500000", categoryId: "cat-1" };
+  assert.deepEqual(toGoalCreate(withCategory, 50000000, 0), {
+    title: "Car",
+    target_amount: 50000000,
+    current_amount: 0,
+    priority: "medium",
+    category_id: "cat-1",
+  });
+  // No category chosen: the key is left out entirely, same as the other optional fields.
+  assert.deepEqual(toGoalCreate({ ...emptyGoalDraft(), title: "No category", target: "5", priority: null }, 500, 0), {
+    title: "No category",
+    target_amount: 500,
+    current_amount: 0,
+  });
+
+  const g = goal({ category_id: "cat-1", category: "Travel" });
+  const draft = goalDraftFromGoal(g);
+  assert.equal(draft.categoryId, "cat-1");
+  assert.deepEqual(goalEditPatch(g, draft, g.target_amount, g.current_amount), {});
+  assert.deepEqual(goalEditPatch(g, { ...draft, categoryId: "cat-2" }, g.target_amount, g.current_amount), { category_id: "cat-2" });
+  assert.deepEqual(goalEditPatch(g, { ...draft, categoryId: null }, g.target_amount, g.current_amount), { category_id: null });
+
+  assert.notEqual(goalDraftKey(draft), goalDraftKey({ ...draft, categoryId: "cat-2" }));
+  assert.notEqual(goalDraftKey(draft), goalDraftKey({ ...draft, categoryId: null }));
+});
+
 test("placeGoal puts a saved goal in the list for its status and out of the others", () => {
   const list = (status: string, goals: Goal[]): GoalsListResponse => ({ status, count: goals.length, goals });
   const a = goal({ id: "a" });

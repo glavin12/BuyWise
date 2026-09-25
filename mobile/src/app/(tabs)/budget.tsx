@@ -22,6 +22,7 @@ import {
   Banner,
   Button,
   Card,
+  CategoryIcon,
   confirm,
   ErrorState,
   hapticSuccess,
@@ -34,6 +35,36 @@ import {
   Stack,
   Text,
 } from "@/ui";
+
+/** One of the three top tiles: an amount once its query has it, else a compact loading/error state. */
+function MoneyTile({
+  label,
+  minor,
+  currency,
+  error,
+  onRetry,
+}: {
+  label: string;
+  minor: number | undefined;
+  currency: string;
+  error: boolean;
+  onRetry: () => void;
+}) {
+  return (
+    <Card grow>
+      <Text variant="caption" tone="muted">
+        {label}
+      </Text>
+      {minor !== undefined ? (
+        <Amount variant="heading" value={minorToDisplay(minor)} currency={currency} />
+      ) : error ? (
+        <Button title="Try again" variant="link" onPress={onRetry} />
+      ) : (
+        <Skeleton height={24} />
+      )}
+    </Card>
+  );
+}
 
 function BudgetRow({
   budget,
@@ -59,6 +90,7 @@ function BudgetRow({
       accessibilityLabel={`${name}${archived ? ", archived category" : ""}. ${spent}. ${status}. Tap to edit.`}
     >
       <Row justify="between">
+        <CategoryIcon name={budget.category} size={32} />
         <Stack grow gap="xs">
           <Text variant="heading">{name}</Text>
           {archived ? (
@@ -69,7 +101,12 @@ function BudgetRow({
         </Stack>
         <Icon name="create-outline" />
       </Row>
-      <ProgressBar percent={progress.barPercent} tone={progress.over ? "negative" : "accent"} label={`${name} budget used`} />
+      <ProgressBar
+        percent={progress.barPercent}
+        tone={progress.over ? "negative" : undefined}
+        category={{ name: budget.category }}
+        label={`${name} budget used`}
+      />
       <Text variant="caption" tone="muted">
         {spent}
       </Text>
@@ -202,6 +239,12 @@ export default function BudgetTab() {
         )
       ) : (
         <>
+          <Row align="stretch">
+            <MoneyTile label="Income" minor={income.data?.income} currency={currency} error={income.isError} onRetry={() => income.refetch()} />
+            <MoneyTile label="Assigned" minor={ready?.assigned} currency={currency} error={false} onRetry={() => budgets.refetch()} />
+            <MoneyTile label="Spent" minor={income.data?.expenses} currency={currency} error={income.isError} onRetry={() => income.refetch()} />
+          </Row>
+
           <Card>
             <Text variant="caption" tone="muted">
               Ready to assign

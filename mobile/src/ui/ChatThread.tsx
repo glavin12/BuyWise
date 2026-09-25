@@ -1,13 +1,13 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useQuery } from "@tanstack/react-query";
 import { useRef, useState, type ReactNode } from "react";
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from "react-native";
+import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 
 import { isNotFound, userMessage } from "@/lib/api";
-import { newIdempotencyKey, prettyToolName, visibleMessages } from "@/lib/chat";
+import { firstSuggestionOverride, newIdempotencyKey, toolSummary, visibleMessages } from "@/lib/chat";
 import { usePendingChatIds, useSendMessage, type SendVars } from "@/lib/mutations";
 import { useOnline } from "@/lib/network";
-import { messagesQuery } from "@/lib/queries";
+import { dashboardQuery, messagesQuery, recentTransactionsQuery } from "@/lib/queries";
 import type { ChatResponse, Message, ToolCall } from "@/lib/types";
 
 import { Banner } from "./Banner";
@@ -26,6 +26,14 @@ const SUGGESTIONS = [
   "Show my recent transactions",
   "How much did I spend on Food this month?",
   "How are my goals tracking?",
+];
+
+// #21: pinned above the composer. A tap fills the draft; it never sends.
+const PREFILL_CHIPS: { label: string; text: string }[] = [
+  { label: "💡 Log expense", text: "Log an expense: " },
+  { label: "📊 Compare months", text: "Compare this month with last month" },
+  { label: "🎯 Fund a goal", text: "Add money to my goal: " },
+  { label: "🔎 Spending by category", text: "Show my spending by category this month" },
 ];
 
 /**
@@ -53,6 +61,16 @@ export function ChatThread({
   const online = useOnline();
   const [draft, setDraft] = useState("");
   const list = useRef<FlatList<Message>>(null);
+  const input = useRef<TextInput>(null);
+
+  // #8: cache-only reads (enabled: false), so this never fires a network call of its own.
+  const recent = useQuery({ ...recentTransactionsQuery, enabled: false });
+  const dashboard = useQuery({ ...dashboardQuery("this_month"), enabled: false });
+  const firstSuggestion = firstSuggestionOverride(
+    recent.data && recent.data.transactions.length > 0,
+    dashboard.data?.has_budget
+  );
+  const suggestions = firstSuggestion ? [firstSuggestion, ...SUGGESTIONS.slice(1)] : SUGGESTIONS;
 
   if (id && isNotFound(history.error)) return <NotFoundScreen title={title} what="Conversation" />;
 
@@ -90,7 +108,7 @@ export function ChatThread({
           title="Ask BuyWise"
           message="Ask a question, log an expense or plan a goal, in plain words."
         />
-        {SUGGESTIONS.map((s) => (
+        {suggestions.map((s) => (
           <Button key={s} title={s} variant="secondary" requiresNetwork disabled={busy} onPress={() => void submit(s)} />
         ))}
       </View>
@@ -138,7 +156,24 @@ export function ChatThread({
         onContentSizeChange={() => list.current?.scrollToEnd({ animated: true })}
         keyboardShouldPersistTaps="handled"
       />
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips} keyboardShouldPersistTaps="handled">
+        {PREFILL_CHIPS.map((chip) => (
+          <Pressable
+            key={chip.label}
+            onPress={() => {
+              setDraft(chip.text);
+              input.current?.focus();
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={chip.label}
+            style={({ pressed }) => [styles.chip, pressed && styles.pressed]}
+          >
+            <Text variant="caption">{chip.label}</Text>
+          </Pressable>
+        ))}
+      </ScrollView>
       <ChatInput
+        inputRef={input}
         value={draft}
         onChangeText={setDraft}
         onSend={() => {
@@ -146,6 +181,9 @@ export function ChatThread({
         }}
         busy={busy}
       />
+      <Text variant="caption" tone="muted" align="center">
+        BuyWise AI can make mistakes. Verify important financial information.
+      </Text>
     </Screen>
   );
 }
@@ -184,7 +222,7 @@ function ToolCard({ call }: { call: ToolCall }) {
     <Disclosure
       header={
         <>
-          <Text variant="caption">{prettyToolName(call.tool_name)}</Text>
+          <Text variant="caption">{toolSummary(call)}</Text>
           <View style={styles.spacer} />
           <Text variant="caption" tone="positive">
             done
@@ -232,6 +270,16 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.lg,
   },
   reply: { gap: theme.space.xs },
+  chips: { flexDirection: "row", gap: theme.space.sm },
+  chip: {
+    minHeight: theme.minHit,
+    justifyContent: "center",
+    paddingHorizontal: theme.space.md,
+    borderRadius: theme.radius.pill,
+    borderWidth: 1,
+    borderColor: theme.color.border,
+    backgroundColor: theme.color.surface,
+  },
   assistant: {
     paddingHorizontal: theme.space.md,
     paddingVertical: theme.space.sm,

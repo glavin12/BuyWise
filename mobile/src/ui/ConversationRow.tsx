@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet } from "react-native";
 
+import { timeAgo } from "@/lib/format";
 import type { Conversation } from "@/lib/types";
 
 import { Text } from "./Text";
@@ -17,7 +18,7 @@ export function ConversationRow({
   onLongPress: (conversation: Conversation) => void;
   locked: boolean;
 }) {
-  const when = new Date(conversation.last_message_at ?? conversation.created_at).toLocaleDateString();
+  const when = timeAgo(conversation.last_message_at ?? conversation.created_at);
   const title = conversation.title || "New conversation";
 
   return (
