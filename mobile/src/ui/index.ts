@@ -6,6 +6,7 @@ export { AppShell } from "./AppShell";
 export { Banner } from "./Banner";
 export { Button } from "./Button";
 export { Card } from "./Card";
+export { CategoryIcon } from "./CategoryIcon";
 export { Celebration } from "./Celebration";
 export { Avatar, Chips, Segmented } from "./Controls";
 export { confirm } from "./confirm";

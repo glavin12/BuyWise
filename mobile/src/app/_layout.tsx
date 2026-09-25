@@ -1,4 +1,10 @@
+import { InstrumentSans_400Regular } from "@expo-google-fonts/instrument-sans/400Regular";
+import { InstrumentSans_500Medium } from "@expo-google-fonts/instrument-sans/500Medium";
+import { InstrumentSans_600SemiBold } from "@expo-google-fonts/instrument-sans/600SemiBold";
+import { InstrumentSerif_400Regular } from "@expo-google-fonts/instrument-serif/400Regular";
+import { JetBrainsMono_400Regular } from "@expo-google-fonts/jetbrains-mono/400Regular";
 import { QueryClientProvider } from "@tanstack/react-query";
+import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
@@ -9,7 +15,7 @@ import { queryClient } from "@/lib/queryClient";
 import { AuthProvider, useAuth } from "@/providers/AuthProvider";
 import { AppShell, ErrorBoundary, sheetScreenOptions, stackScreenOptions } from "@/ui";
 
-// Keep the native splash up until the stored session has been read.
+// Keep the native splash up until the fonts are loaded and the stored session has been read.
 SplashScreen.preventAutoHideAsync();
 
 function RootNavigator() {
@@ -30,6 +36,13 @@ function RootNavigator() {
       <Stack.Protected guard={signedIn}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="settings" />
+        <Stack.Screen name="settings/profile" />
+        <Stack.Screen name="settings/categories" />
+        <Stack.Screen name="settings/category/new" options={sheetScreenOptions} />
+        <Stack.Screen name="settings/category/[id]" options={sheetScreenOptions} />
+        <Stack.Screen name="settings/payees" />
+        <Stack.Screen name="settings/payee/new" options={sheetScreenOptions} />
+        <Stack.Screen name="settings/payee/[id]" options={sheetScreenOptions} />
         <Stack.Screen name="reports" />
         <Stack.Screen name="add-transaction" options={sheetScreenOptions} />
         <Stack.Screen name="transaction/[id]" />
@@ -51,6 +64,16 @@ function RootNavigator() {
 }
 
 export default function RootLayout() {
+  // The names are the families theme.ts uses. A font that fails to load falls back to the system font rather than a stuck splash.
+  const [fontsLoaded, fontError] = useFonts({
+    InstrumentSans_400Regular,
+    InstrumentSans_500Medium,
+    InstrumentSans_600SemiBold,
+    InstrumentSerif_400Regular,
+    JetBrainsMono_400Regular,
+  });
+  if (!fontsLoaded && !fontError) return null;
+
   return (
     <SafeAreaProvider>
       <ErrorBoundary>

@@ -6,12 +6,13 @@ import { METHOD_LABEL, TYPE_LABEL } from "@/lib/labels";
 import type { Transaction } from "@/lib/types";
 
 import { Amount } from "./Amount";
+import { CategoryIcon } from "./CategoryIcon";
 import { Row, Stack } from "./Layout";
 import { Text } from "./Text";
 import { theme } from "./theme";
 
 /**
- * One ledger line: payee (or a dash), category and method, the amount with its
+ * One ledger line: category tile, payee (or a dash), category and method, the amount with its
  * sign, and the description clamped to two lines. Memoised: long lists re-render
  * often and a row only changes when its own transaction does.
  */
@@ -41,6 +42,7 @@ export const TransactionRow = memo(function TransactionRow({
       style={({ pressed }) => [styles.row, pressed && styles.pressed]}
     >
       <Row justify="between" align="start" gap="md">
+        <CategoryIcon name={tx.category} icon={tx.category_icon} />
         <Stack gap="xs" grow>
           <Text numberOfLines={1}>{title}</Text>
           {subtitle ? (

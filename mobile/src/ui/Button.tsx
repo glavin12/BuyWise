@@ -94,7 +94,7 @@ const styles = StyleSheet.create({
   base: {
     minHeight: theme.minHit,
     paddingHorizontal: theme.space.lg,
-    borderRadius: theme.radius.md,
+    borderRadius: theme.radius.pill,
     alignItems: "center",
     justifyContent: "center",
   },

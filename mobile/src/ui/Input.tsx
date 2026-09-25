@@ -67,5 +67,5 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.md,
   },
   fieldError: { borderColor: theme.color.negative },
-  input: { flex: 1, paddingVertical: theme.space.sm, fontSize: theme.type.body.fontSize, color: theme.color.text },
+  input: { flex: 1, paddingVertical: theme.space.sm, fontFamily: theme.font.sans, fontSize: theme.type.body.fontSize, color: theme.color.text },
 });

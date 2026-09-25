@@ -67,6 +67,7 @@ const styles = StyleSheet.create({
     maxHeight: MAX_LINES * theme.type.body.lineHeight + 2 * theme.space.sm,
     paddingHorizontal: theme.space.sm,
     paddingVertical: theme.space.sm,
+    fontFamily: theme.font.sans,
     fontSize: theme.type.body.fontSize,
     color: theme.color.text,
   },

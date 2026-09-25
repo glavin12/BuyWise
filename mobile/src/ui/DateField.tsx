@@ -92,6 +92,7 @@ export function DateField({
               style={{
                 minHeight: theme.minHit,
                 padding: theme.space.sm,
+                fontFamily: theme.font.sans,
                 fontSize: theme.type.body.fontSize,
                 color: theme.color.text,
                 backgroundColor: theme.color.surface,

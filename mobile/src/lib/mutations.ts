@@ -6,11 +6,21 @@ import { changesFromTools } from "./chat";
 import type { MonthYear } from "./dates";
 import { placeGoal } from "./goals";
 import { mapPages, type BudgetCopyPlan } from "./ledger";
-import { conversationsQuery, GOAL_LISTS, goalsQuery, invalidateAfter, messagesQuery, transactionDetailKey } from "./queries";
+import {
+  conversationsQuery,
+  GOAL_LISTS,
+  goalsQuery,
+  invalidateAfter,
+  messagesQuery,
+  profileQuery,
+  transactionDetailKey,
+} from "./queries";
 import { applyPatch } from "./transactionForm";
 import type {
   BudgetCreate,
+  Category,
   CategoryCreate,
+  CategoryUpdate,
   Conversation,
   ConversationHistory,
   Message,
@@ -18,11 +28,14 @@ import type {
   GoalCreate,
   GoalsListResponse,
   GoalUpdate,
+  Payee,
   PayeeCreate,
+  ProfileUpdate,
   Transaction,
   TransactionCreate,
   TransactionUpdate,
   TransactionsResponse,
+  UserProfile,
 } from "./types";
 
 // Every write the app makes. Screens never call `api` themselves; they call
@@ -130,6 +143,77 @@ export function useCreatePayee() {
   return useMutation({
     mutationFn: (data: PayeeCreate) => api.createPayee(data), // idempotent: find-or-create by name
     onSuccess: (payee) => {
+      void invalidateAfter(queryClient, { kind: "payee", type: payee.type });
+    },
+  });
+}
+
+// ── Settings: profile, categories, payees ───────────────────────
+// Edits invalidate on settle, not just on success: a 404 (deleted on another
+// device) is also a reason for the lists to refresh.
+
+/**
+ * Optimistic, so the budget-alerts switch flips at once: the cached profile takes
+ * the patch, a failure puts back what was there, and the refetch on settle makes
+ * the server's row the truth when two quick writes race (R3).
+ */
+export function useUpdateProfile() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (patch: ProfileUpdate) => api.updateProfile(patch),
+    onMutate: async (patch) => {
+      await queryClient.cancelQueries({ queryKey: profileQuery.queryKey });
+      const previous = queryClient.getQueryData<UserProfile>(profileQuery.queryKey);
+      if (previous) queryClient.setQueryData<UserProfile>(profileQuery.queryKey, { ...previous, ...patch });
+      return { previous };
+    },
+    onError: (_error, _patch, context) => {
+      if (context?.previous) queryClient.setQueryData(profileQuery.queryKey, context.previous);
+    },
+    onSettled: () => {
+      void invalidateAfter(queryClient, { kind: "profile" });
+    },
+  });
+}
+
+/** `category` is the row being edited: its type picks which list to refresh (a category's type never changes). */
+export function useUpdateCategory() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ category, patch }: { category: Category; patch: CategoryUpdate }) => api.updateCategory(category.id, patch),
+    onSettled: (_data, _error, { category }) => {
+      void invalidateAfter(queryClient, { kind: "category", type: category.type });
+    },
+  });
+}
+
+/** DELETE archives: the category leaves the lists and pickers, and old transactions and budgets keep its name. */
+export function useArchiveCategory() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (category: Category) => api.deleteCategory(category.id),
+    onSettled: (_data, _error, category) => {
+      void invalidateAfter(queryClient, { kind: "category", type: category.type });
+    },
+  });
+}
+
+export function useUpdatePayee() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ payee, name }: { payee: Payee; name: string }) => api.updatePayee(payee.id, { name }),
+    onSettled: (_data, _error, { payee }) => {
+      void invalidateAfter(queryClient, { kind: "payee", type: payee.type });
+    },
+  });
+}
+
+/** A hard delete: the payee's transactions keep their amounts and lose the payee. */
+export function useDeletePayee() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payee: Payee) => api.deletePayee(payee.id),
+    onSettled: (_data, _error, payee) => {
       void invalidateAfter(queryClient, { kind: "payee", type: payee.type });
     },
   });

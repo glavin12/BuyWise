@@ -19,7 +19,7 @@ export function Amount({ value, currency = "INR", signed, tone, ...rest }: Amoun
   // amount cannot break a financial layout, and it is one line that shrinks to
   // fit, so a very large amount (F6) never wraps or overflows.
   return (
-    <Text numberOfLines={1} adjustsFontSizeToFit maxFontSizeMultiplier={1.3} tone={resolved} {...rest}>
+    <Text numeric numberOfLines={1} adjustsFontSizeToFit maxFontSizeMultiplier={1.3} tone={resolved} {...rest}>
       {text}
     </Text>
   );
