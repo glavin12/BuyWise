@@ -66,11 +66,7 @@ test("prettyToolName", () => {
 test("changesFromTools maps writing tools once each and ignores the rest", () => {
   const calls = ["get_dashboard", "add_goal", "update_goal_progress", "set_category_budget", "constructor"].map((tool_name) => ({ tool_name }));
   assert.deepEqual(changesFromTools(calls), [{ kind: "goal" }, { kind: "budget" }]);
-  assert.deepEqual(changesFromTools([{ tool_name: "add_transaction" }]), [
-    { kind: "transaction" },
-    { kind: "payee", type: "expense" },
-    { kind: "payee", type: "income" },
-  ]);
+  assert.deepEqual(changesFromTools([{ tool_name: "add_transaction" }]), [{ kind: "transaction" }, { kind: "payee" }]);
   assert.deepEqual(changesFromTools([]), []);
 });
 

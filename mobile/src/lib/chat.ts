@@ -36,11 +36,11 @@ export function prettyToolName(name: string): string {
 }
 
 /** Structurally a `Change` from queries.ts (which this file cannot import and stay testable). */
-export type ToolChange = { kind: "transaction" | "budget" | "goal" } | { kind: "payee"; type: "expense" | "income" };
+export type ToolChange = { kind: "transaction" | "budget" | "goal" | "payee" };
 
-// The tools that write. add_transaction can create a payee of either type.
+// The tools that write. add_transaction can create a payee.
 const TOOL_CHANGES = new Map<string, ToolChange[]>([
-  ["add_transaction", [{ kind: "transaction" }, { kind: "payee", type: "expense" }, { kind: "payee", type: "income" }]],
+  ["add_transaction", [{ kind: "transaction" }, { kind: "payee" }]],
   ["set_category_budget", [{ kind: "budget" }]],
   ["add_goal", [{ kind: "goal" }]],
   ["update_goal_progress", [{ kind: "goal" }]],

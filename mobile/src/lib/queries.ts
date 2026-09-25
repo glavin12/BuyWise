@@ -137,6 +137,42 @@ export const payeesQuery = (type: CategoryType) =>
     staleTime: FIVE_MINUTES,
   });
 
+const TYPES: readonly CategoryType[] = ["expense", "income"];
+
+/** One category: opens instantly from a cached Expense / Income list, then confirms with a GET (an archived one is in neither). */
+export function useCategory(id: string, enabled = true) {
+  const queryClient = useQueryClient();
+  return useQuery({
+    queryKey: ["categories", "detail", id],
+    queryFn: () => api.getCategory(id),
+    enabled,
+    staleTime: 0,
+    initialData: () => {
+      for (const type of TYPES) {
+        const hit = queryClient.getQueryData(categoriesQuery(type).queryKey)?.categories.find((c) => c.id === id);
+        if (hit) return hit;
+      }
+    },
+  });
+}
+
+/** One payee, the same way as useCategory. */
+export function usePayee(id: string, enabled = true) {
+  const queryClient = useQueryClient();
+  return useQuery({
+    queryKey: ["payees", "detail", id],
+    queryFn: () => api.getPayee(id),
+    enabled,
+    staleTime: 0,
+    initialData: () => {
+      for (const type of TYPES) {
+        const hit = queryClient.getQueryData(payeesQuery(type).queryKey)?.payees.find((p) => p.id === id);
+        if (hit) return hit;
+      }
+    },
+  });
+}
+
 // ── Budgets ─────────────────────────────────────────────────────
 
 export const monthBudgetsQuery = ({ month, year }: MonthYear) =>
@@ -254,9 +290,7 @@ export const messagesQuery = (id: string) =>
 // ── Invalidation ────────────────────────────────────────────────
 
 export type Change =
-  | { kind: "transaction" | "budget" | "goal" }
-  | { kind: "category" | "payee"; type: CategoryType }
-  | { kind: "profile" }
+  | { kind: "transaction" | "budget" | "goal" | "category" | "payee" | "profile" }
   | { kind: "conversation" };
 
 /**
@@ -279,7 +313,7 @@ export function invalidateAfter(queryClient: QueryClient, change: Change): Promi
     case "category":
       // Transactions, budgets, goals and reports show category names (and archived ones keep showing).
       return Promise.all([
-        invalidate(["categories", change.type]),
+        invalidate(["categories"]), // both types' lists and any opened category
         invalidate(["transactions"]),
         invalidate(["budgets"]),
         invalidate(["goals"]),
@@ -287,7 +321,7 @@ export function invalidateAfter(queryClient: QueryClient, change: Change): Promi
       ]);
     case "payee":
       // Transactions show payee names; a deleted payee leaves its transactions without one.
-      return Promise.all([invalidate(["payees", change.type]), invalidate(["transactions"])]);
+      return Promise.all([invalidate(["payees"]), invalidate(["transactions"])]);
     case "profile":
       // The Dashboard's currency comes from the profile.
       return Promise.all([invalidate(["profile"]), invalidate(["dashboard"])]);

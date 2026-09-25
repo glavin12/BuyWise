@@ -18,7 +18,6 @@ import {
 import { applyPatch } from "./transactionForm";
 import type {
   BudgetCreate,
-  Category,
   CategoryCreate,
   CategoryUpdate,
   Conversation,
@@ -28,7 +27,6 @@ import type {
   GoalCreate,
   GoalsListResponse,
   GoalUpdate,
-  Payee,
   PayeeCreate,
   ProfileUpdate,
   Transaction,
@@ -132,8 +130,8 @@ export function useCreateCategory() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (data: CategoryCreate) => api.createCategory(data), // idempotent: an existing name returns that category
-    onSuccess: (category) => {
-      void invalidateAfter(queryClient, { kind: "category", type: category.type });
+    onSuccess: () => {
+      void invalidateAfter(queryClient, { kind: "category" });
     },
   });
 }
@@ -142,8 +140,8 @@ export function useCreatePayee() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (data: PayeeCreate) => api.createPayee(data), // idempotent: find-or-create by name
-    onSuccess: (payee) => {
-      void invalidateAfter(queryClient, { kind: "payee", type: payee.type });
+    onSuccess: () => {
+      void invalidateAfter(queryClient, { kind: "payee" });
     },
   });
 }
@@ -176,13 +174,13 @@ export function useUpdateProfile() {
   });
 }
 
-/** `category` is the row being edited: its type picks which list to refresh (a category's type never changes). */
+/** Name, icon and colour; a category's type never changes. */
 export function useUpdateCategory() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ category, patch }: { category: Category; patch: CategoryUpdate }) => api.updateCategory(category.id, patch),
-    onSettled: (_data, _error, { category }) => {
-      void invalidateAfter(queryClient, { kind: "category", type: category.type });
+    mutationFn: ({ id, patch }: { id: string; patch: CategoryUpdate }) => api.updateCategory(id, patch),
+    onSettled: () => {
+      void invalidateAfter(queryClient, { kind: "category" });
     },
   });
 }
@@ -191,9 +189,9 @@ export function useUpdateCategory() {
 export function useArchiveCategory() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (category: Category) => api.deleteCategory(category.id),
-    onSettled: (_data, _error, category) => {
-      void invalidateAfter(queryClient, { kind: "category", type: category.type });
+    mutationFn: (id: string) => api.deleteCategory(id),
+    onSettled: () => {
+      void invalidateAfter(queryClient, { kind: "category" });
     },
   });
 }
@@ -201,9 +199,9 @@ export function useArchiveCategory() {
 export function useUpdatePayee() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ payee, name }: { payee: Payee; name: string }) => api.updatePayee(payee.id, { name }),
-    onSettled: (_data, _error, { payee }) => {
-      void invalidateAfter(queryClient, { kind: "payee", type: payee.type });
+    mutationFn: ({ id, name }: { id: string; name: string }) => api.updatePayee(id, { name }),
+    onSettled: () => {
+      void invalidateAfter(queryClient, { kind: "payee" });
     },
   });
 }
@@ -212,9 +210,9 @@ export function useUpdatePayee() {
 export function useDeletePayee() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (payee: Payee) => api.deletePayee(payee.id),
-    onSettled: (_data, _error, payee) => {
-      void invalidateAfter(queryClient, { kind: "payee", type: payee.type });
+    mutationFn: (id: string) => api.deletePayee(id),
+    onSettled: () => {
+      void invalidateAfter(queryClient, { kind: "payee" });
     },
   });
 }
