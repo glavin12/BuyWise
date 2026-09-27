@@ -89,10 +89,12 @@ export type GoalDraft = {
   /** "YYYY-MM-DD" or null */
   date: string | null;
   description: string;
+  /** An expense category id, or null for none. */
+  categoryId: string | null;
 };
 
 export function emptyGoalDraft(): GoalDraft {
-  return { title: "", type: null, priority: "medium", target: "", saved: "", date: null, description: "" };
+  return { title: "", type: null, priority: "medium", target: "", saved: "", date: null, description: "", categoryId: null };
 }
 
 // Rows written before the API validated these can hold other strings: read them as "not set".
@@ -110,6 +112,7 @@ export function goalDraftFromGoal(goal: Goal): GoalDraft {
     saved: minorToAmountText(goal.current_amount),
     date: goal.target_date,
     description: goal.description ?? "",
+    categoryId: goal.category_id,
   };
 }
 
@@ -144,6 +147,7 @@ export function toGoalCreate(draft: GoalDraft, target: number, saved: number): G
     ...(draft.priority ? { priority: draft.priority } : {}),
     ...(draft.date ? { target_date: draft.date } : {}),
     ...(description ? { description } : {}),
+    ...(draft.categoryId ? { category_id: draft.categoryId } : {}),
   };
 }
 
@@ -156,6 +160,7 @@ export type GoalFields = {
   current_amount: number;
   target_date: string | null;
   description: string | null;
+  category_id: string | null;
 };
 
 export function goalFieldsOf(goal: Goal): GoalFields {
@@ -167,6 +172,7 @@ export function goalFieldsOf(goal: Goal): GoalFields {
     current_amount: goal.current_amount,
     target_date: goal.target_date,
     description: goal.description?.trim() || null,
+    category_id: goal.category_id,
   };
 }
 
@@ -180,11 +186,21 @@ export function goalEditPatch(goal: Goal, draft: GoalDraft, target: number, save
     current_amount: saved,
     target_date: draft.date,
     description: draft.description.trim() || null,
+    category_id: draft.categoryId,
   };
   return diffFields(goalFieldsOf(goal), current);
 }
 
 /** A stable fingerprint of the form, so "dirty" ignores object identity. */
 export function goalDraftKey(draft: GoalDraft): string {
-  return JSON.stringify([draft.title.trim(), draft.type, draft.priority, draft.target.trim(), draft.saved.trim(), draft.date, draft.description.trim()]);
+  return JSON.stringify([
+    draft.title.trim(),
+    draft.type,
+    draft.priority,
+    draft.target.trim(),
+    draft.saved.trim(),
+    draft.date,
+    draft.description.trim(),
+    draft.categoryId,
+  ]);
 }

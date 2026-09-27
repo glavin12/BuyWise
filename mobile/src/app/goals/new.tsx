@@ -5,7 +5,7 @@ import { useState } from "react";
 import { userMessage } from "@/lib/api";
 import { emptyGoalDraft, goalDraftKey, toGoalCreate, validateGoalDraft } from "@/lib/goals";
 import { useCreateGoal } from "@/lib/mutations";
-import { profileQuery } from "@/lib/queries";
+import { categoriesQuery, profileQuery } from "@/lib/queries";
 import { GoalEditor, hapticSuccess, showToast, useDiscardGuard } from "@/ui";
 
 export default function NewGoalSheet() {
@@ -14,6 +14,7 @@ export default function NewGoalSheet() {
   const [draft, setDraft] = useState(baseline);
   const [attempted, setAttempted] = useState(false);
   const profile = useQuery(profileQuery);
+  const categories = useQuery(categoriesQuery("expense"));
   const create = useCreateGoal();
   const { allowLeave } = useDiscardGuard(goalDraftKey(draft) !== goalDraftKey(baseline));
 
@@ -44,6 +45,12 @@ export default function NewGoalSheet() {
       currency={profile.data?.currency ?? "INR"}
       savedLabel="Starting amount"
       autoFocusTitle
+      categories={{
+        items: categories.data?.categories ?? [],
+        loading: categories.isPending,
+        error: categories.isError ? userMessage(categories.error, "load your categories") : null,
+        onRetry: () => void categories.refetch(),
+      }}
       errors={attempted ? errors : {}}
       formError={create.isError ? userMessage(create.error, "create this goal") : null}
       primary={{ label: "Create goal", onPress: save, disabled: create.isPending }}

@@ -45,6 +45,8 @@ export const dashboardQuery = (period: DashboardPeriod) =>
 export type TransactionFilters = {
   /** Omitted = expenses, income and starting balances. */
   type?: "expense" | "income";
+  /** Omitted = every category. */
+  category_id?: string;
   date_from: string;
   date_to: string;
 };
@@ -60,6 +62,7 @@ export const transactionsListQuery = (filters: TransactionFilters) =>
     queryFn: ({ pageParam }) =>
       api.listTransactions({
         transaction_type: filters.type,
+        category_id: filters.category_id,
         date_from: filters.date_from,
         date_to: filters.date_to,
         limit: PAGE_SIZE,
@@ -134,6 +137,42 @@ export const payeesQuery = (type: CategoryType) =>
     staleTime: FIVE_MINUTES,
   });
 
+const TYPES: readonly CategoryType[] = ["expense", "income"];
+
+/** One category: opens instantly from a cached Expense / Income list, then confirms with a GET (an archived one is in neither). */
+export function useCategory(id: string, enabled = true) {
+  const queryClient = useQueryClient();
+  return useQuery({
+    queryKey: ["categories", "detail", id],
+    queryFn: () => api.getCategory(id),
+    enabled,
+    staleTime: 0,
+    initialData: () => {
+      for (const type of TYPES) {
+        const hit = queryClient.getQueryData(categoriesQuery(type).queryKey)?.categories.find((c) => c.id === id);
+        if (hit) return hit;
+      }
+    },
+  });
+}
+
+/** One payee, the same way as useCategory. */
+export function usePayee(id: string, enabled = true) {
+  const queryClient = useQueryClient();
+  return useQuery({
+    queryKey: ["payees", "detail", id],
+    queryFn: () => api.getPayee(id),
+    enabled,
+    staleTime: 0,
+    initialData: () => {
+      for (const type of TYPES) {
+        const hit = queryClient.getQueryData(payeesQuery(type).queryKey)?.payees.find((p) => p.id === id);
+        if (hit) return hit;
+      }
+    },
+  });
+}
+
 // ── Budgets ─────────────────────────────────────────────────────
 
 export const monthBudgetsQuery = ({ month, year }: MonthYear) =>
@@ -147,6 +186,28 @@ export const monthIncomeQuery = ({ month, year }: MonthYear) =>
   queryOptions({
     queryKey: ["analytics", "monthly", monthKey(month, year)],
     queryFn: () => api.monthlyAnalytics(month, year),
+  });
+
+// ── Analytics (Reports) ─────────────────────────────────────────
+// Everything under ["analytics"] is refreshed by the "transaction" invalidation.
+
+export const categorySpendingQuery = ({ month, year }: MonthYear) =>
+  queryOptions({
+    queryKey: ["analytics", "categories", monthKey(month, year)],
+    queryFn: () => api.categoryAnalytics(month, year),
+  });
+
+export const paymentMethodQuery = ({ month, year }: MonthYear) =>
+  queryOptions({
+    queryKey: ["analytics", "paymentMethods", monthKey(month, year)],
+    queryFn: () => api.paymentMethodAnalytics(month, year),
+  });
+
+/** `to` measured against `from`: each `change` is to minus from, and its percent is relative to `from`. */
+export const comparisonQuery = (from: MonthYear, to: MonthYear) =>
+  queryOptions({
+    queryKey: ["analytics", "comparison", monthKey(from.month, from.year), monthKey(to.month, to.year)],
+    queryFn: () => api.comparisonAnalytics(from.month, from.year, to.month, to.year),
   });
 
 /**
@@ -229,8 +290,7 @@ export const messagesQuery = (id: string) =>
 // ── Invalidation ────────────────────────────────────────────────
 
 export type Change =
-  | { kind: "transaction" | "budget" | "goal" }
-  | { kind: "category" | "payee"; type: CategoryType }
+  | { kind: "transaction" | "budget" | "goal" | "category" | "payee" | "profile" }
   | { kind: "conversation" };
 
 /**
@@ -251,9 +311,20 @@ export function invalidateAfter(queryClient: QueryClient, change: Change): Promi
       // Both lists: a save can move a goal from Active to Achieved and back. The Dashboard shows the active count.
       return Promise.all([invalidate(["goals"]), invalidate(["dashboard"])]);
     case "category":
-      return invalidate(["categories", change.type]);
+      // Transactions, budgets, goals and reports show category names (and archived ones keep showing).
+      return Promise.all([
+        invalidate(["categories"]), // both types' lists and any opened category
+        invalidate(["transactions"]),
+        invalidate(["budgets"]),
+        invalidate(["goals"]),
+        invalidate(["analytics"]),
+      ]);
     case "payee":
-      return invalidate(["payees", change.type]);
+      // Transactions show payee names; a deleted payee leaves its transactions without one.
+      return Promise.all([invalidate(["payees"]), invalidate(["transactions"])]);
+    case "profile":
+      // The Dashboard's currency comes from the profile.
+      return Promise.all([invalidate(["profile"]), invalidate(["dashboard"])]);
     case "conversation":
       // The History list and, by prefix, every cached thread (their server rows replace optimistic ones).
       return invalidate(["conversations"]);

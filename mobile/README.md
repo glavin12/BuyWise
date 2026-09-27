@@ -4,6 +4,9 @@ React Native (Expo SDK 57, Expo Router) client for the BuyWise FastAPI + Supabas
 Phase 1: auth, session persistence, API client, 5-tab shell, Dashboard.
 Phase 2: Transactions (list, quick add, detail, edit, delete).
 Phase 3: Budget (per-month budgets, ready to assign, copy from last month) and Goals (create, contribute, edit, archive).
+Phase 4: AI chat (new chat, History, markdown replies, tool cards).
+Phase 1.5: the cream visual design (tokens, Instrument Sans / Serif, category colours).
+Phase 5: Reports and full Settings (profile, categories, payees, budget alerts).
 
 The rules every change follows are in [`../BUYWISE_MOBILE_GUIDE.md`](../BUYWISE_MOBILE_GUIDE.md).
 
@@ -29,16 +32,16 @@ Notes:
 `npx tsc --noEmit`, `npx expo lint`, `npm test`, `npx expo-doctor`
 
 `npm test` runs the pure logic in `src/lib/*.test.ts` (money parsing, dates, ledger grouping and
-diffing, the transaction form, budget and goal maths, error wording) with Node's built-in test runner. Those modules are
+diffing, the transaction form, budget, goal and report maths, the settings forms, category colours, chat tool summaries, error wording) with Node's built-in test runner. Those modules are
 import-free (or import siblings with an explicit `.ts` extension) so they need no test framework.
 
 ## Layout
 
-- `src/app/`: Expo Router routes (`(auth)`, `(tabs)`, `settings`, `reports`, `add-transaction`, `transaction/[id]`,
-  `budget/set`, `goals/`)
+- `src/app/`: Expo Router routes (`(auth)`, `(tabs)`, `settings`, `settings/`, `reports`, `add-transaction`, `transaction/[id]`,
+  `budget/set`, `goals/`, `conversations/`)
 - `src/lib/`: everything that is not UI
   - `api.ts`: the typed API client (screens never call it directly) and `errors.ts`: how a failure becomes friendly text
   - `queries.ts` / `mutations.ts`: the only way screens read and write server data, including cache keys and invalidation
-  - `money.ts`, `dates.ts`, `ledger.ts`, `transactionForm.ts`, `budget.ts`, `goals.ts`: pure logic with tests
+  - `money.ts`, `dates.ts`, `ledger.ts`, `transactionForm.ts`, `budget.ts`, `goals.ts`, `reports.ts`, `settings.ts`, `categoryStyle.ts`, `chat.ts`: pure logic with tests
 - `src/providers/`: `AuthProvider`
-- `src/ui/`: greybox primitives. Only this folder reads `theme.ts`, so the real design can replace it without touching screens.
+- `src/ui/`: primitives in the cream design. Only this folder reads `theme.ts`, so a look changes there without touching screens.

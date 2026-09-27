@@ -10,7 +10,7 @@ import { priorityLabel } from "@/lib/labels";
 import { goalsQuery, profileQuery, type GoalList } from "@/lib/queries";
 import type { Goal } from "@/lib/types";
 import { useRefetchStaleOnFocus } from "@/lib/useRefetchStaleOnFocus";
-import { Banner, Button, Card, EmptyState, ErrorState, ProgressBar, Screen, Segmented, Skeleton, Text } from "@/ui";
+import { Banner, Button, Card, EmptyState, ErrorState, ProgressBar, ProgressRing, Screen, Segmented, Skeleton, Text } from "@/ui";
 
 const VIEWS = [
   { label: "Active", value: "active" },
@@ -52,7 +52,11 @@ function GoalCard({
           {`${priority} priority`}
         </Text>
       ) : null}
-      <ProgressBar percent={percent} tone={achieved ? "positive" : "accent"} label={`${goal.title} progress`} />
+      {featured ? (
+        <ProgressRing percent={percent} tone={achieved ? "positive" : "accent"} label={`${goal.title} progress`} />
+      ) : (
+        <ProgressBar percent={percent} tone={achieved ? "positive" : "accent"} label={`${goal.title} progress`} />
+      )}
       <Text variant="caption" tone="muted">{`${amounts} · ${percent}%`}</Text>
       {achieved ? (
         <Text variant="caption" tone="positive">
@@ -93,7 +97,7 @@ export default function GoalsScreen() {
   const openGoal = (id: string) => router.push(`/goals/${id}`);
 
   const refresh = async () => {
-    if (refreshing) return; // ignore a second pull while one is running
+    if (refreshing) return; // G4: ignore a second pull while one is running
     setRefreshing(true);
     try {
       await goals.refetch();

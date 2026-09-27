@@ -3,16 +3,17 @@ import { useRouter } from "expo-router";
 import { useState } from "react";
 
 import { userMessage } from "@/lib/api";
-import { isValidRange, rangeFor, relativeDayLabel, todayLocal, type DateRange, type RangeKind } from "@/lib/dates";
-import { formatDate } from "@/lib/format";
+import { currentMonth, isValidRange, monthShift, rangeFor, relativeDayLabel, todayLocal, type DateRange, type RangeKind } from "@/lib/dates";
+import { formatDate, formatMinor } from "@/lib/format";
 import { flattenPages, groupByDay, matchesSearch, type DaySection } from "@/lib/ledger";
-import { profileQuery, transactionsListQuery, type TransactionFilters } from "@/lib/queries";
+import { categoriesQuery, monthIncomeQuery, profileQuery, transactionsListQuery, type TransactionFilters } from "@/lib/queries";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
 import { useRefetchStaleOnFocus } from "@/lib/useRefetchStaleOnFocus";
 import {
   Amount,
   Banner,
   Button,
+  Chips,
   DateField,
   EmptyState,
   ErrorState,
@@ -43,23 +44,37 @@ const RANGES = [
   { label: "Custom", value: "custom" },
 ] as const;
 
+// The chip that means "every category". Empty string can never be a real category id.
+const ALL_CATEGORIES = "";
+const VISIBLE_CATEGORIES = 4;
+
 export default function TransactionsTab() {
   const router = useRouter();
   const [type, setType] = useState<TypeFilter>("all");
+  const [categoryId, setCategoryId] = useState<string | null>(null);
+  const [categoriesExpanded, setCategoriesExpanded] = useState(false);
   const [range, setRange] = useState<RangeKind>("this_month");
   const [custom, setCustom] = useState<DateRange>(() => rangeFor("this_month"));
   const [search, setSearch] = useState("");
   const [refreshing, setRefreshing] = useState(false);
   const query = useDebouncedValue(search.trim(), 300);
 
+  // Categories are per type, so switching type drops whatever category was picked.
+  const changeType = (next: TypeFilter) => {
+    setType(next);
+    setCategoryId(null);
+    setCategoriesExpanded(false);
+  };
+
   // Dates are always explicit and computed on the phone: the server's own
   // "this month" follows its UTC clock, not the user's calendar.
   const dates = range === "custom" ? custom : rangeFor(range);
   const validRange = isValidRange(dates);
-  const filters: TransactionFilters = { type: type === "all" ? undefined : type, ...dates };
+  const filters: TransactionFilters = { type: type === "all" ? undefined : type, category_id: categoryId ?? undefined, ...dates };
 
   const list = useInfiniteQuery({ ...transactionsListQuery(filters), enabled: validRange });
   const profile = useQuery(profileQuery);
+  const categoriesForType = useQuery({ ...categoriesQuery(type === "income" ? "income" : "expense"), enabled: type !== "all" });
   useRefetchStaleOnFocus();
 
   const currency = profile.data?.currency ?? "INR";
@@ -68,8 +83,31 @@ export default function TransactionsTab() {
   const sections = groupByDay(shown);
   const today = todayLocal();
 
+  const activeCategories = categoriesForType.data?.categories.filter((c) => c.is_active) ?? [];
+  const visibleCategories = categoriesExpanded ? activeCategories : activeCategories.slice(0, VISIBLE_CATEGORIES);
+  const categoryChipOptions = [{ label: "All", value: ALL_CATEGORIES }, ...visibleCategories.map((c) => ({ label: c.name, value: c.id }))];
+
+  // ponytail: there is no range-analytics endpoint, only whole-month, so the money
+  // breakdown only shows for this/last month and only with no category narrowing it.
+  const summaryMonth = range === "this_month" ? currentMonth() : range === "last_month" ? monthShift(currentMonth().month, currentMonth().year, -1) : null;
+  const showMonthlyBreakdown = summaryMonth !== null && !categoryId;
+  const monthly = useQuery({ ...monthIncomeQuery(summaryMonth ?? currentMonth()), enabled: showMonthlyBreakdown });
+
+  const total = list.data?.pages[0]?.total;
+  const entriesText = total !== undefined ? `${total} ${total === 1 ? "entry" : "entries"}` : null;
+  const summaryText =
+    entriesText === null
+      ? null
+      : showMonthlyBreakdown && monthly.data
+        ? type === "expense"
+          ? `${entriesText} · ${formatMinor(monthly.data.expenses, currency)} spent`
+          : type === "income"
+            ? `${entriesText} · ${formatMinor(monthly.data.income, currency)} in`
+            : `${entriesText} · ${formatMinor(monthly.data.expenses, currency)} spent · ${formatMinor(monthly.data.income, currency)} in`
+        : entriesText;
+
   const refresh = async () => {
-    if (refreshing) return; // ignore a second pull while one is running
+    if (refreshing) return; // G4: ignore a second pull while one is running
     setRefreshing(true);
     try {
       await list.refetch();
@@ -86,7 +124,24 @@ export default function TransactionsTab() {
 
   const header = (
     <Stack>
-      <Segmented options={TYPES} value={type} onChange={setType} />
+      <Segmented options={TYPES} value={type} onChange={changeType} />
+      {type !== "all" && activeCategories.length > 0 ? (
+        <Stack gap="xs">
+          <Chips
+            label="Category"
+            options={categoryChipOptions}
+            value={categoryId ?? ALL_CATEGORIES}
+            onChange={(next) => setCategoryId(next && next !== ALL_CATEGORIES ? next : null)}
+          />
+          {activeCategories.length > VISIBLE_CATEGORIES ? (
+            <Button
+              title={categoriesExpanded ? "Fewer" : "More"}
+              variant="link"
+              onPress={() => setCategoriesExpanded((e) => !e)}
+            />
+          ) : null}
+        </Stack>
+      ) : null}
       <Segmented options={RANGES} value={range} onChange={setRange} />
       {range === "custom" ? (
         <Row align="start">
@@ -99,6 +154,11 @@ export default function TransactionsTab() {
         </Row>
       ) : null}
       {validRange ? null : <Banner tone="warning" message="The end date is before the start date." />}
+      {summaryText ? (
+        <Text variant="caption" tone="muted">
+          {summaryText}
+        </Text>
+      ) : null}
       <Input
         label="Search"
         value={search}

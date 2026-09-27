@@ -11,36 +11,39 @@ Expo / React Native client for the BuyWise backend (FastAPI + Supabase, in the r
 
 ## Status
 
-Verified against the code on 2026-09-24. Phase names come from the README and code comments. No written plan for phases 1.5, 4 and 5 exists in the repo, so ask the owner before inventing their scope.
+Verified against the code on 2026-09-27. Phase names come from the README and code comments; the scope of phases 1.5 and 5 came from the owner's Day-0 plan, which is not in the repo.
 
 | Phase | Scope | State |
 |---|---|---|
 | 1 | Auth, session persistence, API client, 5-tab shell, Dashboard | Done |
-| 1.5 | Real visual design; `src/ui/theme.ts` is a "greybox" placeholder it replaces | Not built |
+| 1.5 | Visual design: the cream tokens, Instrument Sans / Serif and JetBrains Mono, category colours and emoji (`src/ui/theme.ts`, `src/lib/categoryStyle.ts`) | Done |
 | 2 | Transactions: list, quick add, detail, edit, delete | Done |
 | 3 | Budget (per month) and Goals | Done |
 | 4 | AI chat | Done: new chat on the Chat tab, History, open and delete a conversation |
-| 5 | Reports and full Settings | Not built: placeholders |
+| 5 | Reports and full Settings | Done |
 
 ### Screens (`src/app/`)
 
 | Route files | What it does | State |
 |---|---|---|
 | `(auth)/login`, `(auth)/signup` | Log in; sign up (shows "Check your email" when Supabase wants the email confirmed) | Done. No forgot-password |
-| `(tabs)/index` | Dashboard: balance, income / spent / net, budget line, 3 recent transactions, this / last month | Done |
-| `(tabs)/transactions` | Day-grouped list, infinite scroll (20 per page), type and date-range filters, client-side search over the rows already loaded | Done |
-| `add-transaction`, `(tabs)/add` | Quick-add modal opened by the centre tab button ("Save & add another", category suggested from the payee); `add` only redirects to it | Done |
+| `(tabs)/index` | Dashboard: balance with the net and days left, income / spent / net, budget line, the 3 budgets closest to their limit, up to 4 active goals, 3 recent transactions, this / last month | Done |
+| `(tabs)/transactions` | Day-grouped list, infinite scroll (20 per page), type, category (once a type is picked) and date-range filters, an "entries · spent · in" summary, client-side search over the rows already loaded. The money in the summary shows only for this or last month with no category, because the API has monthly analytics only (`ponytail:`) | Done |
+| `add-transaction`, `(tabs)/add` | Quick-add modal opened by the centre tab button ("Save & add another", category suggested from the payee, a toast naming the amount and category); `add` only redirects to it | Done |
 | `transaction/[id]`, `transaction/[id]/edit` | Detail, edit (optimistic update with rollback), delete | Done |
-| `(tabs)/budget`, `budget/set` | Month switcher, "ready to assign", per-category progress, set / edit / delete, copy from last month | Done |
-| `goals/index`, `goals/new`, `goals/[id]`, `goals/[id]/contribute`, `goals/[id]/edit` | Active / achieved lists, create, contribute (celebration when reached), edit, archive | Done |
-| `settings` | Email, name, Sign out | Partial |
-| `(tabs)/chat` | A new chat (header: History, New chat). Markdown replies, tool cards and "Thinking" on the reply that just arrived, 4 suggestions, retry a failed send, long-press copies text | Done |
-| `conversations/index`, `conversations/[id]` | History grouped Today / This week / Older (long-press deletes); an existing thread, which continues in place | Done |
-| `reports` | "Coming in Phase 5" | Placeholder |
+| `(tabs)/budget`, `budget/set` | Month switcher, Income / Assigned / Spent tiles, "ready to assign", per-category progress in the category's colour, set / edit / delete, copy from last month | Done |
+| `goals/index`, `goals/new`, `goals/[id]`, `goals/[id]/contribute`, `goals/[id]/edit` | Active / achieved lists (a progress ring on the featured goal and on the detail screen), create and edit with an optional expense category, contribute (celebration when reached), archive | Done |
+| `settings` | Email; Profile, Categories and Payees; a budget-alerts switch (optimistic, rolls back on failure); the web's "coming soon" rows (they show a toast); Sign out | Done |
+| `settings/profile` | Name, currency (INR, USD, EUR, GBP), time zone (a curated list plus the saved one, since Hermes may lack `Intl.supportedValuesOf`), join date | Done |
+| `settings/categories`, `settings/category/new`, `settings/category/[id]` | Expense / Income lists; create and edit name, emoji icon and colour (one of the 8 hues); type locked when editing; archive | Done |
+| `settings/payees`, `settings/payee/new`, `settings/payee/[id]` | Type filter and search; create, rename (type locked), delete | Done |
+| `(tabs)/chat` | A new chat (header: History, New chat). Markdown replies, tool cards with a readable summary and "Thinking" on the reply that just arrived, 4 suggestions (the first one personalised when there are no transactions or no budget), prefill chips above the input that fill it without sending, an AI disclaimer, retry a failed send, long-press copies text | Done |
+| `conversations/index`, `conversations/[id]` | History grouped Today / This week / Older with relative times (long-press deletes); an existing thread, which continues in place | Done |
+| `reports` | Month switcher (not past the current month); 6-month income vs spend bars (the six months load in parallel), savings rate against the 6-month average, spending by category, the month against the one before, spending by payment method, two insight cards. Each section loads and fails on its own | Done |
 
 ### Backend calls
 
-`src/lib/api.ts` wraps 34 calls; screens use 23 of them, always through `queries.ts` / `mutations.ts`. Written but not used by any screen yet: `updateProfile`, `getCategory`, `updateCategory`, `deleteCategory`, `getPayee`, `updatePayee`, `deletePayee`, `getBudget`, `categoryAnalytics`, `paymentMethodAnalytics`, `comparisonAnalytics`.
+`src/lib/api.ts` wraps 34 calls; screens use 33 of them, always through `queries.ts` / `mutations.ts`. Written but not used: `getBudget` (`budget/set` finds the row in the month's list).
 
 ### Not set up
 
@@ -48,11 +51,11 @@ No `eas.json`. No `android.package` or `ios.bundleIdentifier` in `app.json`. Lig
 
 ### Baseline
 
-2026-09-25: `npm test` 80 passing; `npx tsc --noEmit` and `npx expo lint` clean.
+2026-09-27: `npm test` 112 passing; `npx tsc --noEmit` and `npx expo lint` clean.
 
 ## Stack
 
-Expo SDK 57 (`expo ~57.0.24`), React Native 0.86.3, React 19.2.3 with the React Compiler on, Expo Router with typed routes, TypeScript `strict`, TanStack Query 5 for server state, `@supabase/supabase-js` for authentication only, `expo-secure-store` for the session, NetInfo for connectivity, Ionicons for icons, `@ronradtke/react-native-markdown-display` (pure JS, runs in Expo Go) for chat replies, imported only by `src/ui/Markdown.tsx`. See `package.json` for the rest. The package manager is npm (`package-lock.json`).
+Expo SDK 57 (`expo ~57.0.24`), React Native 0.86.3, React 19.2.3 with the React Compiler on, Expo Router with typed routes, TypeScript `strict`, TanStack Query 5 for server state, `@supabase/supabase-js` for authentication only, `expo-secure-store` for the session, NetInfo for connectivity, Ionicons for icons, `@ronradtke/react-native-markdown-display` (pure JS, runs in Expo Go) for chat replies, imported only by `src/ui/Markdown.tsx`, `react-native-svg` (bundled in Expo Go) for the goal `ProgressRing` only, and `@expo-google-fonts/instrument-sans`, `instrument-serif` and `jetbrains-mono`, loaded with `useFonts` in `src/app/_layout.tsx` (the splash stays up until they load). See `package.json` for the rest. The package manager is npm (`package-lock.json`).
 
 ## Commands
 
@@ -73,7 +76,7 @@ Run tests, typecheck and lint before declaring any task done. New logic in `src/
 
 - `src/app/`: Expo Router routes. Every file is a screen and `_layout.tsx` files define navigators; keep non-route code out of it. The signed-in / signed-out route guard (`Stack.Protected`) is in `src/app/_layout.tsx`.
 - `src/ui/`: primitives (`Screen`, `Button`, `Card`, `Text`, `Input`, `Amount`, `TransactionEditor`, ...). It is the only code that reads `theme.ts`; screens import from `@/ui`, which does not export the theme.
-- `src/lib/`: everything that is not UI. `api.ts` (typed client), `queries.ts` and `mutations.ts` (the only way screens read and write server data, including cache keys and invalidation), `errors.ts`, `types.ts`, `network.ts`, `queryClient.ts`, `supabase.ts`, `format.ts`, `labels.ts`, and pure logic with a `*.test.ts` beside it: `money`, `dates`, `ledger`, `transactionForm`, `budget`, `goals`, `errors`, `ids`, `chat`.
+- `src/lib/`: everything that is not UI. `api.ts` (typed client), `queries.ts` and `mutations.ts` (the only way screens read and write server data, including cache keys and invalidation), `errors.ts`, `types.ts`, `network.ts`, `queryClient.ts`, `supabase.ts`, `format.ts`, `labels.ts`, and pure logic with a `*.test.ts` beside it: `money`, `dates`, `ledger`, `transactionForm`, `budget`, `goals`, `errors`, `ids`, `chat`, `reports`, `settings`, `categoryStyle`.
 - `src/providers/AuthProvider.tsx`: session, `signIn` / `signUp` / `signOut`, the "session expired" notice.
 - Alias `@/*` maps to `src/*`.
 
@@ -83,7 +86,7 @@ Run tests, typecheck and lint before declaring any task done. New logic in `src/
 2. **Errors:** never render `err.message`; use `userMessage(err, "save this expense")`. A 404 on delete or update means "already gone" (`isNotFound`). A batch stops on `stopsBatch` errors (offline, signed out, rate limited).
 3. **Money is integer minor units (paise).** Parse typed text only with `src/lib/money.ts`, total with `sumMinor`, never add `display_*` floats, and show amounts with `Amount` / `formatCurrency` / `formatMinor`. Amount fields use `AmountInput`.
 4. **Dates are local calendar `YYYY-MM-DD`** computed on the phone (`todayLocal`, `rangeFor`, `monthShift`). List queries send explicit `date_from` / `date_to` because the server's own "this month" follows its UTC clock. The Dashboard is the exception: it sends `period=this_month|last_month`.
-5. **Visuals live in `src/ui`.** A new look becomes a primitive there, not inline styles in a screen.
+5. **Visuals live in `src/ui`.** A new look becomes a primitive there, not inline styles in a screen. Text uses the `theme.type` / `theme.font` families, whose weight is in the family name: never set `fontWeight` (Android fakes it). Money uses `Amount`, which is serif. Category colours and emoji come only from `lib/categoryStyle.ts` (through `CategoryIcon` and `ProgressBar`'s `category` prop).
 6. **Pure logic in `src/lib`** is import-free or imports siblings with an explicit `.ts` extension, so `node --test` runs it without a bundler. A module that imports `@/...`, React or React Native cannot be tested that way.
 7. **Every data screen handles Loading (`Skeleton`), Success, Empty (`EmptyState`) and Error (`ErrorState` with retry).** If cached data exists and a refresh fails, keep showing it with `Banner tone="warning"` ("Couldn't refresh. Showing ..."). Tab roots support pull-to-refresh and `useRefetchStaleOnFocus()`.
 8. **Forms and writes:** guard unsaved input with `useDiscardGuard`; destructive actions go through `confirm()`; success is `hapticSuccess()` plus `showToast()`. Writing buttons use `requiresNetwork` and are disabled while pending; the API has no idempotency for transactions, so that guard is what stops a double tap.
@@ -99,12 +102,12 @@ The API lives in `../ai_service/` (details in `../AGENTS.md`). `src/lib/types.ts
 - **One balance, no accounts or transfers.** The Dashboard's `current_balance` is income + starting balances - expenses. Each transaction has an optional `payment_method`: `cash`, `upi`, `bank_transfer`, `card` or `other`.
 - **Amounts** are integer minor units; every money field also has a `display_*` float for display only.
 - **Transaction types** are `expense`, `income` and `starting_balance`. Expense and income need a category of the same type. The add form offers Expense and Income only; a starting balance can be viewed and edited but not created in the app.
-- **Categories and payees** are per user and seeded on the first `GET /profile` (36 each). A category's `type` cannot change. `DELETE /categories/{id}` archives it (hidden from lists, still shown on old transactions and budgets). `POST /categories` and `POST /payees` return the existing row when the name already exists, and `payee_name` on a new transaction finds or creates the payee.
+- **Categories and payees** are per user and seeded on the first `GET /profile` (36 each). A category's `type` cannot change. `DELETE /categories/{id}` archives it (hidden from lists, still shown on old transactions and budgets). `POST /categories` and `POST /payees` return the existing row when the name already exists, and `payee_name` on a new transaction finds or creates the payee. A category's `color` is saved as one of the 8 hue `bar` hexes in `lib/categoryStyle.ts` (what the web's swatches write too); the seeded rows carry other hexes and word icons (`"food"`), so the app ignores those and uses the name's hue and emoji.
 - **Budgets:** `POST /budgets` is an upsert per category and month; `GET /budgets/YYYY-MM` returns `spent`, `remaining` and `percent_used`. Only active expense categories can be budgeted.
 - **Goals** have no GET-by-id and no DELETE. The app finds a goal in the cached Active / Achieved lists, and archiving (`PATCH status=archived`) is the removal path. The server sets `status` to `completed` when `current_amount >= target_amount`, and back to `active` if it drops below, unless a `status` is sent or the goal is archived. Contributing sends `current_amount = cached + amount` (there is no atomic contribute endpoint), so two devices contributing at the same moment lose one; this is deliberate and marked with `ponytail:` in `goals/[id]/contribute.tsx`.
 - **Transactions list:** `limit` 1 to 100 (the app uses 20), `offset`, and filters `transaction_type`, `category_id`, `payee_id`, `cleared_status`, `date_from`, `date_to`, `period`.
 - **Limits and failures:** the API rate-limits per access token, or per IP when there is none (defaults in `ai_service/core/config.py`: 60 per minute for financial routes, 30 for profile, 20 for chat), and a 429 carries `Retry-After`. A 409 is a conflict (duplicate or racing insert); a 401 carries `WWW-Authenticate: Bearer`.
-- **Chat:** `api.chat` (60 s timeout), `listConversations` (History shows the 50 newest), `getMessages` and `deleteConversation`; `MSG.busy` is the 409 "Still processing". A message is at most 4000 characters and an agent turn can take up to 60 s. Each new send gets a fresh `idempotency_key` (`newIdempotencyKey`), and a retry of a failed send reuses its key: the server replays a finished send, answers 409 while it is still running and reruns a failed one. `getMessages` returns the newest page in chronological order; the app asks for 500 rows and has no "Load earlier" (`ponytail:` in `queries.ts`). History rows carry no tool calls and reasoning is not stored, so tool cards and "Thinking" show only on the reply that just arrived. `useSendMessage` writes both messages into the thread's cache in the hook options (so they land even if the user left the screen), then invalidates `conversation` plus whatever the reply's tools changed (`changesFromTools`: transactions, payees, budgets, goals). History won't delete a conversation whose reply is still on its way.
+- **Chat:** `api.chat` (60 s timeout), `listConversations` (History shows the 50 newest), `getMessages` and `deleteConversation`; `MSG.busy` is the 409 "Still processing". A message is at most 4000 characters and an agent turn can take up to 60 s. Each new send gets a fresh `idempotency_key` (`newIdempotencyKey`), and a retry of a failed send reuses its key: the server replays a finished send, answers 409 while it is still running and reruns a failed one. `getMessages` returns the newest page in chronological order; the app asks for 500 rows and has no "Load earlier" (`ponytail:` in `queries.ts`). History rows carry no tool calls and reasoning is not stored, so tool cards and "Thinking" show only on the reply that just arrived. A tool card's header is `toolSummary` (parsed from the tool's JSON output, falling back to the tool name); the raw input and output stay behind the expander. `useSendMessage` writes both messages into the thread's cache in the hook options (so they land even if the user left the screen), then invalidates `conversation` plus whatever the reply's tools changed (`changesFromTools`: transactions, payees, budgets, goals). History won't delete a conversation whose reply is still on its way.
 
 ## Environment and running
 

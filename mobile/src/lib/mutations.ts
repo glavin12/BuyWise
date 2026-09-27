@@ -6,11 +6,20 @@ import { changesFromTools } from "./chat";
 import type { MonthYear } from "./dates";
 import { placeGoal } from "./goals";
 import { mapPages, type BudgetCopyPlan } from "./ledger";
-import { conversationsQuery, GOAL_LISTS, goalsQuery, invalidateAfter, messagesQuery, transactionDetailKey } from "./queries";
+import {
+  conversationsQuery,
+  GOAL_LISTS,
+  goalsQuery,
+  invalidateAfter,
+  messagesQuery,
+  profileQuery,
+  transactionDetailKey,
+} from "./queries";
 import { applyPatch } from "./transactionForm";
 import type {
   BudgetCreate,
   CategoryCreate,
+  CategoryUpdate,
   Conversation,
   ConversationHistory,
   Message,
@@ -19,10 +28,12 @@ import type {
   GoalsListResponse,
   GoalUpdate,
   PayeeCreate,
+  ProfileUpdate,
   Transaction,
   TransactionCreate,
   TransactionUpdate,
   TransactionsResponse,
+  UserProfile,
 } from "./types";
 
 // Every write the app makes. Screens never call `api` themselves; they call
@@ -119,8 +130,8 @@ export function useCreateCategory() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (data: CategoryCreate) => api.createCategory(data), // idempotent: an existing name returns that category
-    onSuccess: (category) => {
-      void invalidateAfter(queryClient, { kind: "category", type: category.type });
+    onSuccess: () => {
+      void invalidateAfter(queryClient, { kind: "category" });
     },
   });
 }
@@ -129,8 +140,79 @@ export function useCreatePayee() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (data: PayeeCreate) => api.createPayee(data), // idempotent: find-or-create by name
-    onSuccess: (payee) => {
-      void invalidateAfter(queryClient, { kind: "payee", type: payee.type });
+    onSuccess: () => {
+      void invalidateAfter(queryClient, { kind: "payee" });
+    },
+  });
+}
+
+// ── Settings: profile, categories, payees ───────────────────────
+// Edits invalidate on settle, not just on success: a 404 (deleted on another
+// device) is also a reason for the lists to refresh.
+
+/**
+ * Optimistic, so the budget-alerts switch flips at once: the cached profile takes
+ * the patch, a failure puts back what was there, and the refetch on settle makes
+ * the server's row the truth when two quick writes race (R3).
+ */
+export function useUpdateProfile() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (patch: ProfileUpdate) => api.updateProfile(patch),
+    onMutate: async (patch) => {
+      await queryClient.cancelQueries({ queryKey: profileQuery.queryKey });
+      const previous = queryClient.getQueryData<UserProfile>(profileQuery.queryKey);
+      if (previous) queryClient.setQueryData<UserProfile>(profileQuery.queryKey, { ...previous, ...patch });
+      return { previous };
+    },
+    onError: (_error, _patch, context) => {
+      if (context?.previous) queryClient.setQueryData(profileQuery.queryKey, context.previous);
+    },
+    onSettled: () => {
+      void invalidateAfter(queryClient, { kind: "profile" });
+    },
+  });
+}
+
+/** Name, icon and colour; a category's type never changes. */
+export function useUpdateCategory() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: CategoryUpdate }) => api.updateCategory(id, patch),
+    onSettled: () => {
+      void invalidateAfter(queryClient, { kind: "category" });
+    },
+  });
+}
+
+/** DELETE archives: the category leaves the lists and pickers, and old transactions and budgets keep its name. */
+export function useArchiveCategory() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.deleteCategory(id),
+    onSettled: () => {
+      void invalidateAfter(queryClient, { kind: "category" });
+    },
+  });
+}
+
+export function useUpdatePayee() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, name }: { id: string; name: string }) => api.updatePayee(id, { name }),
+    onSettled: () => {
+      void invalidateAfter(queryClient, { kind: "payee" });
+    },
+  });
+}
+
+/** A hard delete: the payee's transactions keep their amounts and lose the payee. */
+export function useDeletePayee() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.deletePayee(id),
+    onSettled: () => {
+      void invalidateAfter(queryClient, { kind: "payee" });
     },
   });
 }

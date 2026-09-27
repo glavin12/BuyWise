@@ -3,8 +3,11 @@ import { useRouter } from "expo-router";
 import { useState } from "react";
 
 import { userMessage } from "@/lib/api";
-import { formatCurrency } from "@/lib/format";
-import { dashboardQuery, profileQuery, recentTransactionsQuery, type DashboardPeriod } from "@/lib/queries";
+import { budgetProgress, budgetStatusText, closestToLimit } from "@/lib/budget";
+import { currentMonth, monthShift } from "@/lib/dates";
+import { formatCurrency, formatMinor } from "@/lib/format";
+import { percentOf } from "@/lib/goals";
+import { dashboardQuery, goalsQuery, monthBudgetsQuery, profileQuery, recentTransactionsQuery, type DashboardPeriod } from "@/lib/queries";
 import type { DashboardData } from "@/lib/types";
 import { useRefetchStaleOnFocus } from "@/lib/useRefetchStaleOnFocus";
 import { useAuth } from "@/providers/AuthProvider";
@@ -14,8 +17,10 @@ import {
   Banner,
   Button,
   Card,
+  CategoryIcon,
   EmptyState,
   ErrorState,
+  ProgressBar,
   Row,
   Screen,
   Segmented,
@@ -88,13 +93,18 @@ export default function DashboardScreen() {
   const dashboard = useQuery(dashboardQuery(period));
   const recent = useQuery(recentTransactionsQuery);
   const profile = useQuery(profileQuery);
+  // "Closest to limit" tracks whichever month the balance card is showing.
+  const now = currentMonth();
+  const budgetMonth = period === "this_month" ? now : monthShift(now.month, now.year, -1);
+  const budgets = useQuery(monthBudgetsQuery(budgetMonth));
+  const goals = useQuery(goalsQuery("active"));
   useRefetchStaleOnFocus();
 
   const refresh = async () => {
     if (refreshing) return; // G4: ignore a second pull while one is running
     setRefreshing(true);
     try {
-      await Promise.all([dashboard.refetch(), recent.refetch(), profile.refetch()]);
+      await Promise.all([dashboard.refetch(), recent.refetch(), profile.refetch(), budgets.refetch(), goals.refetch()]);
     } finally {
       setRefreshing(false);
     }
@@ -117,7 +127,8 @@ export default function DashboardScreen() {
 
   const name = profile.data?.full_name || session?.user.email?.split("@")[0] || "";
   const budget = data ? budgetLine(data) : null;
-  const goalCount = data?.active_goals_count ?? 0;
+  const currency = data?.currency ?? "INR";
+  const closest = budgets.data ? closestToLimit(budgets.data.budgets, 3) : [];
 
   return (
     <Screen insetBottom={false} onRefresh={refresh} refreshing={refreshing}>
@@ -149,6 +160,14 @@ export default function DashboardScreen() {
               Total balance
             </Text>
             <Amount variant="display" value={data.display_current_balance} currency={data.currency} />
+            <Row gap="xs">
+              <Amount variant="caption" value={data.display_net} currency={data.currency} signed />
+              {period === "this_month" ? (
+                <Text variant="caption" tone="muted">
+                  {`· ${data.days_remaining_in_month} day${data.days_remaining_in_month === 1 ? "" : "s"} left in month`}
+                </Text>
+              ) : null}
+            </Row>
           </Card>
 
           <Row align="stretch">
@@ -178,6 +197,53 @@ export default function DashboardScreen() {
           </Card>
         </>
       )}
+
+      {/* D11 already prompts to set a budget when there is none, so this section only
+          appears once there is something to rank; it loads independently of the balance. */}
+      {/* C8: cached rows stay on screen when a refresh fails; the error shows only with nothing to show. */}
+      {budgets.isPending || budgets.isError || closest.length > 0 ? (
+        <>
+          <Row justify="between">
+            <Text variant="heading">Closest to limit</Text>
+            <Button title="See all →" variant="link" onPress={() => router.push("/budget")} />
+          </Row>
+          {budgets.isPending ? (
+            <Stack>
+              <Skeleton height={64} />
+              <Skeleton height={64} />
+            </Stack>
+          ) : closest.length === 0 ? (
+            <Stack gap="xs">
+              <Text tone="muted">{"Couldn't load your budgets."}</Text>
+              <Button title="Try again" variant="link" onPress={() => budgets.refetch()} />
+            </Stack>
+          ) : (
+            closest.map((b) => {
+              const progress = budgetProgress(b);
+              const categoryName = b.category ?? "Unknown category";
+              return (
+                <Card key={b.id} onPress={() => router.push("/budget")}>
+                  <Row gap="sm">
+                    <CategoryIcon name={b.category} size={32} />
+                    <Stack grow gap="xs">
+                      <Text>{categoryName}</Text>
+                      <ProgressBar
+                        percent={progress.barPercent}
+                        tone={progress.over ? "negative" : undefined}
+                        category={{ name: b.category }}
+                        label={`${categoryName} budget used`}
+                      />
+                      <Text variant="caption" tone={progress.over ? "negative" : "muted"}>
+                        {budgetStatusText(progress, (m) => formatMinor(m, currency))}
+                      </Text>
+                    </Stack>
+                  </Row>
+                </Card>
+              );
+            })
+          )}
+        </>
+      ) : null}
 
       <Card>
         <Row justify="between">
@@ -218,13 +284,38 @@ export default function DashboardScreen() {
         )}
       </Card>
 
-      {data ? (
-        <Button
-          title={goalCount > 0 ? `${goalCount} active goal${goalCount === 1 ? "" : "s"} →` : "No goals yet — add one →"}
-          variant="link"
-          onPress={() => router.push("/goals")}
-        />
-      ) : null}
+      {/* Mini cards for up to 4 active goals; empty stays a single link (D1-style),
+          so a brand-new user does not get a heading over nothing. */}
+      {goals.data && goals.data.goals.length > 0 ? (
+        <>
+          <Row justify="between">
+            <Text variant="heading">Goals</Text>
+            <Button title="See all →" variant="link" onPress={() => router.push("/goals")} />
+          </Row>
+          {goals.data.goals.slice(0, 4).map((g) => {
+            const percent = percentOf(g.current_amount, g.target_amount);
+            return (
+              <Card key={g.id} onPress={() => router.push(`/goals/${g.id}`)}>
+                <Text numberOfLines={1}>{g.title}</Text>
+                <ProgressBar percent={percent} label={`${g.title} progress`} />
+                <Text variant="caption" tone="muted">{`${percent}%`}</Text>
+              </Card>
+            );
+          })}
+        </>
+      ) : goals.isPending ? (
+        <Stack>
+          <Skeleton height={64} />
+        </Stack>
+      ) : goals.isError ? (
+        <Stack gap="xs">
+          <Text tone="muted">{"Couldn't load your goals."}</Text>
+          <Button title="Try again" variant="link" onPress={() => goals.refetch()} />
+        </Stack>
+      ) : (
+        <Button title="No goals yet — add one →" variant="link" onPress={() => router.push("/goals/new")} />
+      )}
+
       <Button title="View reports →" variant="link" onPress={() => router.push("/reports")} />
     </Screen>
   );

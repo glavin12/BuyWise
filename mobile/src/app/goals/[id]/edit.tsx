@@ -7,7 +7,7 @@ import { formatCurrency } from "@/lib/format";
 import { goalDraftFromGoal, goalDraftKey, goalEditPatch, justAchieved, validateGoalDraft } from "@/lib/goals";
 import { isUuid } from "@/lib/ids";
 import { useUpdateGoal } from "@/lib/mutations";
-import { profileQuery, useOpenedGoal } from "@/lib/queries";
+import { categoriesQuery, profileQuery, useOpenedGoal } from "@/lib/queries";
 import type { Goal } from "@/lib/types";
 import {
   Celebration,
@@ -51,6 +51,7 @@ function EditForm({ goal }: { goal: Goal }) {
   const [reached, setReached] = useState<Goal | null>(null); // the goal, once this save completed it
   const [failure, setFailure] = useState<string | null>(null);
   const profile = useQuery(profileQuery);
+  const categories = useQuery(categoriesQuery("expense"));
   const update = useUpdateGoal();
   const { allowLeave } = useDiscardGuard(goalDraftKey(draft) !== goalDraftKey(baseline));
 
@@ -94,6 +95,13 @@ function EditForm({ goal }: { goal: Goal }) {
         onChange={setDraft}
         currency={currency}
         savedLabel="Saved so far"
+        categories={{
+          items: categories.data?.categories ?? [],
+          loading: categories.isPending,
+          error: categories.isError ? userMessage(categories.error, "load your categories") : null,
+          onRetry: () => void categories.refetch(),
+        }}
+        categoryFallback={goal.category_id ? { id: goal.category_id, name: goal.category ?? "Category" } : null}
         // The form starts valid, so any error shown here comes from something the user just changed.
         errors={errors}
         formError={failure}

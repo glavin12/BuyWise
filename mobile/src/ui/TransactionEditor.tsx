@@ -1,5 +1,5 @@
-import { useEffect, useState, type Ref } from "react";
-import { BackHandler, StyleSheet, View, type TextInput } from "react-native";
+import { useState, type Ref } from "react";
+import { StyleSheet, View, type TextInput } from "react-native";
 
 import { isOverAYearAgo, todayLocal } from "@/lib/dates";
 import { METHOD_LABEL, PAYMENT_METHODS } from "@/lib/labels";
@@ -81,16 +81,6 @@ export function TransactionEditor({
 }) {
   const [picker, setPicker] = useState<PickerKind | null>(null);
   const startingBalance = draft.type === "starting_balance";
-
-  // Android back closes the open chooser first instead of leaving the screen.
-  useEffect(() => {
-    if (!picker) return;
-    const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
-      setPicker(null);
-      return true;
-    });
-    return () => subscription.remove();
-  }, [picker]);
 
   const chooseCategory = (item: PickerItem) => {
     const category = categories.items.find((c) => c.id === item.id);

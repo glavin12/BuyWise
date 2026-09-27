@@ -17,7 +17,7 @@ export const sheetScreenOptions = { presentation: "modal" } as const;
 // setting cannot make the bar overflow (instead of switching scaling off).
 function TabLabel({ color, children }: { color: ColorValue; children: string }) {
   return (
-    <RNText maxFontSizeMultiplier={1.3} numberOfLines={1} style={{ color, fontSize: 11, textAlign: "center" }}>
+    <RNText maxFontSizeMultiplier={1.3} numberOfLines={1} style={{ color, fontFamily: theme.font.sansMedium, fontSize: 11, textAlign: "center" }}>
       {children}
     </RNText>
   );
