@@ -1,6 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { router } from "expo-router";
-import type { ReactNode } from "react";
+import { router, useScrollToTop } from "expo-router";
+import { useRef, type ReactNode } from "react";
 import {
   KeyboardAvoidingView,
   Pressable,
@@ -81,13 +81,9 @@ export function Screen({
     ) : null;
 
   const body = scroll ? (
-    <ScrollView
-      contentContainerStyle={styles.scrollContent}
-      keyboardShouldPersistTaps="handled" // F2: a tap outside the field dismisses the keyboard
-      refreshControl={onRefresh ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} /> : undefined}
-    >
-      <View style={styles.column}>{children}</View>
-    </ScrollView>
+    <ScrollBody onRefresh={onRefresh} refreshing={refreshing}>
+      {children}
+    </ScrollBody>
   ) : (
     <View style={[styles.scrollContent, styles.fill]}>
       <View style={styles.column}>{children}</View>
@@ -108,6 +104,24 @@ export function Screen({
     </KeyboardAvoidingView>
   ) : (
     screen
+  );
+}
+
+// Its own component so only scrolling screens use the navigation hook: the root
+// ErrorBoundary renders a non-scrolling Screen above the router.
+function ScrollBody({ children, onRefresh, refreshing }: { children: ReactNode; onRefresh?: () => void; refreshing: boolean }) {
+  const ref = useRef<ScrollView>(null);
+  useScrollToTop(ref); // N7: tapping the tab you're on scrolls it back to the top (a no-op outside the tabs)
+
+  return (
+    <ScrollView
+      ref={ref}
+      contentContainerStyle={styles.scrollContent}
+      keyboardShouldPersistTaps="handled" // F2: a tap outside the field dismisses the keyboard
+      refreshControl={onRefresh ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} /> : undefined}
+    >
+      <View style={styles.column}>{children}</View>
+    </ScrollView>
   );
 }
 

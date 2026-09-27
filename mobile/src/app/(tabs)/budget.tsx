@@ -170,7 +170,7 @@ export default function BudgetTab() {
     });
 
   const refresh = async () => {
-    if (refreshing) return; // ignore a second pull while one is running
+    if (refreshing) return; // G4: ignore a second pull while one is running
     setRefreshing(true);
     try {
       await Promise.all([budgets.refetch(), income.refetch(), categories.refetch()]);

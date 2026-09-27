@@ -97,7 +97,7 @@ export default function GoalsScreen() {
   const openGoal = (id: string) => router.push(`/goals/${id}`);
 
   const refresh = async () => {
-    if (refreshing) return; // ignore a second pull while one is running
+    if (refreshing) return; // G4: ignore a second pull while one is running
     setRefreshing(true);
     try {
       await goals.refetch();

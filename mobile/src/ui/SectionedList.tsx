@@ -1,4 +1,5 @@
-import type { ReactElement } from "react";
+import { useScrollToTop } from "expo-router";
+import { useRef, type ReactElement } from "react";
 import { SectionList, StyleSheet } from "react-native";
 
 import { theme } from "./theme";
@@ -31,8 +32,12 @@ export function SectionedList<Section extends { data: readonly unknown[] }>({
   onRefresh: () => void;
   onEndReached?: () => void;
 }) {
+  const ref = useRef<SectionList<Section["data"][number], Section>>(null);
+  useScrollToTop(ref); // N7: tapping the tab you're on scrolls the list back to the top
+
   return (
     <SectionList<Section["data"][number], Section>
+      ref={ref}
       style={styles.list}
       contentContainerStyle={styles.content}
       sections={sections}

@@ -107,7 +107,7 @@ export default function TransactionsTab() {
         : entriesText;
 
   const refresh = async () => {
-    if (refreshing) return; // ignore a second pull while one is running
+    if (refreshing) return; // G4: ignore a second pull while one is running
     setRefreshing(true);
     try {
       await list.refetch();
