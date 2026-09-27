@@ -211,7 +211,7 @@ export default function TransactionsTab() {
   ) : null;
 
   return (
-    <Screen title="Transactions" scroll={false} insetBottom={false}>
+    <Screen title="Transactions" scroll={false} tabBar>
       <SectionedList
         sections={sections}
         keyExtractor={(tx) => tx.id}

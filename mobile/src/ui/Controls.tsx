@@ -3,13 +3,13 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { Text } from "./Text";
 import { theme } from "./theme";
 
-/** Round button showing the user's initial (opens Settings from the Dashboard). */
+/** Round button showing the user's initial (opens the Profile tab from the Dashboard). */
 export function Avatar({ label, onPress }: { label: string; onPress: () => void }) {
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel="Open settings"
+      accessibilityLabel="Open profile"
       style={({ pressed }) => [styles.avatar, pressed && styles.pressed]}
     >
       <Text variant="heading" tone="onAccent">

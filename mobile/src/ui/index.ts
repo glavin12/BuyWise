@@ -1,4 +1,4 @@
-// Screens import UI from here. The theme is deliberately not exported:
+// Screens import UI from here. The theme and tokens are deliberately not exported:
 // only the primitives in this folder may read visual tokens.
 export { Amount } from "./Amount";
 export { AmountInput } from "./AmountInput";
@@ -20,7 +20,7 @@ export { Icon } from "./Icon";
 export { Input } from "./Input";
 export { Row, Stack } from "./Layout";
 export { MonthSwitcher } from "./MonthSwitcher";
-export { AddTabButton, sheetScreenOptions, stackScreenOptions, tabIcon, tabScreenOptions } from "./navigation";
+export { quickAddSheetOptions, sheetScreenOptions, stackScreenOptions } from "./navigation";
 export { PayeeEditor } from "./PayeeEditor";
 export { PickerList, type PickerItem } from "./PickerList";
 export { ProgressBar } from "./ProgressBar";
@@ -42,3 +42,10 @@ export { ChatInput } from "./ChatInput";
 export { ChatThread } from "./ChatThread";
 export { ConversationRow } from "./ConversationRow";
 export { Markdown } from "./Markdown";
+// Design v3 kit (DESIGN.md §3). Screens pass lucide-react-native icons to it.
+export { Panel, IconTile, Title } from "./Blocks";
+export { CircleButton, PrimaryButton, SecondaryButton } from "./Buttons";
+export { Chip, InlineChip, Pill, RichText, type ChipVariant, type Hue } from "./Chips";
+export { Illustration, type IllustrationName } from "./Illustration";
+export { PressableScale } from "./PressableScale";
+export { TabBar } from "./TabBar";

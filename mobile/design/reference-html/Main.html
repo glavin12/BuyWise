@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>BuyWise — Log in</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+*{box-sizing:border-box;-webkit-font-smoothing:antialiased}
+a{text-decoration:none;color:inherit}
+a:hover{opacity:.92}
+button{border:0;font:inherit}
+input{font-family:'JetBrains Mono',ui-monospace,monospace}
+input::placeholder{color:#AAA8A0}
+</style>
+</helmet>
+<div style="width:390px;height:844px;overflow:hidden;position:relative;background:#242426;color:#F3F1EA;font-family:'JetBrains Mono',ui-monospace,monospace;">
+
+<div style="position:absolute;left:0;right:0;top:0;height:480px;background:#D9E4D5;"></div>
+<div style="position:absolute;left:22px;right:22px;top:44px;display:flex;align-items:center;justify-content:space-between;">
+  <div style="font-family:'Barlow Semi Condensed','Arial Narrow',sans-serif;font-weight:700;font-size:26px;letter-spacing:.3px;color:#161616;">BUYWISE</div>
+</div>
+<div style="position:absolute;left:0;top:70px;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 390 372" width="390" height="372" style="display:block;" aria-hidden="true"><circle cx="198" cy="176" r="128" fill="#BEE3CB" stroke="#161616" stroke-width="3.2"/><g stroke="#161616" stroke-width="3" stroke-linecap="round"><path d="M338.0 176.0 L360.0 176.0"/><path d="M331.1 219.3 L352.1 226.1"/><path d="M311.3 258.3 L329.1 271.2"/><path d="M280.3 289.3 L293.2 307.1"/><path d="M241.3 309.1 L248.1 330.1"/><path d="M198.0 316.0 L198.0 338.0"/><path d="M154.7 309.1 L147.9 330.1"/><path d="M115.7 289.3 L102.8 307.1"/><path d="M84.7 258.3 L66.9 271.2"/><path d="M64.9 219.3 L43.9 226.1"/><path d="M58.0 176.0 L36.0 176.0"/><path d="M64.9 132.7 L43.9 125.9"/><path d="M84.7 93.7 L66.9 80.8"/><path d="M115.7 62.7 L102.8 44.9"/><path d="M154.7 42.9 L147.9 21.9"/><path d="M198.0 36.0 L198.0 14.0"/><path d="M241.3 42.9 L248.1 21.9"/><path d="M280.3 62.7 L293.2 44.9"/><path d="M311.3 93.7 L329.1 80.8"/><path d="M331.1 132.7 L352.1 125.9"/></g><path d="M0 322 C78.0 300 136.5 300 195.0 318 C257.40000000000003 330 312.0 294 390 316 L390 722 L0 722 Z" fill="#9CC7AE" stroke="#161616" stroke-width="3.2"/><g transform="translate(70,74) scale(0.95)" stroke="#161616" stroke-width="3.4" stroke-linejoin="round" fill="#F3EEE2">
+  <path d="M-46 16 C-62 16 -64 -6 -48 -8 C-52 -26 -30 -34 -20 -22 C-16 -40 12 -42 16 -24 C28 -36 50 -26 44 -8 C62 -6 60 18 42 16 Z"/>
+  <path d="M-40 8 C-36 0 -26 0 -24 8" fill="none" stroke-width="2.4"/>
+</g><g transform="translate(338,120) scale(0.62)" stroke="#161616" stroke-width="3.4" stroke-linejoin="round" fill="#F3EEE2">
+  <path d="M-46 16 C-62 16 -64 -6 -48 -8 C-52 -26 -30 -34 -20 -22 C-16 -40 12 -42 16 -24 C28 -36 50 -26 44 -8 C62 -6 60 18 42 16 Z"/>
+  <path d="M-40 8 C-36 0 -26 0 -24 8" fill="none" stroke-width="2.4"/>
+</g><path transform="translate(46,184) scale(0.9)" d="M0 -14 L3.5 -3.5 L14 0 L3.5 3.5 L0 14 L-3.5 3.5 L-14 0 L-3.5 -3.5 Z" fill="#F4C443" stroke="#161616" stroke-width="2.6" stroke-linejoin="round"/><path transform="translate(352,44) scale(1.05)" d="M0 -14 L3.5 -3.5 L14 0 L3.5 3.5 L0 14 L-3.5 3.5 L-14 0 L-3.5 -3.5 Z" fill="#F3EEE2" stroke="#161616" stroke-width="2.6" stroke-linejoin="round"/><path transform="translate(300,214) scale(0.7)" d="M0 -14 L3.5 -3.5 L14 0 L3.5 3.5 L0 14 L-3.5 3.5 L-14 0 L-3.5 -3.5 Z" fill="#F0604A" stroke="#161616" stroke-width="2.6" stroke-linejoin="round"/><g transform="translate(243,15) rotate(90)" stroke="#161616" stroke-width="3.2" stroke-linecap="round" fill="none"><path d="M0 0 L-15 0" /><path d="M0 7 L-10 7" /><path d="M0 14 L-5 14" /></g><g transform="translate(236,34) rotate(-14) scale(1.0)">
+  <defs><pattern id="ht1" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(18)"><circle cx="2.5" cy="2.5" r="1.2" fill="#161616" opacity="0.3"/></pattern></defs>
+  <ellipse cx="3" cy="3" rx="14" ry="14" fill="#161616"/>
+  <circle cx="0" cy="0" r="14" fill="#F4C443" stroke="#161616" stroke-width="3.2"/>
+  <path d="M1.4 -14.0 A14 14 0 0 1 1.4 14.0 A12.6 14 0 0 0 1.4 -14.0Z" fill="url(#ht1)"/>
+  <circle cx="0" cy="0" r="10.4" fill="none" stroke="#161616" stroke-width="1.8" stroke-dasharray="2.5 3.5"/><text x="0" y="5.0" text-anchor="middle" font-family="Barlow Semi Condensed, Archivo, sans-serif" font-weight="700" font-size="14.7" fill="#161616">&#8377;</text></g><g transform="translate(273,54) rotate(90)" stroke="#161616" stroke-width="3.2" stroke-linecap="round" fill="none"><path d="M0 0 L-15 0" /><path d="M0 7 L-10 7" /><path d="M0 14 L-5 14" /></g><g transform="translate(266,70) rotate(20) scale(1.0)">
+  <defs><pattern id="ht2" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(18)"><circle cx="2.5" cy="2.5" r="1.2" fill="#161616" opacity="0.3"/></pattern></defs>
+  <ellipse cx="3" cy="3" rx="11" ry="11" fill="#161616"/>
+  <circle cx="0" cy="0" r="11" fill="#F4C443" stroke="#161616" stroke-width="3.2"/>
+  <path d="M1.1 -11.0 A11 11 0 0 1 1.1 11.0 A9.9 11 0 0 0 1.1 -11.0Z" fill="url(#ht2)"/>
+  <circle cx="0" cy="0" r="8.1" fill="none" stroke="#161616" stroke-width="1.8" stroke-dasharray="2.5 3.5"/><text x="0" y="4.0" text-anchor="middle" font-family="Barlow Semi Condensed, Archivo, sans-serif" font-weight="700" font-size="11.6" fill="#161616">&#8377;</text></g><ellipse cx="196" cy="346" rx="92" ry="10" fill="#161616" opacity="0.18"/><g transform="translate(192,214) rotate(0) scale(0.92)"><defs><pattern id="ht3" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(18)"><circle cx="3.0" cy="3.0" r="1.55" fill="#161616" opacity="0.38"/></pattern><clipPath id="cl4"><path d="M-34 -76 C-104 -66 -116 44 -64 78 C-32 98 32 98 64 78 C116 44 104 -66 34 -76 Z"/></clipPath></defs><path d="M-30 80 Q-38 104 -44 124" fill="none" stroke="#161616" stroke-width="10" stroke-linecap="round"/><path d="M30 80 Q40 104 50 124" fill="none" stroke="#161616" stroke-width="10" stroke-linecap="round"/><g transform="translate(-52,130) scale(-1.05,1.05)" stroke="#161616" stroke-width="3.2" stroke-linejoin="round">
+  <path d="M-14 -4 C-14 -16 6 -16 14 -10 C30 -8 34 4 28 10 C18 14 -10 14 -16 10 C-20 6 -18 0 -14 -4 Z" fill="#161616"/>
+  <ellipse cx="18" cy="-3" rx="6" ry="3" fill="#F3EEE2" stroke="none" transform="rotate(-12 18 -3)"/>
+</g><g transform="translate(58,130) scale(1.05,1.05)" stroke="#161616" stroke-width="3.2" stroke-linejoin="round">
+  <path d="M-14 -4 C-14 -16 6 -16 14 -10 C30 -8 34 4 28 10 C18 14 -10 14 -16 10 C-20 6 -18 0 -14 -4 Z" fill="#161616"/>
+  <ellipse cx="18" cy="-3" rx="6" ry="3" fill="#F3EEE2" stroke="none" transform="rotate(-12 18 -3)"/>
+</g><path d="M-86 -6 Q-118 -20 -120 -58" fill="none" stroke="#161616" stroke-width="10" stroke-linecap="round"/><g transform="translate(-121,-70) rotate(-12) scale(1.0,1.0)" stroke="#161616" stroke-width="3.2" stroke-linejoin="round" stroke-linecap="round">
+  <ellipse cx="-10" cy="-13" rx="6.2" ry="10" fill="#F3EEE2" transform="rotate(-14 -10 -13)"/>
+  <ellipse cx="0" cy="-17" rx="6.4" ry="11" fill="#F3EEE2"/>
+  <ellipse cx="10" cy="-13" rx="6.2" ry="10" fill="#F3EEE2" transform="rotate(14 10 -13)"/>
+  <ellipse cx="-16" cy="2" rx="5.6" ry="8.5" fill="#F3EEE2" transform="rotate(-48 -16 2)"/>
+  <circle cx="0" cy="0" r="14" fill="#F3EEE2"/>
+  <path d="M-5 -2 L-4 6 M1 -3 L1 6 M6 -2 L5 6" fill="none" stroke-width="2.4"/>
+  <path d="M-13 12 Q0 19 13 12 L11 22 Q0 27 -11 22 Z" fill="#F3EEE2"/>
+</g><path d="M90 4 Q128 22 112 46" fill="none" stroke="#161616" stroke-width="10" stroke-linecap="round"/><path d="M-44 84 C-44 100 44 100 44 84 L40 96 C30 106 -30 106 -40 96 Z" fill="#B8412D" stroke="#161616" stroke-width="3.6" stroke-linejoin="round"/><path d="M-34 -76 C-104 -66 -116 44 -64 78 C-32 98 32 98 64 78 C116 44 104 -66 34 -76 Z" transform="translate(5,5)" fill="#161616"/><path d="M-34 -76 C-104 -66 -116 44 -64 78 C-32 98 32 98 64 78 C116 44 104 -66 34 -76 Z" fill="#E2553C" stroke="#161616" stroke-width="4.2" stroke-linejoin="round"/><g clip-path="url(#cl4)"><ellipse cx="58" cy="40" rx="92" ry="86" fill="url(#ht3)"/><path d="M-74 -30 C-80 -2 -74 22 -60 40 C-66 12 -64 -14 -52 -40 Z" fill="#F3EEE2" opacity=".85"/><path d="M-112 34 C-60 58 60 58 112 34 L112 50 C60 74 -60 74 -112 50 Z" fill="#F4C443" stroke="#161616" stroke-width="3"/><circle cx="-84" cy="53.6" r="3.4" fill="#F3EEE2" stroke="#161616" stroke-width="1.8"/><circle cx="-60" cy="56.5" r="3.4" fill="#F3EEE2" stroke="#161616" stroke-width="1.8"/><circle cx="-36" cy="58.7" r="3.4" fill="#F3EEE2" stroke="#161616" stroke-width="1.8"/><circle cx="-12" cy="59.9" r="3.4" fill="#F3EEE2" stroke="#161616" stroke-width="1.8"/><circle cx="12" cy="59.9" r="3.4" fill="#F3EEE2" stroke="#161616" stroke-width="1.8"/><circle cx="36" cy="58.7" r="3.4" fill="#F3EEE2" stroke="#161616" stroke-width="1.8"/><circle cx="60" cy="56.5" r="3.4" fill="#F3EEE2" stroke="#161616" stroke-width="1.8"/><circle cx="84" cy="53.6" r="3.4" fill="#F3EEE2" stroke="#161616" stroke-width="1.8"/><path d="M-100 74 C-50 92 50 92 100 74" fill="none" stroke="#161616" stroke-width="2.4" stroke-dasharray="1 8" stroke-linecap="round"/></g><path d="M-66 -52 Q-55 -60 -44 -52 T-22 -52 T0 -52 T22 -52 T44 -52 T66 -52" fill="none" stroke="#F3EEE2" stroke-width="3.2" stroke-linecap="round" clip-path="url(#cl4)"/><path d="M-40 -74 C-40 -92 40 -92 40 -74 C30 -66 -30 -66 -40 -74 Z" fill="#E2553C" stroke="#161616" stroke-width="4" stroke-linejoin="round"/><ellipse cx="0" cy="-86" rx="30" ry="9" fill="#B8412D" stroke="#161616" stroke-width="3.6"/><circle cx="0" cy="-100" r="11" fill="#E2553C" stroke="#161616" stroke-width="3.6"/><rect x="-22" y="-64" width="44" height="9" rx="4.5" fill="#161616" transform="rotate(-6 0 -60)"/><ellipse cx="-28" cy="-24" rx="12" ry="17" fill="#F3EEE2" stroke="#161616" stroke-width="3.4"/>
+<ellipse cx="-24" cy="-26" rx="6.6" ry="11.2" fill="#161616"/>
+<path d="M-24 -26 L-21.0 -38.2 L-16.6 -33.1 Z" fill="#F3EEE2"/><ellipse cx="24" cy="-24" rx="12" ry="17" fill="#F3EEE2" stroke="#161616" stroke-width="3.4"/>
+<ellipse cx="28" cy="-26" rx="6.6" ry="11.2" fill="#161616"/>
+<path d="M28 -26 L31.0 -38.2 L35.4 -33.1 Z" fill="#F3EEE2"/><circle cx="-50" cy="4" r="8" fill="#F0604A" opacity=".0"/><ellipse cx="-52" cy="2" rx="9" ry="6" fill="#F58E78" /><ellipse cx="48" cy="2" rx="9" ry="6" fill="#F58E78"/><path d="M-30 2 Q-2 40 28 2 Q-2 12 -30 2 Z" fill="#161616" stroke="#161616" stroke-width="3.4" stroke-linejoin="round"/><path d="M-12 18 Q-2 28 10 18 Q-1 12 -12 18 Z" fill="#F0604A"/><g transform="translate(106,50) rotate(-130) scale(-0.9,0.9)" stroke="#161616" stroke-width="3.2" stroke-linejoin="round" stroke-linecap="round">
+  <ellipse cx="-10" cy="-13" rx="6.2" ry="10" fill="#F3EEE2" transform="rotate(-14 -10 -13)"/>
+  <ellipse cx="0" cy="-17" rx="6.4" ry="11" fill="#F3EEE2"/>
+  <ellipse cx="10" cy="-13" rx="6.2" ry="10" fill="#F3EEE2" transform="rotate(14 10 -13)"/>
+  <ellipse cx="-16" cy="2" rx="5.6" ry="8.5" fill="#F3EEE2" transform="rotate(-48 -16 2)"/>
+  <circle cx="0" cy="0" r="14" fill="#F3EEE2"/>
+  <path d="M-5 -2 L-4 6 M1 -3 L1 6 M6 -2 L5 6" fill="none" stroke-width="2.4"/>
+  <path d="M-13 12 Q0 19 13 12 L11 22 Q0 27 -11 22 Z" fill="#F3EEE2"/>
+</g></g><ellipse cx="58" cy="356" rx="30" ry="6" fill="#161616" opacity="0.18"/><g transform="translate(58,304) rotate(-8) scale(0.74)"><path d="M-12 18 Q-16 34 -20 44" fill="none" stroke="#161616" stroke-width="7" stroke-linecap="round"/><path d="M12 18 Q18 34 22 44" fill="none" stroke="#161616" stroke-width="7" stroke-linecap="round"/><g transform="translate(-22,48) scale(-0.55,0.55)" stroke="#161616" stroke-width="3.2" stroke-linejoin="round">
+  <path d="M-14 -4 C-14 -16 6 -16 14 -10 C30 -8 34 4 28 10 C18 14 -10 14 -16 10 C-20 6 -18 0 -14 -4 Z" fill="#161616"/>
+  <ellipse cx="18" cy="-3" rx="6" ry="3" fill="#F3EEE2" stroke="none" transform="rotate(-12 18 -3)"/>
+</g><g transform="translate(24,48) scale(0.55,0.55)" stroke="#161616" stroke-width="3.2" stroke-linejoin="round">
+  <path d="M-14 -4 C-14 -16 6 -16 14 -10 C30 -8 34 4 28 10 C18 14 -10 14 -16 10 C-20 6 -18 0 -14 -4 Z" fill="#161616"/>
+  <ellipse cx="18" cy="-3" rx="6" ry="3" fill="#F3EEE2" stroke="none" transform="rotate(-12 18 -3)"/>
+</g><path d="M-22 -2 Q-38 -16 -40 -34" fill="none" stroke="#161616" stroke-width="7" stroke-linecap="round"/><path d="M22 -2 Q38 -16 40 -34" fill="none" stroke="#161616" stroke-width="7" stroke-linecap="round"/><g transform="translate(-40,-40) rotate(-20) scale(0.62,0.62)" stroke="#161616" stroke-width="3.2" stroke-linejoin="round" stroke-linecap="round">
+  <ellipse cx="-10" cy="-13" rx="6.2" ry="10" fill="#F3EEE2" transform="rotate(-14 -10 -13)"/>
+  <ellipse cx="0" cy="-17" rx="6.4" ry="11" fill="#F3EEE2"/>
+  <ellipse cx="10" cy="-13" rx="6.2" ry="10" fill="#F3EEE2" transform="rotate(14 10 -13)"/>
+  <ellipse cx="-16" cy="2" rx="5.6" ry="8.5" fill="#F3EEE2" transform="rotate(-48 -16 2)"/>
+  <circle cx="0" cy="0" r="14" fill="#F3EEE2"/>
+  <path d="M-5 -2 L-4 6 M1 -3 L1 6 M6 -2 L5 6" fill="none" stroke-width="2.4"/>
+  <path d="M-13 12 Q0 19 13 12 L11 22 Q0 27 -11 22 Z" fill="#F3EEE2"/>
+</g><g transform="translate(40,-40) rotate(20) scale(-0.62,0.62)" stroke="#161616" stroke-width="3.2" stroke-linejoin="round" stroke-linecap="round">
+  <ellipse cx="-10" cy="-13" rx="6.2" ry="10" fill="#F3EEE2" transform="rotate(-14 -10 -13)"/>
+  <ellipse cx="0" cy="-17" rx="6.4" ry="11" fill="#F3EEE2"/>
+  <ellipse cx="10" cy="-13" rx="6.2" ry="10" fill="#F3EEE2" transform="rotate(14 10 -13)"/>
+  <ellipse cx="-16" cy="2" rx="5.6" ry="8.5" fill="#F3EEE2" transform="rotate(-48 -16 2)"/>
+  <circle cx="0" cy="0" r="14" fill="#F3EEE2"/>
+  <path d="M-5 -2 L-4 6 M1 -3 L1 6 M6 -2 L5 6" fill="none" stroke-width="2.4"/>
+  <path d="M-13 12 Q0 19 13 12 L11 22 Q0 27 -11 22 Z" fill="#F3EEE2"/>
+</g><g transform="translate(0,0) rotate(0) scale(1.0)">
+  <defs><pattern id="ht5" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(18)"><circle cx="2.5" cy="2.5" r="1.2" fill="#161616" opacity="0.3"/></pattern></defs>
+  <ellipse cx="3" cy="3" rx="26" ry="26" fill="#161616"/>
+  <circle cx="0" cy="0" r="26" fill="#F4C443" stroke="#161616" stroke-width="3.2"/>
+  <path d="M2.6 -26.0 A26 26 0 0 1 2.6 26.0 A23.4 26 0 0 0 2.6 -26.0Z" fill="url(#ht5)"/>
+  <circle cx="0" cy="0" r="19.2" fill="none" stroke="#161616" stroke-width="1.8" stroke-dasharray="2.5 3.5"/><ellipse cx="-8.58" cy="-3.12" rx="7.072" ry="9.724" fill="#F3EEE2" stroke="#161616" stroke-width="3.4"/>
+<ellipse cx="-5.58" cy="-4.12" rx="3.9" ry="6.4" fill="#161616"/>
+<path d="M-5.58 -4.12 L-3.8 -11.1 L-1.2 -8.2 Z" fill="#F3EEE2"/><ellipse cx="8.58" cy="-3.12" rx="7.072" ry="9.724" fill="#F3EEE2" stroke="#161616" stroke-width="3.4"/>
+<ellipse cx="11.58" cy="-4.12" rx="3.9" ry="6.4" fill="#161616"/>
+<path d="M11.58 -4.12 L13.3 -11.1 L16.0 -8.2 Z" fill="#F3EEE2"/><path d="M-7.8 8.3 Q0 16.1 7.8 8.3" fill="none" stroke="#161616" stroke-width="3" stroke-linecap="round"/></g></g></svg></div>
+<div style="position:absolute;left:0;right:0;bottom:0;height:410px;background:#242426;border-radius:34px 34px 0 0;padding:22px 22px 20px;display:flex;flex-direction:column;">
+  <h1 style="margin:0;font-family:'Barlow Semi Condensed','Arial Narrow',sans-serif;font-weight:700;font-size:34px;line-height:0.9;text-transform:uppercase;letter-spacing:.2px;color:#F3F1EA;">Money that<br>talks back.</h1>
+  <p style="margin:10px 0 0;font-size:12.5px;line-height:1.55;color:#AAA8A0;max-width:300px;">Log a spend in <span style="display:inline-block;padding:0 6px;border-radius:6px;line-height:1.45;background:#1C1C1E;color:#F3F1EA;border:1px solid #4A4A4E;font-weight:500;">3 taps</span>, or just ask where it all went.</p>
+  <div style="margin-top:18px;display:flex;flex-direction:column;gap:10px;">
+    <label for="lg-em" style="display:flex;align-items:center;gap:10px;height:52px;border-radius:17px;background:#333335;padding:0 16px;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#AAA8A0" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>
+      <input id="lg-em" type="email" aria-label="Email" value="bhagy@dau.ac.in" style="flex:1;min-width:0;border:0;background:transparent;color:#F3F1EA;font-size:13.5px;outline:none;">
+    </label>
+    <label for="lg-pw" style="display:flex;align-items:center;gap:10px;height:52px;border-radius:17px;background:#333335;padding:0 8px 0 16px;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#AAA8A0" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+      <input id="lg-pw" type="password" aria-label="Password" value="bhagy2026" style="flex:1;min-width:0;border:0;background:transparent;color:#F3F1EA;font-size:13.5px;outline:none;">
+      <button aria-label="Show password" style="width:38px;height:38px;border-radius:50%;background:transparent;display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:0;cursor:pointer;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#AAA8A0" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg></button>
+    </label>
+  </div>
+  <a href="Dashboard.dc.html" style="margin-top:16px;height:60px;border-radius:999px;background:#F0604A;display:flex;align-items:center;justify-content:space-between;padding:0 8px 0 24px;">
+    <span style="font-family:'Barlow Semi Condensed','Arial Narrow',sans-serif;font-weight:700;font-size:21px;letter-spacing:.4px;color:#161616;">LOG IN</span>
+    <span style="width:44px;height:44px;border-radius:50%;background:#161616;display:flex;align-items:center;justify-content:center;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F3EEE2" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M8 7h9v9"/></svg></span>
+  </a>
+  <p style="margin:auto 0 0;text-align:center;font-size:12px;color:#AAA8A0;">New here? <a href="Dashboard.dc.html" style="color:#F3F1EA;font-weight:700;border-bottom:1.5px solid #F0604A;">Create an account</a></p>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic { renderVals(){ return {}; } }
+</script>
+</body>
+</html>

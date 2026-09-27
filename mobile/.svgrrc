@@ -1,0 +1,19 @@
+{
+  "replaceAttrValues": { "Barlow Semi Condensed, Archivo, sans-serif": "BarlowSemiCondensed_700Bold" },
+  "svgoConfig": {
+    "plugins": [
+      {
+        "name": "preset-default",
+        "params": {
+          "overrides": {
+            "inlineStyles": { "onlyMatchedOnce": false },
+            "removeViewBox": false,
+            "removeUnknownsAndDefaults": false,
+            "convertColors": false,
+            "cleanupIds": false
+          }
+        }
+      }
+    ]
+  }
+}

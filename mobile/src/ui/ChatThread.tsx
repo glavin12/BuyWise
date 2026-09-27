@@ -139,7 +139,7 @@ export function ChatThread({
   );
 
   return (
-    <Screen title={title} back={back} keyboard scroll={false} insetBottom={back}>
+    <Screen title={title} back={back} keyboard scroll={false} tabBar={!back}>
       {actions ? <Row justify="between">{actions}</Row> : null}
       <FlatList
         ref={list}
