@@ -225,7 +225,7 @@ export default function BudgetTab() {
   };
 
   return (
-    <Screen title="Budget" insetBottom={false} onRefresh={refresh} refreshing={refreshing}>
+    <Screen title="Budget" tabBar onRefresh={refresh} refreshing={refreshing}>
       <MonthSwitcher label={monthLabel} onPrevious={() => changeMonth(-1)} onNext={() => changeMonth(1)} />
 
       {copyResult ? <Banner tone={copyResult.tone} message={copyResult.message} /> : null}

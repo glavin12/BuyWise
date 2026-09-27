@@ -27,8 +27,9 @@ export function Row({
   grow,
   justify = "start",
   align = "center",
+  wrap,
   ...rest
-}: LayoutProps & { justify?: keyof typeof JUSTIFY; align?: keyof typeof ALIGN }) {
+}: LayoutProps & { justify?: keyof typeof JUSTIFY; align?: keyof typeof ALIGN; /** Wrap onto more lines (chip rows). */ wrap?: boolean }) {
   return (
     <View
       style={[
@@ -39,6 +40,7 @@ export function Row({
           alignItems: ALIGN[align],
         },
         grow && { flex: 1, minWidth: 0 },
+        wrap && { flexWrap: "wrap" },
       ]}
       {...rest}
     />

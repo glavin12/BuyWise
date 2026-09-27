@@ -115,7 +115,7 @@ export default function DashboardScreen() {
   // C8: the API is down and there is nothing cached to show.
   if (!data && dashboard.isError) {
     return (
-      <Screen insetBottom={false}>
+      <Screen tabBar>
         <ErrorState
           title="BuyWise is temporarily unavailable"
           message={userMessage(dashboard.error, "load your dashboard")}
@@ -131,7 +131,7 @@ export default function DashboardScreen() {
   const closest = budgets.data ? closestToLimit(budgets.data.budgets, 3) : [];
 
   return (
-    <Screen insetBottom={false} onRefresh={refresh} refreshing={refreshing}>
+    <Screen tabBar onRefresh={refresh} refreshing={refreshing}>
       <Row justify="between">
         <Stack gap="xs" grow>
           <Text variant="caption" tone="muted">
@@ -141,7 +141,7 @@ export default function DashboardScreen() {
             {name || "Welcome"}
           </Text>
         </Stack>
-        <Avatar label={name} onPress={() => router.push("/settings")} />
+        <Avatar label={name} onPress={() => router.push("/profile")} />
       </Row>
 
       <Segmented options={PERIODS} value={period} onChange={setPeriod} />

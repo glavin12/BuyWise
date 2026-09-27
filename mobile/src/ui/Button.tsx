@@ -35,14 +35,15 @@ const BACKGROUND: Record<Variant, string> = {
   link: "transparent",
 };
 
-export function Button({
-  title,
-  onPress,
-  variant = "primary",
-  loading = false,
-  disabled = false,
-  requiresNetwork = false,
-}: ButtonProps) {
+/**
+ * The press guard every writing button shares: disabled while offline (C1, when
+ * `requiresNetwork`), and busy until an async `onPress` settles so a double tap
+ * cannot run it twice.
+ */
+export function useGuardedPress(
+  onPress: () => void | Promise<unknown>,
+  { loading = false, disabled = false, requiresNetwork = false }: { loading?: boolean; disabled?: boolean; requiresNetwork?: boolean },
+) {
   const online = useOnline();
   const [busy, setBusy] = useState(false);
   const locked = useRef(false);
@@ -62,12 +63,25 @@ export function Button({
     }
   };
 
+  return { handlePress, inactive, busy: loading || busy };
+}
+
+export function Button({
+  title,
+  onPress,
+  variant = "primary",
+  loading = false,
+  disabled = false,
+  requiresNetwork = false,
+}: ButtonProps) {
+  const { handlePress, inactive, busy } = useGuardedPress(onPress, { loading, disabled, requiresNetwork });
+
   return (
     <Pressable
       onPress={handlePress}
       disabled={inactive}
       accessibilityRole="button"
-      accessibilityState={{ disabled: inactive, busy: loading || busy }}
+      accessibilityState={{ disabled: inactive, busy }}
       style={({ pressed }) => [
         styles.base,
         variant === "link" && styles.link,
@@ -77,7 +91,7 @@ export function Button({
         inactive && styles.inactive,
       ]}
     >
-      {loading || busy ? (
+      {busy ? (
         <ActivityIndicator
           color={variant === "primary" || variant === "danger" ? theme.color.onAccent : theme.color.textMuted}
         />

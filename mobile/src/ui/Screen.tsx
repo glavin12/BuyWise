@@ -1,5 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router, useScrollToTop } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import { useRef, type ReactNode } from "react";
 import {
   KeyboardAvoidingView,
@@ -13,8 +14,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useOnline } from "@/lib/network";
 
+import { useTabBarSpace } from "./TabBar";
 import { Text } from "./Text";
 import { theme } from "./theme";
+import { colors } from "./tokens";
 
 export type ScreenProps = {
   children: ReactNode;
@@ -31,9 +34,13 @@ export type ScreenProps = {
   scroll?: boolean;
   /** Lifts content above the keyboard (forms). */
   keyboard?: boolean;
-  /** Tab screens pass false: the tab bar already handles the bottom inset. */
-  insetBottom?: boolean;
+  /** Tab roots: content clears the floating tab bar (and scrolls under its fade) instead of the bottom inset. */
+  tabBar?: boolean;
+  /** Design v3 background. Omitted = the old cream background, until every screen has moved over. */
+  surface?: "screen" | "sage" | "peri";
 };
+
+const SURFACE = { screen: colors.screen, sage: colors.sage, peri: colors.peri } as const;
 
 export function goBack() {
   if (router.canGoBack()) router.back();
@@ -49,14 +56,18 @@ export function Screen({
   refreshing = false,
   scroll = true,
   keyboard = false,
-  insetBottom = true,
+  tabBar = false,
+  surface,
 }: ScreenProps) {
   const insets = useSafeAreaInsets();
   const online = useOnline();
+  const barSpace = useTabBarSpace();
+  // Scrolling tab roots pad their content instead, so it can pass under the bar's fade.
+  const bottom = tabBar ? (scroll ? 0 : barSpace) : insets.bottom;
 
   // While offline the OfflineBanner sits above the app and already covers the
   // status-bar area, so the screen must not add the top inset a second time.
-  const frame = { paddingTop: online ? insets.top : 0, paddingBottom: insetBottom ? insets.bottom : 0 };
+  const frame = { paddingTop: online ? insets.top : 0, paddingBottom: bottom };
 
   const header =
     title || back ? (
@@ -81,7 +92,7 @@ export function Screen({
     ) : null;
 
   const body = scroll ? (
-    <ScrollBody onRefresh={onRefresh} refreshing={refreshing}>
+    <ScrollBody onRefresh={onRefresh} refreshing={refreshing} bottom={tabBar ? barSpace : 0}>
       {children}
     </ScrollBody>
   ) : (
@@ -91,7 +102,8 @@ export function Screen({
   );
 
   const screen = (
-    <View style={[styles.root, frame]}>
+    <View style={[styles.root, frame, surface && { backgroundColor: SURFACE[surface] }]}>
+      {surface === "screen" && <StatusBar style="light" />}
       {header}
       {body}
     </View>
@@ -109,14 +121,24 @@ export function Screen({
 
 // Its own component so only scrolling screens use the navigation hook: the root
 // ErrorBoundary renders a non-scrolling Screen above the router.
-function ScrollBody({ children, onRefresh, refreshing }: { children: ReactNode; onRefresh?: () => void; refreshing: boolean }) {
+function ScrollBody({
+  children,
+  onRefresh,
+  refreshing,
+  bottom,
+}: {
+  children: ReactNode;
+  onRefresh?: () => void;
+  refreshing: boolean;
+  bottom: number;
+}) {
   const ref = useRef<ScrollView>(null);
   useScrollToTop(ref); // N7: tapping the tab you're on scrolls it back to the top (a no-op outside the tabs)
 
   return (
     <ScrollView
       ref={ref}
-      contentContainerStyle={styles.scrollContent}
+      contentContainerStyle={[styles.scrollContent, bottom > 0 && { paddingBottom: bottom }]}
       keyboardShouldPersistTaps="handled" // F2: a tap outside the field dismisses the keyboard
       refreshControl={onRefresh ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} /> : undefined}
     >

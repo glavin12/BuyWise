@@ -8,10 +8,10 @@ import { profileQuery } from "@/lib/queries";
 import { useAuth } from "@/providers/AuthProvider";
 import { Button, Card, confirm, Screen, SettingsRow, showToast, Stack, Text } from "@/ui";
 
-// Phase 5. Profile, Categories, Payees and the Budget alerts switch are wired
+// Phase 5; the Profile tab since design v3 (was the Settings stack screen). Profile, Categories, Payees and the Budget alerts switch are wired
 // to the backend; everything else here has no backend field yet and shows a
 // "Coming soon" toast, matching the web (frontend/lib/coming-soon.ts).
-export default function SettingsScreen() {
+export default function ProfileScreen() {
   const router = useRouter();
   const { session, signOut } = useAuth();
   const profile = useQuery(profileQuery);
@@ -37,7 +37,7 @@ export default function SettingsScreen() {
   const alertsDisabled = !profile.data || updateProfile.isPending || !online;
 
   return (
-    <Screen title="Settings" back>
+    <Screen title="Profile" tabBar>
       <Stack gap="xs">
         <Text variant="caption" tone="muted">
           Email
@@ -100,6 +100,12 @@ export default function SettingsScreen() {
           <SettingsRow label="Manage billing" onPress={soon("Billing")} />
         </Card>
       </Stack>
+
+      {__DEV__ && (
+        <Card>
+          <SettingsRow label="Design kit (dev only)" onPress={() => router.push("/kit")} />
+        </Card>
+      )}
 
       <Button title="Sign out" variant="danger" onPress={onSignOut} />
     </Screen>

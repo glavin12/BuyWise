@@ -21,6 +21,7 @@ Verified against the code on 2026-09-27. Phase names come from the README and co
 | 3 | Budget (per month) and Goals | Done |
 | 4 | AI chat | Done: new chat on the Chat tab, History, open and delete a conversation |
 | 5 | Reports and full Settings | Done |
+| v3 design | The charcoal redesign from `design/` (Claude Design handoff; `design/README.md` lists the phases). 0: plan. 1: tokens, fonts, SVG illustrations. 2: component kit. 3: the tab bar. 4+: one screen at a time | Phases 1 to 3 done. No screen rebuilt yet: every screen still uses the cream primitives, under the new charcoal tab-bar fade |
 
 ### Screens (`src/app/`)
 
@@ -29,16 +30,17 @@ Verified against the code on 2026-09-27. Phase names come from the README and co
 | `(auth)/login`, `(auth)/signup` | Log in; sign up (shows "Check your email" when Supabase wants the email confirmed) | Done. No forgot-password |
 | `(tabs)/index` | Dashboard: balance with the net and days left, income / spent / net, budget line, the 3 budgets closest to their limit, up to 4 active goals, 3 recent transactions, this / last month | Done |
 | `(tabs)/transactions` | Day-grouped list, infinite scroll (20 per page), type, category (once a type is picked) and date-range filters, an "entries · spent · in" summary, client-side search over the rows already loaded. The money in the summary shows only for this or last month with no category, because the API has monthly analytics only (`ponytail:`) | Done |
-| `add-transaction`, `(tabs)/add` | Quick-add modal opened by the centre tab button ("Save & add another", category suggested from the payee, a toast naming the amount and category); `add` only redirects to it | Done |
+| `add-transaction` | Quick-add form in a native sheet (`quickAddSheetOptions`: formSheet, 0.92 detent, radius 34), opened by holding the centre tab ("Save & add another", category suggested from the payee, a toast naming the amount and category) | Done |
 | `transaction/[id]`, `transaction/[id]/edit` | Detail, edit (optimistic update with rollback), delete | Done |
 | `(tabs)/budget`, `budget/set` | Month switcher, Income / Assigned / Spent tiles, "ready to assign", per-category progress in the category's colour, set / edit / delete, copy from last month | Done |
 | `goals/index`, `goals/new`, `goals/[id]`, `goals/[id]/contribute`, `goals/[id]/edit` | Active / achieved lists (a progress ring on the featured goal and on the detail screen), create and edit with an optional expense category, contribute (celebration when reached), archive | Done |
-| `settings` | Email; Profile, Categories and Payees; a budget-alerts switch (optimistic, rolls back on failure); the web's "coming soon" rows (they show a toast); Sign out | Done |
+| `(tabs)/profile` | The Profile tab (was the `settings` stack screen). Email; Profile, Categories and Payees; a budget-alerts switch (optimistic, rolls back on failure); the web's "coming soon" rows (they show a toast); a dev-only "Design kit" row; Sign out | Done |
 | `settings/profile` | Name, currency (INR, USD, EUR, GBP), time zone (a curated list plus the saved one, since Hermes may lack `Intl.supportedValuesOf`), join date | Done |
 | `settings/categories`, `settings/category/new`, `settings/category/[id]` | Expense / Income lists; create and edit name, emoji icon and colour (one of the 8 hues); type locked when editing; archive | Done |
 | `settings/payees`, `settings/payee/new`, `settings/payee/[id]` | Type filter and search; create, rename (type locked), delete | Done |
 | `(tabs)/chat` | A new chat (header: History, New chat). Markdown replies, tool cards with a readable summary and "Thinking" on the reply that just arrived, 4 suggestions (the first one personalised when there are no transactions or no budget), prefill chips above the input that fill it without sending, an AI disclaimer, retry a failed send, long-press copies text | Done |
 | `conversations/index`, `conversations/[id]` | History grouped Today / This week / Older with relative times (long-press deletes); an existing thread, which continues in place | Done |
+| `kit` | Dev-only (`__DEV__`, redirects home otherwise) gallery of the v3 kit and the 5 illustrations, to compare with `design/screens/*.png` | Done |
 | `reports` | Month switcher (not past the current month); 6-month income vs spend bars (the six months load in parallel), savings rate against the 6-month average, spending by category, the month against the one before, spending by payment method, two insight cards. Each section loads and fails on its own | Done |
 
 ### Backend calls
@@ -51,11 +53,11 @@ No `eas.json`. No `android.package` or `ios.bundleIdentifier` in `app.json`. Lig
 
 ### Baseline
 
-2026-09-27: `npm test` 112 passing; `npx tsc --noEmit` and `npx expo lint` clean.
+2026-09-27: `npm test` 116 passing; `npx tsc --noEmit` and `npx expo lint` clean.
 
 ## Stack
 
-Expo SDK 57 (`expo ~57.0.24`), React Native 0.86.3, React 19.2.3 with the React Compiler on, Expo Router with typed routes, TypeScript `strict`, TanStack Query 5 for server state, `@supabase/supabase-js` for authentication only, `expo-secure-store` for the session, NetInfo for connectivity, Ionicons for icons, `@ronradtke/react-native-markdown-display` (pure JS, runs in Expo Go) for chat replies, imported only by `src/ui/Markdown.tsx`, `react-native-svg` (bundled in Expo Go) for the goal `ProgressRing` only, and `@expo-google-fonts/instrument-sans`, `instrument-serif` and `jetbrains-mono`, loaded with `useFonts` in `src/app/_layout.tsx` (the splash stays up until they load). See `package.json` for the rest. The package manager is npm (`package-lock.json`).
+Expo SDK 57 (`expo ~57.0.24`), React Native 0.86.3, React 19.2.3 with the React Compiler on, Expo Router with typed routes, TypeScript `strict`, TanStack Query 5 for server state, `@supabase/supabase-js` for authentication only, `expo-secure-store` for the session, NetInfo for connectivity, Ionicons for icons, `@ronradtke/react-native-markdown-display` (pure JS, runs in Expo Go) for chat replies, imported only by `src/ui/Markdown.tsx`, `react-native-svg` (bundled in Expo Go) for the goal `ProgressRing`, the tab bar and the v3 illustrations, which `react-native-svg-transformer` imports as components (`metro.config.js`; `.svgrrc` keeps their ids and maps the coins' ₹ font to Barlow; `svg.d.ts` types them), `lucide-react-native` for the v3 kit's line icons, `expo-linear-gradient` for the tab-bar fade, Reanimated for `PressableScale` and the hold ring, and `@expo-google-fonts/instrument-sans`, `instrument-serif`, `jetbrains-mono` and `barlow-semi-condensed`, loaded with `useFonts` in `src/app/_layout.tsx` (the splash stays up until they load). The Instrument fonts go once no screen uses the cream primitives. See `package.json` for the rest. The package manager is npm (`package-lock.json`).
 
 ## Commands
 
@@ -75,7 +77,9 @@ Run tests, typecheck and lint before declaring any task done. New logic in `src/
 ## Layout
 
 - `src/app/`: Expo Router routes. Every file is a screen and `_layout.tsx` files define navigators; keep non-route code out of it. The signed-in / signed-out route guard (`Stack.Protected`) is in `src/app/_layout.tsx`.
-- `src/ui/`: primitives (`Screen`, `Button`, `Card`, `Text`, `Input`, `Amount`, `TransactionEditor`, ...). It is the only code that reads `theme.ts`; screens import from `@/ui`, which does not export the theme.
+- `src/ui/`: primitives (`Screen`, `Button`, `Card`, `Text`, `Input`, `Amount`, `TransactionEditor`, ...). It is the only code that reads `theme.ts` (cream, being retired) and `tokens.ts` (design v3, a copy of `design/theme.ts` plus an `extra` block of values from `design/reference-html`); screens import from `@/ui`, which exports neither.
+- The v3 kit in `src/ui/` (DESIGN.md §3): `Blocks.tsx` (`Title`, `Panel` = the design's Card, `IconTile`), `Buttons.tsx` (`CircleButton`, `PrimaryButton`, `SecondaryButton`; the writing buttons share `useGuardedPress` from `Button.tsx`), `Chips.tsx` (`Chip`, `Pill`, `InlineChip`, `RichText`, whose template parser is `lib/richText.ts`), `PressableScale.tsx`, `Illustration.tsx`, `TabBar.tsx`. Screens pass it `lucide-react-native` icons. `Screen` takes `surface` (`screen`, `sage`, `peri`; omitted = cream) and `tabBar` (a tab root: content clears the floating bar).
+- `design/`: the v3 handoff. `DESIGN.md` is the look, `screens/*.png` the targets, `reference-html/*.html` the exact values, `assets/illustrations/` the SVGs (imported from there; never redrawn).
 - `src/lib/`: everything that is not UI. `api.ts` (typed client), `queries.ts` and `mutations.ts` (the only way screens read and write server data, including cache keys and invalidation), `errors.ts`, `types.ts`, `network.ts`, `queryClient.ts`, `supabase.ts`, `format.ts`, `labels.ts`, and pure logic with a `*.test.ts` beside it: `money`, `dates`, `ledger`, `transactionForm`, `budget`, `goals`, `errors`, `ids`, `chat`, `reports`, `settings`, `categoryStyle`.
 - `src/providers/AuthProvider.tsx`: session, `signIn` / `signUp` / `signOut`, the "session expired" notice.
 - Alias `@/*` maps to `src/*`.
@@ -94,6 +98,16 @@ Run tests, typecheck and lint before declaring any task done. New logic in `src/
 10. **Auth:** the session is kept in SecureStore (split into chunks because values can exceed ~2 KB; web falls back to localStorage). On a 401 the client refreshes the token once (single-flight), retries once, then signs out locally; `SIGNED_OUT` clears the whole query cache. Supabase is used for authentication only: all data goes through the FastAPI API with `Authorization: Bearer <access token>`, and the `anon` / `authenticated` database roles have no table privileges, so never query Supabase tables directly.
 11. **Network:** `networkMode: "always"`. `useOnline()` means only "no connection at all" and drives the offline banner and `requiresNetwork` buttons. Default `staleTime` 30 s, one retry except on 4xx, no refetch on reconnect (it only marks data stale). Timeouts: 15 s for CRUD, 60 s for chat.
 12. **Comments:** short tags (`C4`, `L3`, `A1`, ...) mark edge cases handled on purpose, so keep them intact when editing nearby code. A `ponytail:` comment marks a deliberate shortcut and names its ceiling and upgrade path; read it before changing that code.
+
+## Design v3 rules
+
+From `design/CLAUDE.design.md`, with its paths adapted to this app (the kit is in `src/ui`, not `src/components` / `src/theme`):
+
+- Visual source of truth: `design/DESIGN.md`, `design/theme.ts` (copied to `src/ui/tokens.ts`) and `design/screens/*.png`. Exact values (padding, radius, sizes, copy) are in `design/reference-html/*.html`: read them instead of guessing.
+- Colours, fonts, radii and durations come from `src/ui/tokens.ts`; never hardcode hex or font names outside `src/ui`. Screens compose the kit and never write one-off styles for something it covers.
+- Titles are uppercase Barlow Semi Condensed; all body copy is JetBrains Mono. No emoji in rebuilt screens (category icons are lucide glyphs on `IconTile`s).
+- Tabs are Home · Activity · [AI chat] · Budget · Profile, drawn by `TabBar` (no container, border or hairline; DESIGN.md §5). The centre opens Chat on tap and the QuickAdd sheet on a 350 ms hold (medium haptic, a ring fills while held; screen readers get an "Add a transaction" action). Budget uses the `marigold` bar surface (`surfaces` in `(tabs)/_layout.tsx`). The bar hides while the keyboard is up.
+- A rebuilt screen is compared side by side with its PNG before moving on. The owner tests in Expo Go; `/kit` (Profile → Design kit, dev builds) shows every kit variant.
 
 ## Backend contract the client relies on
 

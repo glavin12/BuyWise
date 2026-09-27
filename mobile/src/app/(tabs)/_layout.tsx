@@ -1,27 +1,17 @@
-import { Tabs, useRouter } from "expo-router";
+import { Tabs } from "expo-router/js-tabs";
 
-import { AddTabButton, tabIcon, tabScreenOptions } from "@/ui";
+import { TabBar } from "@/ui";
 
+// Design v3 (DESIGN.md §5): Home · Activity · [AI chat] · Budget · Profile, no labels. The
+// centre opens Chat on tap and the QuickAdd sheet on a 350 ms hold (both in TabBar).
 export default function TabsLayout() {
-  const router = useRouter();
-
   return (
-    <Tabs screenOptions={tabScreenOptions}>
-      <Tabs.Screen name="index" options={{ title: "Home", tabBarIcon: tabIcon("home-outline") }} />
-      <Tabs.Screen
-        name="transactions"
-        options={{ title: "Transactions", tabBarIcon: tabIcon("swap-horizontal-outline") }}
-      />
-      {/* Centre button: opens the quick-add modal instead of showing a tab screen. */}
-      <Tabs.Screen
-        name="add"
-        options={{
-          title: "Add",
-          tabBarButton: () => <AddTabButton onPress={() => router.push("/add-transaction")} />,
-        }}
-      />
-      <Tabs.Screen name="budget" options={{ title: "Budget", tabBarIcon: tabIcon("wallet-outline") }} />
-      <Tabs.Screen name="chat" options={{ title: "Chat", tabBarIcon: tabIcon("chatbubbles-outline") }} />
+    <Tabs screenOptions={{ headerShown: false }} tabBar={(props) => <TabBar {...props} surfaces={{ budget: "marigold" }} />}>
+      <Tabs.Screen name="index" options={{ title: "Home" }} />
+      <Tabs.Screen name="transactions" options={{ title: "Activity" }} />
+      <Tabs.Screen name="chat" options={{ title: "Chat" }} />
+      <Tabs.Screen name="budget" options={{ title: "Budget" }} />
+      <Tabs.Screen name="profile" options={{ title: "Profile" }} />
     </Tabs>
   );
 }
