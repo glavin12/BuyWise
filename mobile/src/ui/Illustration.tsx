@@ -19,5 +19,5 @@ export type IllustrationName = keyof typeof ART;
 
 export function Illustration({ name, width }: { name: IllustrationName; width: number }) {
   const { Art, ratio } = ART[name];
-  return <Art width={width} height={width * ratio} accessible={false} />;
+  return <Art width={width} height={width * ratio} />;
 }

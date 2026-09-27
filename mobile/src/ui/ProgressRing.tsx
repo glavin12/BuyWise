@@ -46,8 +46,8 @@ export function ProgressRing({ percent, label, tone = "accent" }: { percent: num
           strokeDasharray={CIRCUMFERENCE}
           strokeDashoffset={offset}
           strokeLinecap="round"
-          rotation={-90}
-          origin={[SIZE / 2, SIZE / 2]}
+          // Start at 12 o'clock. An SVG transform string, since `rotation` + `origin` break on web.
+          transform={`rotate(-90 ${SIZE / 2} ${SIZE / 2})`}
         />
       </Svg>
       <View style={styles.label}>

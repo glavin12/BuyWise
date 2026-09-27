@@ -61,14 +61,13 @@ export function TabBar({ state, descriptors, navigation, surfaces = {} }: Bottom
   if (keyboard) return null; // it would ride up over the chat input
 
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+    <View style={[StyleSheet.absoluteFill, styles.passThrough]}>
       <LinearGradient
-        pointerEvents="none"
         colors={[fadeAt(surface.fade, 0), fadeAt(surface.fade, 0.92), surface.fade]}
         locations={[0, 0.42, 0.7]}
         style={[styles.fade, { height: FADE + bottom - 20 }, surfaceName === "marigold" && styles.fadeInset]}
       />
-      <View style={[styles.row, { bottom }]} pointerEvents="box-none" accessibilityRole="tablist">
+      <View style={[styles.row, styles.passThrough, { bottom }]} accessibilityRole="tablist">
         {state.routes.map((route, i) => {
           const isFocused = i === state.index;
           const open = () => {
@@ -174,7 +173,8 @@ function CentreButton({
       onAccessibilityAction={(e) => e.nativeEvent.actionName === "longpress" && openQuickAdd()}
       style={[styles.centre, { backgroundColor: bg }]}
     >
-      <Svg pointerEvents="none" width={RING_R * 2 + 4} height={RING_R * 2 + 4} style={styles.ring}>
+      {/* Rotated -90° as a whole so the ring starts at 12 o'clock (an `origin` prop breaks on web). */}
+      <Svg width={RING_R * 2 + 4} height={RING_R * 2 + 4} style={styles.ring}>
         <AnimatedCircle
           cx={RING_R + 2}
           cy={RING_R + 2}
@@ -185,8 +185,6 @@ function CentreButton({
           fill="none"
           strokeDasharray={RING_C}
           animatedProps={ringProps}
-          rotation={-90}
-          origin={`${RING_R + 2}, ${RING_R + 2}`}
         />
       </Svg>
       <Svg width={28} height={28} viewBox="0 0 24 24">
@@ -203,7 +201,8 @@ function CentreButton({
 }
 
 const styles = StyleSheet.create({
-  fade: { position: "absolute", left: 0, right: 0, bottom: 0 },
+  passThrough: { pointerEvents: "box-none" },
+  fade: { position: "absolute", left: 0, right: 0, bottom: 0, pointerEvents: "none" },
   fadeInset: { left: 12, right: 12 }, // matches the Budget front card's width
   row: {
     position: "absolute",
@@ -224,7 +223,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     boxShadow: `0 10px 24px ${extra.shadow}`,
   },
-  ring: { position: "absolute", left: -6, top: -6 },
+  ring: { position: "absolute", left: -6, top: -6, pointerEvents: "none", transform: [{ rotate: "-90deg" }] },
   badge: {
     position: "absolute",
     right: -4,
