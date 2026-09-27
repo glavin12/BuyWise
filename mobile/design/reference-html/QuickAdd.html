@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>BuyWise — Add expense</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+*{box-sizing:border-box;-webkit-font-smoothing:antialiased}
+a{text-decoration:none;color:inherit}
+a:hover{opacity:.92}
+button{border:0;font:inherit}
+input{font-family:'JetBrains Mono',ui-monospace,monospace}
+input::placeholder{color:#AAA8A0}
+</style>
+</helmet>
+<div style="width:390px;height:844px;overflow:hidden;position:relative;background:#242426;color:#F3F1EA;font-family:'JetBrains Mono',ui-monospace,monospace;">
+
+<div style="position:absolute;inset:0;background:#242426;"></div>
+<div style="position:absolute;left:18px;right:18px;top:54px;display:flex;align-items:center;gap:10px;opacity:.35;">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" width="42" height="42" style="display:block;" aria-hidden="true"><defs><clipPath id="avc"><circle cx="40" cy="40" r="38"/></clipPath></defs><circle cx="40" cy="40" r="38" fill="#F4C443"/><g clip-path="url(#avc)"><g transform="translate(40,66) rotate(0) scale(0.52)"><defs><pattern id="ht11" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(18)"><circle cx="3.0" cy="3.0" r="1.55" fill="#161616" opacity="0.38"/></pattern><clipPath id="cl12"><path d="M-34 -76 C-104 -66 -116 44 -64 78 C-32 98 32 98 64 78 C116 44 104 -66 34 -76 Z"/></clipPath></defs><path d="M-44 84 C-44 100 44 100 44 84 L40 96 C30 106 -30 106 -40 96 Z" fill="#B8412D" stroke="#161616" stroke-width="3.6" stroke-linejoin="round"/><path d="M-34 -76 C-104 -66 -116 44 -64 78 C-32 98 32 98 64 78 C116 44 104 -66 34 -76 Z" transform="translate(5,5)" fill="#161616"/><path d="M-34 -76 C-104 -66 -116 44 -64 78 C-32 98 32 98 64 78 C116 44 104 -66 34 -76 Z" fill="#E2553C" stroke="#161616" stroke-width="4.2" stroke-linejoin="round"/><g clip-path="url(#cl12)"><ellipse cx="58" cy="40" rx="92" ry="86" fill="url(#ht11)"/><path d="M-74 -30 C-80 -2 -74 22 -60 40 C-66 12 -64 -14 -52 -40 Z" fill="#F3EEE2" opacity=".85"/><path d="M-112 34 C-60 58 60 58 112 34 L112 50 C60 74 -60 74 -112 50 Z" fill="#F4C443" stroke="#161616" stroke-width="3"/><circle cx="-84" cy="53.6" r="3.4" fill="#F3EEE2" stroke="#161616" stroke-width="1.8"/><circle cx="-60" cy="56.5" r="3.4" fill="#F3EEE2" stroke="#161616" stroke-width="1.8"/><circle cx="-36" cy="58.7" r="3.4" fill="#F3EEE2" stroke="#161616" stroke-width="1.8"/><circle cx="-12" cy="59.9" r="3.4" fill="#F3EEE2" stroke="#161616" stroke-width="1.8"/><circle cx="12" cy="59.9" r="3.4" fill="#F3EEE2" stroke="#161616" stroke-width="1.8"/><circle cx="36" cy="58.7" r="3.4" fill="#F3EEE2" stroke="#161616" stroke-width="1.8"/><circle cx="60" cy="56.5" r="3.4" fill="#F3EEE2" stroke="#161616" stroke-width="1.8"/><circle cx="84" cy="53.6" r="3.4" fill="#F3EEE2" stroke="#161616" stroke-width="1.8"/><path d="M-100 74 C-50 92 50 92 100 74" fill="none" stroke="#161616" stroke-width="2.4" stroke-dasharray="1 8" stroke-linecap="round"/></g><path d="M-66 -52 Q-55 -60 -44 -52 T-22 -52 T0 -52 T22 -52 T44 -52 T66 -52" fill="none" stroke="#F3EEE2" stroke-width="3.2" stroke-linecap="round" clip-path="url(#cl12)"/><path d="M-40 -74 C-40 -92 40 -92 40 -74 C30 -66 -30 -66 -40 -74 Z" fill="#E2553C" stroke="#161616" stroke-width="4" stroke-linejoin="round"/><ellipse cx="0" cy="-86" rx="30" ry="9" fill="#B8412D" stroke="#161616" stroke-width="3.6"/><circle cx="0" cy="-100" r="11" fill="#E2553C" stroke="#161616" stroke-width="3.6"/><rect x="-22" y="-64" width="44" height="9" rx="4.5" fill="#161616" transform="rotate(-6 0 -60)"/><ellipse cx="-28" cy="-24" rx="12" ry="17" fill="#F3EEE2" stroke="#161616" stroke-width="3.4"/>
+<ellipse cx="-26" cy="-22" rx="6.6" ry="11.2" fill="#161616"/>
+<path d="M-26 -22 L-23.0 -34.2 L-18.6 -29.1 Z" fill="#F3EEE2"/><ellipse cx="24" cy="-24" rx="12" ry="17" fill="#F3EEE2" stroke="#161616" stroke-width="3.4"/>
+<ellipse cx="26" cy="-22" rx="6.6" ry="11.2" fill="#161616"/>
+<path d="M26 -22 L29.0 -34.2 L33.4 -29.1 Z" fill="#F3EEE2"/><circle cx="-50" cy="4" r="8" fill="#F0604A" opacity=".0"/><ellipse cx="-52" cy="2" rx="9" ry="6" fill="#F58E78" /><ellipse cx="48" cy="2" rx="9" ry="6" fill="#F58E78"/><path d="M-30 2 Q-2 40 28 2 Q-2 12 -30 2 Z" fill="#161616" stroke="#161616" stroke-width="3.4" stroke-linejoin="round"/><path d="M-12 18 Q-2 28 10 18 Q-1 12 -12 18 Z" fill="#F0604A"/></g></g><circle cx="40" cy="40" r="38" fill="none" stroke="#161616" stroke-width="3"/></svg><span style="font-size:13px;">Hi, Bhagy!</span>
+</div>
+<div style="position:absolute;left:0;right:0;bottom:0;height:730px;background:#F3EEE2;color:#161616;border-radius:34px 34px 0 0;padding:12px 22px 22px;">
+  <div style="width:46px;height:5px;border-radius:999px;background:#C9C1AF;margin:0 auto;"></div>
+  <div style="margin-top:14px;display:flex;align-items:center;justify-content:space-between;">
+    <h1 style="margin:0;font-family:'Barlow Semi Condensed','Arial Narrow',sans-serif;font-weight:700;font-size:30px;line-height:0.9;text-transform:uppercase;letter-spacing:.2px;color:#161616;">Add expense</h1>
+    <a href="Dashboard.dc.html" aria-label="Close" style="width:38px;height:38px;border-radius:50%;background:transparent;border:1.5px solid #161616;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#161616" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></a>
+  </div>
+  <div role="tablist" style="margin-top:14px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));padding:4px;border-radius:999px;background:#161616;">
+    <button role="tab" aria-selected="true" style="height:40px;border-radius:999px;background:#F0604A;color:#161616;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;font-weight:700;cursor:pointer;">Expense</button>
+    <button role="tab" aria-selected="false" style="height:40px;border-radius:999px;background:transparent;color:#F3EEE2;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;font-weight:500;cursor:pointer;">Income</button>
+  </div>
+  <div style="margin-top:14px;display:flex;align-items:baseline;justify-content:center;gap:4px;">
+    <span style="font-family:'Barlow Semi Condensed','Arial Narrow',sans-serif;font-weight:600;font-size:40px;color:#8C8473;">&#8377;</span>
+    <span style="font-family:'Barlow Semi Condensed','Arial Narrow',sans-serif;font-weight:700;font-size:86px;line-height:1;letter-spacing:-1px;">250</span>
+    <span style="width:3px;height:62px;background:#F0604A;border-radius:2px;align-self:center;"></span>
+  </div>
+  <div style="margin-top:6px;display:flex;justify-content:center;">
+    <span style="display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:999px;background:#BEE3CB;color:#161616;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10.5px;font-weight:500;white-space:nowrap;"><svg width="13" height="13" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l2.1 6.4 6.4 2.1-6.4 2.1L12 19.5l-2.1-6.4L3.5 11l6.4-2.1z" fill="#161616"/></svg>Swiggy &#8594; Food &amp; Dining, like last time</span>
+  </div>
+  <div style="margin-top:16px;font-size:10px;letter-spacing:1px;color:#6E685C;">CATEGORY</div>
+  <div style="margin-top:8px;display:flex;justify-content:space-between;"><button aria-pressed="true" style="display:flex;flex-direction:column;align-items:center;gap:6px;background:transparent;cursor:pointer;padding:0;">
+      <span style="position:relative;width:58px;height:58px;border-radius:19px;background:#F0604A;display:flex;align-items:center;justify-content:center;border:2.5px solid #161616;"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#161616" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h18a9 9 0 0 1-18 0z"/><path d="M8.5 9c0-2.2 1.6-2.2 1.6-4.4M13.5 9c0-2.2 1.6-2.2 1.6-4.4"/></svg>
+      <span style="position:absolute;right:-6px;top:-6px;width:22px;height:22px;border-radius:50%;background:#161616;display:flex;align-items:center;justify-content:center;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#F3EEE2" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7"/></svg></span></span>
+      <span style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;color:#161616;font-weight:700;">Food</span></button><button aria-pressed="false" style="display:flex;flex-direction:column;align-items:center;gap:6px;background:transparent;cursor:pointer;padding:0;">
+      <span style="position:relative;width:58px;height:58px;border-radius:19px;background:#BEE3CB;display:flex;align-items:center;justify-content:center;"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#161616" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h2l2.5 11h11L21 7H6.5"/><circle cx="9" cy="19.5" r="1.5"/><circle cx="17" cy="19.5" r="1.5"/></svg>
+      </span>
+      <span style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;color:#161616;">Grocery</span></button><button aria-pressed="false" style="display:flex;flex-direction:column;align-items:center;gap:6px;background:transparent;cursor:pointer;padding:0;">
+      <span style="position:relative;width:58px;height:58px;border-radius:19px;background:#8C86F3;display:flex;align-items:center;justify-content:center;"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#161616" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 8h14l-1 13H6z"/><path d="M9 8a3 3 0 0 1 6 0"/></svg>
+      </span>
+      <span style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;color:#161616;">Shopping</span></button><button aria-pressed="false" style="display:flex;flex-direction:column;align-items:center;gap:6px;background:transparent;cursor:pointer;padding:0;">
+      <span style="position:relative;width:58px;height:58px;border-radius:19px;background:#F4C443;display:flex;align-items:center;justify-content:center;"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#161616" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16M3 21h14M5 10h10"/><path d="M15 8l3 3v6a1.5 1.5 0 0 0 3 0V9l-3-3"/></svg>
+      </span>
+      <span style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;color:#161616;">Fuel</span></button><button style="display:flex;flex-direction:column;align-items:center;gap:6px;background:transparent;cursor:pointer;padding:0;">
+      <span style="width:58px;height:58px;border-radius:19px;border:2px dashed #9C9483;display:flex;align-items:center;justify-content:center;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#6E685C" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span>
+      <span style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;color:#6E685C;">New</span></button></div>
+  <div style="margin-top:14px;display:flex;align-items:center;gap:10px;height:50px;border-radius:17px;background:#E5DECF;padding:0 14px;">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#161616" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg><span style="font-size:13px;">Swiggy</span>
+    <span style="margin-left:auto;font-size:10.5px;color:#6E685C;">payee</span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#161616" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+  </div>
+  <div style="margin-top:12px;display:flex;gap:6px;flex-wrap:wrap;">
+    <span style="display:inline-flex;align-items:center;gap:6px;padding:7px 13px;border-radius:999px;background:#161616;color:#F3EEE2;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;font-weight:500;white-space:nowrap;">UPI</span>
+    <span style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:transparent;border:1.4px solid #161616;color:#161616;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;font-weight:500;white-space:nowrap;">Cash</span>
+    <span style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:transparent;border:1.4px solid #161616;color:#161616;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;font-weight:500;white-space:nowrap;">Card</span>
+    <span style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:transparent;border:1.4px solid #161616;color:#161616;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;font-weight:500;white-space:nowrap;">Bank</span>
+    <span style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:transparent;border:1.4px solid #161616;color:#161616;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;font-weight:500;white-space:nowrap;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#161616" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/></svg>Today</span>
+  </div>
+  <a href="Transactions.dc.html" style="margin-top:16px;height:60px;border-radius:999px;background:#F0604A;display:flex;align-items:center;justify-content:space-between;padding:0 8px 0 24px;">
+    <span style="font-family:'Barlow Semi Condensed','Arial Narrow',sans-serif;font-weight:700;font-size:21px;letter-spacing:.4px;color:#161616;">SAVE &#8377;250</span>
+    <span style="width:44px;height:44px;border-radius:50%;background:#161616;display:flex;align-items:center;justify-content:center;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F3EEE2" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7"/></svg></span>
+  </a>
+  <button style="margin-top:8px;width:100%;height:48px;border-radius:999px;background:transparent;border:1.8px solid #161616;color:#161616;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;font-weight:700;cursor:pointer;">Save &amp; add another</button>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic { renderVals(){ return {}; } }
+</script>
+</body>
+</html>
