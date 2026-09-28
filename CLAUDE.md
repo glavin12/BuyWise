@@ -21,7 +21,7 @@ Verified against the code on 2026-09-24. Update this section in the same change 
 | Part | State | Checks (2026-09-24) |
 |---|---|---|
 | Backend | Everything under [HTTP API](#http-api) is implemented, with 13 AI tools and migrations 001 to 003 | `pytest tests`: 71 passing (2026-09-25) |
-| Mobile | Every phase done: auth, Dashboard, Transactions, Budget, Goals, AI chat (1 to 4), the cream visual design (1.5), Reports and full Settings (5). Design v3 (charcoal) phases 1 to 3 done: tokens, fonts, illustrations, component kit, the new tab bar (centre = AI chat, hold = add; Settings is now the Profile tab); screens are rebuilt one at a time next. Details: `mobile/AGENTS.md` | 116 unit tests passing; `tsc` and lint clean (2026-09-27) |
+| Mobile | Every phase done: auth, Dashboard, Transactions, Budget, Goals, AI chat (1 to 4), the cream visual design (1.5), Reports and full Settings (5). Design v3 (charcoal) phases 1 to 3 done: tokens, fonts, illustrations, component kit, the new tab bar (centre = AI chat, hold = add; Settings is now the Profile tab); screens are rebuilt one at a time, Home done so far. Details: `mobile/AGENTS.md` | 121 unit tests passing; `tsc` and lint clean (2026-09-27) |
 | Web | Every sidebar screen exists (see below) | `tsc` clean; `npm run lint` reports 24 errors; no tests |
 
 ### Web app (`frontend/`)

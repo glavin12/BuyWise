@@ -4,9 +4,9 @@ import { StyleSheet, Text as RNText, View, type StyleProp, type ViewStyle } from
 
 import type { Hue } from "./Chips";
 import { PressableScale } from "./PressableScale";
-import { colors, radius, type } from "./tokens";
+import { colors, fonts, radius, type } from "./tokens";
 
-// Title, Panel and IconTile (DESIGN.md §3).
+// Title, Panel and IconTile (DESIGN.md §3), plus the Home screen's HeroAmount, SectionLabel and MiniTile.
 
 /** Condensed uppercase heading. Put "\n" in the text for the two-line titles ("MONEY\nBUDDY"). */
 export function Title({
@@ -15,12 +15,13 @@ export function Title({
   tone = "text",
 }: {
   children: string;
-  size?: "title" | "titleXL" | "cardTitle";
+  /** `panelTitle` is the 24px heading on a colour card ("SPEND / PULSE"). */
+  size?: "title" | "titleXL" | "cardTitle" | "panelTitle";
   /** `ink` on light and colour surfaces. */
   tone?: "text" | "ink";
 }) {
   return (
-    <RNText accessibilityRole="header" style={[type[size], { color: colors[tone] }]}>
+    <RNText accessibilityRole="header" style={[size === "panelTitle" ? styles.panelTitle : type[size], { color: colors[tone] }]}>
       {children}
     </RNText>
   );
@@ -56,17 +57,99 @@ export function Panel({
 // size → [corner radius, glyph size], from design/reference-html.
 const TILE = { 30: [10, 16], 44: [radius.tile, 20], 46: [radius.tile, 22], 58: [radius.tileLg, 26] } as const;
 
-/** Rounded colour square with an ink line glyph: categories, recent tiles. */
-export function IconTile({ icon: Icon, color, size = 44 }: { icon: LucideIcon; color: Hue; size?: keyof typeof TILE }) {
+/** Rounded colour square with an ink line glyph (categories, recent tiles), or a text glyph like "₹". */
+export function IconTile({ icon: Icon, color, size = 44 }: { icon: LucideIcon | string; color: Hue; size?: keyof typeof TILE }) {
   const [corner, glyph] = TILE[size];
   return (
     <View style={[styles.tile, { width: size, height: size, borderRadius: corner, backgroundColor: colors[color] }]}>
-      <Icon size={glyph} color={colors.ink} strokeWidth={2.1} />
+      {typeof Icon === "string" ? (
+        <RNText style={[styles.tileGlyph, { fontSize: glyph + 4 }]}>{Icon}</RNText>
+      ) : (
+        <Icon size={glyph} color={colors.ink} strokeWidth={2.1} />
+      )}
     </View>
+  );
+}
+
+/** The 40px balance figure with its fraction smaller and muted: ₹1,24,860.00. Pass the formatted parts. */
+export function HeroAmount({ whole, fraction }: { whole: string; fraction: string }) {
+  return (
+    <RNText style={styles.hero} numberOfLines={1} adjustsFontSizeToFit accessibilityLabel={whole + fraction}>
+      {whole}
+      <RNText style={styles.heroFraction}>{fraction}</RNText>
+    </RNText>
+  );
+}
+
+/** A small uppercase section label with an optional link on the right ("RECENT … see all →"). */
+export function SectionLabel({ label, link, onLink }: { label: string; link?: string; onLink?: () => void }) {
+  return (
+    <View style={styles.section}>
+      <RNText accessibilityRole="header" style={styles.sectionLabel}>
+        {label}
+      </RNText>
+      {link && onLink && (
+        <PressableScale onPress={onLink} accessibilityRole="link" hitSlop={12}>
+          <RNText style={styles.sectionLink}>{link}</RNText>
+        </PressableScale>
+      )}
+    </View>
+  );
+}
+
+/** A compact card for one transaction: tile, name, amount (`tone` mint for money in). */
+export function MiniTile({
+  tile,
+  name,
+  amount,
+  tone = "text",
+  onPress,
+  label,
+}: {
+  tile: ReactNode;
+  name: string;
+  amount: string;
+  tone?: "text" | "mint";
+  onPress: () => void;
+  label: string;
+}) {
+  return (
+    <PressableScale onPress={onPress} accessibilityLabel={label} style={styles.mini}>
+      {tile}
+      <View style={styles.miniText}>
+        <RNText style={styles.miniName} numberOfLines={1}>
+          {name}
+        </RNText>
+        <RNText style={[styles.miniAmount, { color: colors[tone] }]} numberOfLines={1}>
+          {amount}
+        </RNText>
+      </View>
+    </PressableScale>
   );
 }
 
 const styles = StyleSheet.create({
   panel: { padding: 14 },
+  panelTitle: { ...type.cardTitle, fontSize: 24, lineHeight: 23 },
   tile: { alignItems: "center", justifyContent: "center" },
+  tileGlyph: { fontFamily: fonts.numberBold, color: colors.ink },
+  hero: { fontFamily: fonts.number, fontSize: 40, lineHeight: 44, letterSpacing: -0.3, color: colors.text },
+  heroFraction: { fontSize: 26, color: colors.muted },
+  section: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  sectionLabel: { fontFamily: fonts.mono, fontSize: 10.5, letterSpacing: 1, textTransform: "uppercase", color: colors.muted },
+  sectionLink: { fontFamily: fonts.mono, fontSize: 10.5, color: colors.text },
+  mini: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 9,
+    paddingHorizontal: 10,
+    borderRadius: 18,
+    backgroundColor: colors.card,
+  },
+  miniText: { flex: 1, minWidth: 0 },
+  miniName: { ...type.meta, color: colors.muted },
+  miniAmount: { fontFamily: fonts.number, fontSize: 16, lineHeight: 19 },
 });

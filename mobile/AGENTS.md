@@ -21,14 +21,14 @@ Verified against the code on 2026-09-27. Phase names come from the README and co
 | 3 | Budget (per month) and Goals | Done |
 | 4 | AI chat | Done: new chat on the Chat tab, History, open and delete a conversation |
 | 5 | Reports and full Settings | Done |
-| v3 design | The charcoal redesign from `design/` (Claude Design handoff; `design/README.md` lists the phases). 0: plan. 1: tokens, fonts, SVG illustrations. 2: component kit. 3: the tab bar. 4+: one screen at a time | Phases 1 to 3 done. No screen rebuilt yet: every screen still uses the cream primitives, under the new charcoal tab-bar fade |
+| v3 design | The charcoal redesign from `design/` (Claude Design handoff; `design/README.md` lists the phases). 0: plan. 1: tokens, fonts, SVG illustrations. 2: component kit. 3: the tab bar. 4+: one screen at a time | Phases 1 to 3 done. Phase 4+: Home rebuilt (2026-09-27); every other screen still uses the cream primitives, under the charcoal tab-bar fade |
 
 ### Screens (`src/app/`)
 
 | Route files | What it does | State |
 |---|---|---|
 | `(auth)/login`, `(auth)/signup` | Log in; sign up (shows "Check your email" when Supabase wants the email confirmed) | Done. No forgot-password |
-| `(tabs)/index` | Dashboard: balance with the net and days left, income / spent / net, budget line, the 3 budgets closest to their limit, up to 4 active goals, 3 recent transactions, this / last month | Done |
+| `(tabs)/index` | Home (v3, `design/screens/02-home.png`). Greeting (→ Profile), search (→ Activity), bell ("coming soon" toast); a month pill that flips this / last month (the API has only those two); the balance card (↗ Reports; a sentence with the net, the budget state and the active-goal count, whose chips link to Budget and Goals); Spend Pulse: this or last week's expenses summed per day on the phone (`expensesInRangeQuery`, every page), each day as a % of this month's budget ÷ days in the month (of the week's biggest day when nothing is budgeted), days still to come dashed with no forecast, and the top 3 categories as a legend that filters the bubbles and chart; 3 recent tiles (→ detail) | Done |
 | `(tabs)/transactions` | Day-grouped list, infinite scroll (20 per page), type, category (once a type is picked) and date-range filters, an "entries · spent · in" summary, client-side search over the rows already loaded. The money in the summary shows only for this or last month with no category, because the API has monthly analytics only (`ponytail:`) | Done |
 | `add-transaction` | Quick-add form in a native sheet (`quickAddSheetOptions`: formSheet, 0.92 detent, radius 34), opened by holding the centre tab ("Save & add another", category suggested from the payee, a toast naming the amount and category) | Done |
 | `transaction/[id]`, `transaction/[id]/edit` | Detail, edit (optimistic update with rollback), delete | Done |
@@ -53,7 +53,7 @@ No `eas.json`. No `android.package` or `ios.bundleIdentifier` in `app.json`. Lig
 
 ### Baseline
 
-2026-09-27: `npm test` 116 passing; `npx tsc --noEmit` and `npx expo lint` clean.
+2026-09-27: `npm test` 121 passing; `npx tsc --noEmit` and `npx expo lint` clean.
 
 ## Stack
 
@@ -78,9 +78,9 @@ Run tests, typecheck and lint before declaring any task done. New logic in `src/
 
 - `src/app/`: Expo Router routes. Every file is a screen and `_layout.tsx` files define navigators; keep non-route code out of it. The signed-in / signed-out route guard (`Stack.Protected`) is in `src/app/_layout.tsx`.
 - `src/ui/`: primitives (`Screen`, `Button`, `Card`, `Text`, `Input`, `Amount`, `TransactionEditor`, ...). It is the only code that reads `theme.ts` (cream, being retired) and `tokens.ts` (design v3, a copy of `design/theme.ts` plus an `extra` block of values from `design/reference-html`); screens import from `@/ui`, which exports neither.
-- The v3 kit in `src/ui/` (DESIGN.md §3): `Blocks.tsx` (`Title`, `Panel` = the design's Card, `IconTile`), `Buttons.tsx` (`CircleButton`, `PrimaryButton`, `SecondaryButton`; the writing buttons share `useGuardedPress` from `Button.tsx`), `Chips.tsx` (`Chip`, `Pill`, `InlineChip`, `RichText`, whose template parser is `lib/richText.ts`), `PressableScale.tsx`, `Illustration.tsx`, `TabBar.tsx`. Screens pass it `lucide-react-native` icons. `Screen` takes `surface` (`screen`, `sage`, `peri`; omitted = cream) and `tabBar` (a tab root: content clears the floating bar).
+- The v3 kit in `src/ui/` (DESIGN.md §3): `Blocks.tsx` (`Title`, `Panel` = the design's Card, `IconTile` (a lucide icon or a text glyph such as ₹), and Home's `HeroAmount`, `SectionLabel`, `MiniTile`), `CategoryTile.tsx` (a category's lucide glyph and v3 colour, mapped from `lib/categoryStyle`'s hue; `categoryTone` for legend dots), `SpendPulse.tsx` (`PulseBubbles`, `AreaChart`, hand-drawn SVG), `Buttons.tsx` (`CircleButton`, `PrimaryButton`, `SecondaryButton`; the writing buttons share `useGuardedPress` from `Button.tsx`), `Chips.tsx` (`Chip`, `Pill`, `InlineChip`, `RichText`, whose template parser is `lib/richText.ts`), `PressableScale.tsx`, `Illustration.tsx`, `TabBar.tsx`. Screens pass it `lucide-react-native` icons. `Screen` takes `surface` (`screen`, `sage`, `peri`; omitted = cream; a surface also switches to v3 spacing, 18 side / 8 top / 12 between blocks, and a light refresh spinner) and `tabBar` (a tab root: content clears the floating bar). `Skeleton` takes `tone` (`cream`, `dark`, `light` on a colour card) and `round` (a `tokens.radius` key).
 - `design/`: the v3 handoff. `DESIGN.md` is the look, `screens/*.png` the targets, `reference-html/*.html` the exact values, `assets/illustrations/` the SVGs (imported from there; never redrawn).
-- `src/lib/`: everything that is not UI. `api.ts` (typed client), `queries.ts` and `mutations.ts` (the only way screens read and write server data, including cache keys and invalidation), `errors.ts`, `types.ts`, `network.ts`, `queryClient.ts`, `supabase.ts`, `format.ts`, `labels.ts`, and pure logic with a `*.test.ts` beside it: `money`, `dates`, `ledger`, `transactionForm`, `budget`, `goals`, `errors`, `ids`, `chat`, `reports`, `settings`, `categoryStyle`.
+- `src/lib/`: everything that is not UI. `api.ts` (typed client), `queries.ts` and `mutations.ts` (the only way screens read and write server data, including cache keys and invalidation), `errors.ts`, `types.ts`, `network.ts`, `queryClient.ts`, `supabase.ts`, `format.ts`, `labels.ts`, and pure logic with a `*.test.ts` beside it: `money`, `dates`, `ledger`, `transactionForm`, `budget`, `goals`, `errors`, `ids`, `chat`, `reports`, `settings`, `categoryStyle`, `home` (Spend Pulse week maths, money strings, the balance sentence).
 - `src/providers/AuthProvider.tsx`: session, `signIn` / `signUp` / `signOut`, the "session expired" notice.
 - Alias `@/*` maps to `src/*`.
 

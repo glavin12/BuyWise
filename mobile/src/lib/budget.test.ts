@@ -1,30 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { budgetProgress, budgetStatusText, closestToLimit, copyBudgets, copySummary, isArchivedBudget, readyToAssign, unbudgetedCategories } from "./budget.ts";
+import { budgetProgress, budgetStatusText, copyBudgets, copySummary, isArchivedBudget, readyToAssign, unbudgetedCategories } from "./budget.ts";
 import type { BudgetCopyItem } from "./ledger.ts";
-import type { Budget, Category } from "./types";
+import type { Category } from "./types";
 
 function category(id: string, name: string, extra: Partial<Category> = {}): Category {
   return { id, name, type: "expense", icon: null, color: null, is_active: true, created_at: null, updated_at: null, ...extra };
-}
-
-function budget(id: string, category: string, extra: Partial<Budget> = {}): Budget {
-  return {
-    id,
-    category_id: id,
-    category,
-    month: 9,
-    year: 2026,
-    budgeted_amount: 100000,
-    display_budgeted_amount: 1000,
-    spent: 0,
-    display_spent: 0,
-    remaining: 100000,
-    display_remaining: 1000,
-    percent_used: 0,
-    ...extra,
-  };
 }
 
 const item = (id: string): BudgetCopyItem => ({ category_id: id, category: id, budgeted_amount: 1000 });
@@ -66,19 +48,6 @@ test("unbudgetedCategories is active expense categories without a budget", () =>
   ];
   assert.deepEqual(unbudgetedCategories(cats, [{ category_id: "rent" }]).map((c) => c.id), ["food"]);
   assert.deepEqual(unbudgetedCategories(cats, []).map((c) => c.id), ["food", "rent"]);
-});
-
-test("closestToLimit: top N by percent_used, skipping rows with nothing to divide by", () => {
-  const rows = [
-    budget("a", "Food", { percent_used: 40 }),
-    budget("b", "Rent", { percent_used: 120 }),
-    budget("c", "Fun", { percent_used: null, budgeted_amount: 0 }),
-    budget("d", "Bills", { percent_used: 80 }),
-    budget("e", "Travel", { percent_used: 10 }),
-  ];
-  assert.deepEqual(closestToLimit(rows, 3).map((b) => b.id), ["b", "d", "a"]);
-  assert.equal(closestToLimit(rows, 3).length, 3);
-  assert.deepEqual(closestToLimit([], 3), []);
 });
 
 test("isArchivedBudget: a budget whose category is not in the active list", () => {

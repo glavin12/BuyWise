@@ -10,10 +10,10 @@ import {
 import { useState } from "react";
 
 import { api } from "./api";
-import { monthKey, monthShift, type MonthYear } from "./dates";
+import { monthKey, monthShift, type DateRange, type MonthYear } from "./dates";
 import { findInPages, planBudgetCopy } from "./ledger";
 import { suggestedCategory, type PickedCategory } from "./transactionForm";
-import type { CategoryType, Goal, TransactionType, TransactionsResponse } from "./types";
+import type { CategoryType, Goal, Transaction, TransactionType, TransactionsResponse } from "./types";
 
 // Every query the app makes is declared here, and every screen reads server data
 // through these options or the hooks below, never through `api` directly. The
@@ -55,6 +55,20 @@ export const recentTransactionsQuery = queryOptions({
   queryKey: ["transactions", "recent"],
   queryFn: () => api.listTransactions({ limit: 3 }),
 });
+
+/** Every expense from date_from to date_to, all pages (Home's Spend Pulse week; the API caps a page at 100). */
+export const expensesInRangeQuery = (range: DateRange) =>
+  queryOptions({
+    queryKey: ["transactions", "expenses", range],
+    queryFn: async () => {
+      const rows: Transaction[] = [];
+      for (let offset = 0; ; offset += 100) {
+        const page = await api.listTransactions({ transaction_type: "expense", ...range, limit: 100, offset });
+        rows.push(...page.transactions);
+        if (page.count === 0 || offset + page.limit >= page.total) return rows;
+      }
+    },
+  });
 
 export const transactionsListQuery = (filters: TransactionFilters) =>
   infiniteQueryOptions({

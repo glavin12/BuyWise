@@ -16,6 +16,7 @@ const CHIP = {
   card: { bg: colors.card, fg: colors.text, border: undefined },
   lavender: { bg: colors.lavender, fg: colors.ink, border: undefined }, // category tag
   translucent: { bg: "transparent", fg: colors.text, border: undefined }, // legend on a colour card
+  peri: { bg: colors.peri2, fg: "#FFFFFF", border: undefined }, // dropdown on the peri card
   outlined: { bg: "transparent", fg: colors.ink, border: colors.ink }, // on cream / colour
   outlinedDark: { bg: "transparent", fg: colors.text, border: colors.line }, // on charcoal
 } as const;

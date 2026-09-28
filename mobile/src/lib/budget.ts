@@ -43,14 +43,6 @@ export function budgetStatusText(progress: BudgetProgress, money: (minor: number
   return progress.usedPercent === null ? head : `${head} · ${progress.usedPercent}% used`;
 }
 
-/** The `count` budgets furthest through their limit (by `percent_used`, highest first); a row with nothing to divide by (no budget, or no spend yet) is skipped. */
-export function closestToLimit(budgets: readonly Budget[], count: number): Budget[] {
-  return budgets
-    .filter((b) => b.budgeted_amount > 0 && b.percent_used !== null)
-    .sort((a, b) => (b.percent_used as number) - (a.percent_used as number))
-    .slice(0, count);
-}
-
 /** Active expense categories that have no budget yet this month. */
 export function unbudgetedCategories(categories: readonly Category[], budgets: readonly Pick<Budget, "category_id">[]): Category[] {
   const budgeted = new Set(budgets.map((budget) => budget.category_id));

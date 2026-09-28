@@ -3,22 +3,6 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { Text } from "./Text";
 import { theme } from "./theme";
 
-/** Round button showing the user's initial (opens the Profile tab from the Dashboard). */
-export function Avatar({ label, onPress }: { label: string; onPress: () => void }) {
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel="Open profile"
-      style={({ pressed }) => [styles.avatar, pressed && styles.pressed]}
-    >
-      <Text variant="heading" tone="onAccent">
-        {(label.trim()[0] ?? "?").toUpperCase()}
-      </Text>
-    </Pressable>
-  );
-}
-
 /** Wrapping pill choices where the value is optional: tapping the selected one clears it. */
 export function Chips<T extends string>({
   label,
@@ -92,15 +76,6 @@ export function Segmented<T extends string>({
 }
 
 const styles = StyleSheet.create({
-  avatar: {
-    width: theme.minHit,
-    height: theme.minHit,
-    borderRadius: theme.radius.pill,
-    backgroundColor: theme.color.accent,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  pressed: { opacity: 0.75 },
   track: {
     flexDirection: "row",
     padding: theme.space.xs,

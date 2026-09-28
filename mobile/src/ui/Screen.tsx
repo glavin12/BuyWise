@@ -17,7 +17,7 @@ import { useOnline } from "@/lib/network";
 import { useTabBarSpace } from "./TabBar";
 import { Text } from "./Text";
 import { theme } from "./theme";
-import { colors } from "./tokens";
+import { colors, space } from "./tokens";
 
 export type ScreenProps = {
   children: ReactNode;
@@ -92,12 +92,12 @@ export function Screen({
     ) : null;
 
   const body = scroll ? (
-    <ScrollBody onRefresh={onRefresh} refreshing={refreshing} bottom={tabBar ? barSpace : 0}>
+    <ScrollBody onRefresh={onRefresh} refreshing={refreshing} bottom={tabBar ? barSpace : 0} v3={!!surface}>
       {children}
     </ScrollBody>
   ) : (
-    <View style={[styles.scrollContent, styles.fill]}>
-      <View style={styles.column}>{children}</View>
+    <View style={[styles.scrollContent, surface && styles.v3Content, styles.fill]}>
+      <View style={[styles.column, surface && styles.v3Column]}>{children}</View>
     </View>
   );
 
@@ -126,11 +126,14 @@ function ScrollBody({
   onRefresh,
   refreshing,
   bottom,
+  v3,
 }: {
   children: ReactNode;
   onRefresh?: () => void;
   refreshing: boolean;
   bottom: number;
+  /** Design v3 spacing (18 side, 8 top, 12 between blocks) and a light spinner for the dark surfaces. */
+  v3: boolean;
 }) {
   const ref = useRef<ScrollView>(null);
   useScrollToTop(ref); // N7: tapping the tab you're on scrolls it back to the top (a no-op outside the tabs)
@@ -138,11 +141,11 @@ function ScrollBody({
   return (
     <ScrollView
       ref={ref}
-      contentContainerStyle={[styles.scrollContent, bottom > 0 && { paddingBottom: bottom }]}
+      contentContainerStyle={[styles.scrollContent, v3 && styles.v3Content, bottom > 0 && { paddingBottom: bottom }]}
       keyboardShouldPersistTaps="handled" // F2: a tap outside the field dismisses the keyboard
-      refreshControl={onRefresh ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} /> : undefined}
+      refreshControl={onRefresh ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={v3 ? colors.text : undefined} colors={v3 ? [colors.ink] : undefined} progressBackgroundColor={v3 ? colors.cream : undefined} /> : undefined}
     >
-      <View style={styles.column}>{children}</View>
+      <View style={[styles.column, v3 && styles.v3Column]}>{children}</View>
     </ScrollView>
   );
 }
@@ -160,4 +163,6 @@ const styles = StyleSheet.create({
   backButton: { marginLeft: -theme.space.xs },
   scrollContent: { flexGrow: 1, alignItems: "center", padding: theme.space.lg },
   column: { flexGrow: 1, width: "100%", maxWidth: theme.maxContentWidth, gap: theme.space.lg },
+  v3Content: { paddingHorizontal: space.screenX, paddingTop: space.screenTop },
+  v3Column: { gap: space.lg },
 });
