@@ -100,6 +100,7 @@ export const extra = {
   mutedOnSage: '#5A564D',   // Goals dial "of ₹80,000 · 67%"
   errorOnCream: '#B3261E',  // ours: form errors on a cream sheet (the design draws none; tomato is too light for text)
   trackOnColour: 'rgba(22,22,22,0.14)', // progress track on a colour card
+  trackOnDark: 'rgba(243,241,234,0.16)', // ours: that track on the over-budget envelope
   envelopeDark: '#2B2B2E',  // the over-budget envelope tab
   envelopeShadow: 'rgba(0,0,0,0.12)',
 } as const;

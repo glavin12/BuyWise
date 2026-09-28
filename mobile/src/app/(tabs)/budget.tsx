@@ -4,7 +4,7 @@ import { ArrowUpRight, Copy, Plus, RotateCw } from "lucide-react-native";
 import { useState } from "react";
 
 import { userMessage } from "@/lib/api";
-import { budgetProgress, copySummary, envelopesFor, envelopeStatus, frontEnvelope, readyToAssign } from "@/lib/budget";
+import { budgetProgress, copySummary, envelopesFor, envelopeStack, envelopeStatus, readyToAssign } from "@/lib/budget";
 import { currentMonth, monthKey, monthShift, type MonthYear } from "@/lib/dates";
 import { formatMinor, formatMonth, formatMonthShort } from "@/lib/format";
 import { wholeIfRound } from "@/lib/home";
@@ -42,7 +42,8 @@ import {
 // Budget (design/screens/05-budget.png, values from design/reference-html/Budget.html): title and
 // month pill, the "ready to assign" card with "Copy <last month>", then the envelope stack. Behind
 // the front card: every budget, then unbudgeted categories spent in this month, then "+N more".
-// The front card is the envelope picked (the most spent at first); the tab bar is marigold here.
+// The front card is the most spent at first; tapping a tab swaps it in like a wallet card (it keeps
+// its colour, and the tab bar takes it) and sends the old front to the end, above "+N more".
 
 const MONTHS_AHEAD = 3;
 const MONTHS_BACK = 11;
@@ -51,7 +52,7 @@ export default function BudgetTab() {
   const router = useRouter();
   const now = currentMonth();
   const [period, setPeriod] = useState<MonthYear>(now);
-  const [picked, setPicked] = useState<string | null>(null);
+  const [tapped, setTapped] = useState<string[]>([]);
   const [sheet, setSheet] = useState<"month" | "more" | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [copyResult, setCopyResult] = useState<{ tone: "info" | "warning"; message: string } | null>(null);
@@ -73,8 +74,9 @@ export default function BudgetTab() {
   const activeIds = expenseCategories ? new Set(expenseCategories.filter((c) => c.is_active).map((c) => c.id)) : null;
   const ready = rows && income.data ? readyToAssign(income.data.income, rows) : null;
   const { envelopes, rest } = rows ? envelopesFor(rows, spending.data ?? [], expenseCategories) : { envelopes: [], rest: [] };
-  const front = frontEnvelope(envelopes, picked);
-  const behind = envelopes.filter((e) => e !== front);
+  const { front, behind } = envelopeStack(envelopes, tapped);
+  const frontKind = front ? envelopeStatus(front, money).kind : undefined;
+  const dark = frontKind === "over"; // the charcoal card: light text on it
   const previous = monthShift(period.month, period.year, -1);
 
   const months = Array.from({ length: MONTHS_AHEAD + 1 + MONTHS_BACK }, (_, i) => monthShift(now.month, now.year, MONTHS_AHEAD - i));
@@ -153,7 +155,7 @@ export default function BudgetTab() {
       : "";
 
   const progress = front?.budget ? budgetProgress(front.budget) : null;
-  const goals = <SecondaryButton label="Your goals →" onPress={() => router.push("/goals")} />;
+  const goals = <SecondaryButton label="Your goals →" surface={dark ? "dark" : "light"} onPress={() => router.push("/goals")} />;
 
   return (
     <Screen surface="peri" tabBar bleed onRefresh={refresh} refreshing={refreshing}>
@@ -189,12 +191,13 @@ export default function BudgetTab() {
             key={e.categoryId}
             name={e.name}
             status={envelopeStatus(e, money)}
-            onPress={() => setPicked(e.categoryId)}
+            onPress={() => setTapped((ids) => [...ids.filter((id) => id !== e.categoryId), e.categoryId])}
             onSet={e.budget ? undefined : () => openSet(e.categoryId)}
           />
         ))}
         {rest.length > 0 ? (
           <EnvelopeTab
+            key="more"
             name={`+${rest.length} more`}
             status={{ kind: "more", text: "not budgeted" }}
             onPress={() => setSheet("more")}
@@ -202,7 +205,7 @@ export default function BudgetTab() {
           />
         ) : null}
 
-        <EnvelopeFront>
+        <EnvelopeFront key={front?.categoryId ?? "none"} kind={frontKind}>
           {!rows ? (
             budgets.isError ? (
               <>
@@ -221,11 +224,16 @@ export default function BudgetTab() {
             <>
               <Row justify="between" align="start">
                 <Stack grow>
-                  <Title size="titleXL" tone="ink">
+                  <Title size="titleXL" tone={dark ? "text" : "ink"}>
                     {front.name}
                   </Title>
                 </Stack>
-                <CircleButton icon={ArrowUpRight} variant="ink" label={`${front.name} in Activity`} onPress={() => openActivity(front.categoryId)} />
+                <CircleButton
+                  icon={ArrowUpRight}
+                  variant={dark ? "cream" : "ink"}
+                  label={`${front.name} in Activity`}
+                  onPress={() => openActivity(front.categoryId)}
+                />
               </Row>
               <Row gap="xs" wrap>
                 <Chip dot="tomato" label={`${money(front.spent)} spent`} />
@@ -239,9 +247,14 @@ export default function BudgetTab() {
                   percent={progress.barPercent}
                   tooltip={progress.usedPercent === null ? undefined : `${progress.usedPercent}%`}
                   label={`${front.name}: ${progress.usedPercent ?? 100}% of the budget used`}
+                  tone={dark ? "text" : "ink"}
                 />
               ) : null}
-              <BudgetedLine amount={front.budget ? money(front.budget.budgeted_amount) : null} onPress={() => openSet(front.categoryId)} />
+              <BudgetedLine
+                amount={front.budget ? money(front.budget.budgeted_amount) : null}
+                onPress={() => openSet(front.categoryId)}
+                tone={dark ? "text" : "ink"}
+              />
               <Row justify="center">
                 <Illustration name="budget_plate" width={300} />
               </Row>
@@ -268,7 +281,7 @@ export default function BudgetTab() {
         value={monthKey(period.month, period.year)}
         onSelect={(key) => {
           setPeriod(months.find((m) => monthKey(m.month, m.year) === key) ?? now);
-          setPicked(null);
+          setTapped([]);
           setCopyResult(null);
           setSheet(null);
         }}

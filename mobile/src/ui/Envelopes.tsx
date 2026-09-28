@@ -1,26 +1,33 @@
 import { Check, Pencil } from "lucide-react-native";
 import type { ReactNode } from "react";
 import { StyleSheet, Text as RNText, View } from "react-native";
+import Animated, { FadeInDown, FadeInUp, LinearTransition } from "react-native-reanimated";
 
 import type { EnvelopeStatus } from "@/lib/budget";
 
 import { PressableScale } from "./PressableScale";
 import { Skeleton } from "./Skeleton";
-import { useTabBarSpace } from "./TabBar";
-import { colors, extra, fonts, radius, type } from "./tokens";
+import { useTabBarSpace, useTabSurface, type TabSurface } from "./TabBar";
+import { colors, extra, fonts, motion, radius, type } from "./tokens";
 
 // The Budget envelope stack (DESIGN.md §3 `EnvelopeStack`, values from design/reference-html/Budget.html):
 // tabs overlap by 22 with a top radius of 24, and the front card (radius 26, marigold) runs to the
-// bottom of the screen under the tab bar's marigold fade. A tab's colour says its state, and its
-// words say it too.
+// bottom of the screen under the tab bar's fade. A card's colour says its state, and its words say
+// it too. Like cards in a wallet, a card keeps its colour when it comes to the front (the tab bar
+// fade follows it); in progress is marigold, the design's front card.
 
 const TAB = {
-  done: { bg: colors.tomato, fg: colors.ink, status: colors.ink },
-  over: { bg: extra.envelopeDark, fg: colors.text, status: colors.tomato },
-  progress: { bg: colors.sky, fg: colors.ink, status: colors.ink },
-  unset: { bg: colors.mint, fg: colors.ink, status: colors.forest },
-  more: { bg: colors.lavender, fg: colors.ink, status: colors.ink },
-} as const;
+  done: { bg: colors.tomato, fg: colors.ink, status: colors.ink, bar: "tomato" },
+  over: { bg: extra.envelopeDark, fg: colors.text, status: colors.tomato, bar: "envelopeDark" },
+  progress: { bg: colors.marigold, fg: colors.ink, status: colors.ink, bar: "marigold" },
+  unset: { bg: colors.mint, fg: colors.ink, status: colors.forest, bar: "mint" },
+  more: { bg: colors.lavender, fg: colors.ink, status: colors.ink, bar: "marigold" },
+} as const satisfies Record<EnvelopeStatus["kind"], { bar: TabSurface } & Record<"bg" | "fg" | "status", string>>;
+
+// The swap: tabs slide to their new places, the old front rises into the tabs, the new one drops in.
+const SHIFT = LinearTransition.duration(motion.dur.base);
+const RISE = FadeInDown.duration(motion.dur.base);
+const DROP = FadeInUp.duration(motion.dur.enter).withInitialValues({ opacity: 1, transform: [{ translateY: -32 }] });
 
 /** The cream "READY TO ASSIGN" card: the amount (a placeholder while it loads), a line under it, an action on the right. */
 export function ReadyCard({ amount, line, action }: { amount: string | null; line: string; action: ReactNode }) {
@@ -64,47 +71,60 @@ export function EnvelopeTab({
 }) {
   const look = TAB[status.kind];
   return (
-    <PressableScale
-      onPress={onPress}
-      scaleTo={1}
-      accessibilityLabel={`${name}, ${status.text}`}
-      accessibilityHint="Shows this envelope"
-      accessibilityActions={onSet ? [{ name: "set", label: "Set a budget" }] : undefined}
-      onAccessibilityAction={(e) => {
-        if (e.nativeEvent.actionName === "set") onSet?.();
-      }}
-      style={[styles.tab, { backgroundColor: look.bg }]}
-    >
-      <RNText style={[type.cardTitle, styles.tabName, { color: look.fg }]} numberOfLines={1}>
-        {name}
-      </RNText>
-      <View style={styles.status}>
-        <RNText style={[styles.statusText, { color: look.status }, status.kind === "over" && styles.bold]} numberOfLines={1}>
-          {status.text}
+    <Animated.View layout={SHIFT} entering={RISE} style={[styles.tab, { backgroundColor: look.bg }]}>
+      <PressableScale
+        onPress={onPress}
+        scaleTo={1}
+        accessibilityLabel={`${name}, ${status.text}`}
+        accessibilityHint="Shows this envelope"
+        accessibilityActions={onSet ? [{ name: "set", label: "Set a budget" }] : undefined}
+        onAccessibilityAction={(e) => {
+          if (e.nativeEvent.actionName === "set") onSet?.();
+        }}
+        style={styles.tabRow}
+      >
+        <RNText style={[type.cardTitle, styles.tabName, { color: look.fg }]} numberOfLines={1}>
+          {name}
         </RNText>
-        {status.kind === "done" ? (
-          <View style={styles.check}>
-            <Check size={13} color={colors.cream} strokeWidth={3} />
-          </View>
-        ) : null}
-        {onSet ? (
-          <PressableScale onPress={onSet} hitSlop={8} importantForAccessibility="no" accessibilityElementsHidden style={styles.set}>
-            <RNText style={styles.setText}>Set</RNText>
-          </PressableScale>
-        ) : null}
-      </View>
-    </PressableScale>
+        <View style={styles.status}>
+          <RNText style={[styles.statusText, { color: look.status }, status.kind === "over" && styles.bold]} numberOfLines={1}>
+            {status.text}
+          </RNText>
+          {status.kind === "done" ? (
+            <View style={styles.check}>
+              <Check size={13} color={colors.cream} strokeWidth={3} />
+            </View>
+          ) : null}
+          {onSet ? (
+            <PressableScale onPress={onSet} hitSlop={8} importantForAccessibility="no" accessibilityElementsHidden style={styles.set}>
+              <RNText style={styles.setText}>Set</RNText>
+            </PressableScale>
+          ) : null}
+        </View>
+      </PressableScale>
+    </Animated.View>
   );
 }
 
-/** The front envelope: marigold, down to the bottom of the screen, its content clear of the tab bar. */
-export function EnvelopeFront({ children }: { children: ReactNode }) {
+/**
+ * The front envelope in its state's colour (marigold with none), down to the bottom of the screen,
+ * its content clear of the tab bar, which takes the same colour. Key it by envelope so a swap drops it in.
+ */
+export function EnvelopeFront({ kind = "progress", children }: { kind?: EnvelopeStatus["kind"]; children: ReactNode }) {
   const barSpace = useTabBarSpace();
-  return <View style={[styles.front, { paddingBottom: barSpace }]}>{children}</View>;
+  useTabSurface("budget", TAB[kind].bar);
+  return (
+    <Animated.View entering={DROP} style={[styles.front, { paddingBottom: barSpace, backgroundColor: TAB[kind].bg }]}>
+      {children}
+    </Animated.View>
+  );
 }
 
-/** "budgeted ₹8,000 ✎" with the amount dotted-underlined, or "not budgeted · set a budget ✎". Opens the Set screen. */
-export function BudgetedLine({ amount, onPress }: { amount: string | null; onPress: () => void }) {
+/**
+ * "budgeted ₹8,000 ✎" with the amount dotted-underlined, or "not budgeted · set a budget ✎". Opens the Set screen.
+ * `tone` text on the dark (over budget) card.
+ */
+export function BudgetedLine({ amount, onPress, tone = "ink" }: { amount: string | null; onPress: () => void; tone?: "ink" | "text" }) {
   return (
     <PressableScale
       onPress={onPress}
@@ -112,9 +132,9 @@ export function BudgetedLine({ amount, onPress }: { amount: string | null; onPre
       hitSlop={8}
       style={styles.budgeted}
     >
-      <RNText style={styles.budgetedText}>{amount ? "budgeted " : "not budgeted · "}</RNText>
-      <RNText style={[styles.budgetedText, styles.bold, styles.dotted]}>{amount ?? "set a budget"}</RNText>
-      <Pencil size={14} color={colors.ink} strokeWidth={2.3} />
+      <RNText style={[styles.budgetedText, { color: colors[tone] }]}>{amount ? "budgeted " : "not budgeted · "}</RNText>
+      <RNText style={[styles.budgetedText, styles.bold, styles.dotted, { color: colors[tone] }]}>{amount ?? "set a budget"}</RNText>
+      <Pencil size={14} color={colors[tone]} strokeWidth={2.3} />
     </PressableScale>
   );
 }
@@ -146,6 +166,10 @@ const styles = StyleSheet.create({
   tab: {
     ...shadow,
     marginTop: -22,
+    borderTopLeftRadius: radius.card,
+    borderTopRightRadius: radius.card,
+  },
+  tabRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -153,8 +177,6 @@ const styles = StyleSheet.create({
     paddingTop: 14,
     paddingHorizontal: 18,
     paddingBottom: 34,
-    borderTopLeftRadius: radius.card,
-    borderTopRightRadius: radius.card,
   },
   tabName: { flexShrink: 1 },
   status: { flexDirection: "row", alignItems: "center", gap: 8 },
@@ -174,7 +196,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     borderTopLeftRadius: radius.cardLg,
     borderTopRightRadius: radius.cardLg,
-    backgroundColor: colors.marigold,
   },
   budgeted: { flexDirection: "row", alignItems: "center", alignSelf: "flex-start", gap: 6 },
   budgetedText: { fontFamily: fonts.mono, fontSize: 11, color: colors.ink },

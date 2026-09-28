@@ -6,6 +6,7 @@ import {
   copyBudgets,
   copySummary,
   envelopesFor,
+  envelopeStack,
   envelopeStatus,
   frontEnvelope,
   readyToAssign,
@@ -114,6 +115,17 @@ test("frontEnvelope: the picked one, else the most spent", () => {
   assert.equal(frontEnvelope(envelopes, "a")?.categoryId, "a");
   assert.equal(frontEnvelope(envelopes, "gone")?.categoryId, "b");
   assert.equal(frontEnvelope([], null), undefined);
+});
+
+test("envelopeStack: a tapped card comes to the front, the old front goes to the end of the tabs", () => {
+  const { envelopes } = envelopesFor([budget("rent", 100, 10), budget("food", 100, 90), budget("bus", 100, 20), budget("fuel", 100, 5)], [], []);
+  const ids = (s: ReturnType<typeof envelopeStack>) => [s.behind.map((e) => e.categoryId), s.front?.categoryId];
+  assert.deepEqual(ids(envelopeStack(envelopes, [])), [["rent", "bus", "fuel"], "food"]); // most spent in front
+  assert.deepEqual(ids(envelopeStack(envelopes, ["bus"])), [["rent", "fuel", "food"], "bus"]);
+  assert.deepEqual(ids(envelopeStack(envelopes, ["bus", "rent"])), [["fuel", "food", "bus"], "rent"]);
+  assert.deepEqual(ids(envelopeStack(envelopes, ["bus", "rent", "food"])), [["fuel", "bus", "rent"], "food"]);
+  assert.deepEqual(ids(envelopeStack(envelopes, ["gone", "bus"])), [["rent", "fuel", "food"], "bus"]); // an envelope no longer there is ignored
+  assert.deepEqual(ids(envelopeStack([], ["bus"])), [[], undefined]);
 });
 
 test("envelopeStatus says the state in words", () => {

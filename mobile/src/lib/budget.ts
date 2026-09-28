@@ -87,6 +87,19 @@ export function frontEnvelope(envelopes: readonly Envelope[], pickedId: string |
   return envelopes.find((e) => e.categoryId === pickedId) ?? envelopes.reduce<Envelope | undefined>((best, e) => (!best || e.spent > best.spent ? e : best), undefined);
 }
 
+/**
+ * The stack like cards in a wallet: `tapped` is the envelopes tapped so far, oldest first. A
+ * tapped card comes to the front and the one it replaces goes to the end of the tabs (above
+ * "+N more"). Untapped envelopes keep `envelopes` order at the top; with no taps the most spent
+ * is in front.
+ */
+export function envelopeStack(envelopes: readonly Envelope[], tapped: readonly string[]): { front?: Envelope; behind: Envelope[] } {
+  const moved = tapped.flatMap((id) => envelopes.find((e) => e.categoryId === id) ?? []);
+  const first = frontEnvelope(envelopes, null);
+  const order = [...envelopes.filter((e) => e !== first && !moved.includes(e)), ...(first && !moved.includes(first) ? [first] : []), ...moved];
+  return { front: order.at(-1), behind: order.slice(0, -1) };
+}
+
 export type EnvelopeStatus = { kind: "done" | "over" | "progress" | "unset" | "more"; text: string };
 
 /**
