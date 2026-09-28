@@ -1,7 +1,7 @@
 // Screens import UI from here. The theme and tokens are deliberately not exported:
 // only the primitives in this folder may read visual tokens.
 export { Amount } from "./Amount";
-export { AmountInput } from "./AmountInput";
+export { AmountInput, EntryAmount } from "./AmountInput";
 export { AppShell } from "./AppShell";
 export { Banner } from "./Banner";
 export { Button } from "./Button";
@@ -22,9 +22,8 @@ export { Row, Stack } from "./Layout";
 export { MonthSwitcher } from "./MonthSwitcher";
 export { quickAddSheetOptions, sheetScreenOptions, stackScreenOptions } from "./navigation";
 export { PayeeEditor } from "./PayeeEditor";
-export { PickerList, type PickerItem } from "./PickerList";
+export { Overlaid, PickerList, type PickerItem } from "./PickerList";
 export { ProgressBar } from "./ProgressBar";
-export { ProgressRing } from "./ProgressRing";
 export { goBack, Screen } from "./Screen";
 export { SectionedList } from "./SectionedList";
 export { SectionHeader } from "./SectionHeader";
@@ -42,13 +41,17 @@ export { ChatThread } from "./ChatThread";
 export { ConversationRow } from "./ConversationRow";
 export { Markdown } from "./Markdown";
 // Design v3 kit (DESIGN.md §3). Screens pass lucide-react-native icons to it.
-export { DayHeader, HeroAmount, IconTile, MiniTile, Note, Panel, SectionLabel, Title, TxRow } from "./Blocks";
-export { CategoryTile, categoryTone } from "./CategoryTile";
+export { DayHeader, GoalTile, HeroAmount, IconTile, Meter, MiniTile, Note, Panel, SectionLabel, Title, TxRow } from "./Blocks";
+export { CategoryChoice, CategoryTile, categoryTone, DashedChoice } from "./CategoryTile";
 export { AreaChart, PulseBubbles, type PulseDay } from "./SpendPulse";
-export { CircleButton, PrimaryButton, SecondaryButton } from "./Buttons";
-export { Chip, InlineChip, Pill, RichText, type ChipVariant, type Hue } from "./Chips";
+export { CircleButton, Fab, PillButton, PrimaryButton, SecondaryButton } from "./Buttons";
+export { Chip, InlineChip, Pill, RichText, Toggle, type ChipVariant, type Hue } from "./Chips";
+export { DateChip } from "./DateChip";
+export { Dial } from "./Dial";
+export { BudgetedLine, EnvelopeFront, EnvelopeStack, EnvelopeTab, ReadyCard } from "./Envelopes";
+export { FieldButton, FieldInput } from "./Field";
 export { Illustration, type IllustrationName } from "./Illustration";
-export { OptionSheet, type OptionGroup } from "./OptionSheet";
+export { OptionSheet, Sheet, SheetHandle, type OptionGroup } from "./OptionSheet";
 export { PressableScale } from "./PressableScale";
 export { SearchField } from "./SearchField";
 export { TabBar } from "./TabBar";

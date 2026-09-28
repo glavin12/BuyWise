@@ -11,6 +11,10 @@ export const METHOD_LABEL: Record<PaymentMethod, string> = {
 
 export const PAYMENT_METHODS = Object.keys(METHOD_LABEL) as PaymentMethod[];
 
+/** QuickAdd's method chips, in the design's order and with its short "Bank". */
+export const QUICK_METHODS: readonly PaymentMethod[] = ["upi", "cash", "card", "bank_transfer", "other"];
+export const METHOD_CHIP: Record<PaymentMethod, string> = { ...METHOD_LABEL, bank_transfer: "Bank" };
+
 export const TYPE_LABEL: Record<TransactionType, string> = {
   expense: "Expense",
   income: "Income",

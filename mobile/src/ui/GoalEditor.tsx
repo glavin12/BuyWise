@@ -40,6 +40,7 @@ export function GoalEditor({
   errors,
   formError,
   primary,
+  danger,
 }: {
   title: string;
   draft: GoalDraft;
@@ -54,6 +55,8 @@ export function GoalEditor({
   errors: GoalErrors;
   formError: string | null;
   primary: { label: string; onPress: () => Promise<unknown>; disabled?: boolean };
+  /** A destructive action under the save button (Edit: "Archive goal"). */
+  danger?: { label: string; onPress: () => Promise<unknown> };
 }) {
   const [pickingCategory, setPickingCategory] = useState(false);
   const categoryName =
@@ -143,6 +146,7 @@ export function GoalEditor({
           />
 
           <Button title={primary.label} onPress={primary.onPress} disabled={primary.disabled} requiresNetwork />
+          {danger ? <Button title={danger.label} variant="danger" onPress={danger.onPress} requiresNetwork /> : null}
         </Screen>
       </View>
 

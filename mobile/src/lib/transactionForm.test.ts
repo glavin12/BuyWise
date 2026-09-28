@@ -4,10 +4,12 @@ import { test } from "node:test";
 import {
   afterSaveAndAddAnother,
   applyPatch,
+  defaultMethod,
   draftFromTransaction,
   editPatch,
   emptyDraft,
   isDirty,
+  quickCategories,
   suggestedCategory,
   switchType,
   toCreatePayload,
@@ -176,4 +178,21 @@ test("suggestedCategory only pre-fills a still-active category of the current ty
   assert.equal(suggestedCategory({ category_id: FOOD.id, transaction_type: "income" }, active, "expense"), null); // other type
   assert.equal(suggestedCategory({ category_id: null, transaction_type: "expense" }, active, "expense"), null);
   assert.equal(suggestedCategory(undefined, active, "expense"), null); // payee never used
+});
+
+test("quickCategories: the most used first, with the chosen one always in the row", () => {
+  const cats = ["a", "b", "c", "d", "e", "f"].map((id) => ({ id }));
+  const usage = new Map([["e", 9], ["c", 3]]);
+  const ids = (list: { id: string }[]) => list.map((c) => c.id);
+  assert.deepEqual(ids(quickCategories(cats, usage, null)), ["e", "c", "a", "b"]); // ties keep list order
+  assert.deepEqual(ids(quickCategories(cats, usage, "a")), ["e", "c", "a", "b"]); // already there: nothing moves
+  assert.deepEqual(ids(quickCategories(cats, usage, "f")), ["f", "e", "c", "a"]);
+  assert.deepEqual(ids(quickCategories(cats, usage, "gone")), ["e", "c", "a", "b"]);
+  assert.deepEqual(ids(quickCategories(cats.slice(0, 2), new Map(), "b")), ["a", "b"]);
+});
+
+test("defaultMethod: the newest transaction's method, UPI with no history", () => {
+  assert.equal(defaultMethod({ payment_method: "cash" }), "cash");
+  assert.equal(defaultMethod({ payment_method: null }), null);
+  assert.equal(defaultMethod(undefined), "upi");
 });

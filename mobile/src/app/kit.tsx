@@ -1,7 +1,21 @@
 import { Redirect } from "expo-router";
-import { ArrowLeft, Bell, Calendar, Check, Fuel, History, Pencil, Plus, Search, ShoppingBag, Smartphone, Sparkles, Utensils } from "lucide-react-native";
+import { ArrowLeft, Bell, Calendar, Check, Copy, Fuel, History, LayoutGrid, Pencil, Plane, Plus, Search, ShoppingBag, Smartphone, Sparkles, User, Utensils } from "lucide-react-native";
+import { useState } from "react";
 
+import { todayLocal } from "@/lib/dates";
 import {
+  BudgetedLine,
+  CategoryChoice,
+  DashedChoice,
+  DateChip,
+  Dial,
+  EnvelopeTab,
+  FieldButton,
+  GoalTile,
+  Meter,
+  PillButton,
+  ReadyCard,
+  Toggle,
   Chip,
   CircleButton,
   goBack,
@@ -22,6 +36,9 @@ import {
 // Dev-only gallery of the design v3 kit (DESIGN.md §3) and illustrations (§2), to check
 // against design/screens/*.png. Opened from Profile → "Design kit" in development builds.
 export default function KitScreen() {
+  const [kind, setKind] = useState<"expense" | "income">("expense");
+  const [view, setView] = useState<"active" | "completed">("active");
+  const [date, setDate] = useState(todayLocal);
   if (!__DEV__) return <Redirect href="/" />;
   const tap = (what: string) => () => showToast(what);
 
@@ -129,6 +146,53 @@ export default function KitScreen() {
           <Chip label="Checked Food & Dining · 14 orders" variant="outlined" icon={Sparkles} />
         </Stack>
       </Panel>
+
+      <Title size="cardTitle">Quick add</Title>
+      <Panel color="cream">
+        <Stack gap="md">
+          <Toggle options={[{ label: "Expense", value: "expense" }, { label: "Income", value: "income" }] as const} value={kind} onChange={setKind} />
+          <Chip variant="mint" icon={Sparkles} label="Swiggy → Food, like last time" />
+          <Row justify="between" align="start">
+            <CategoryChoice name="Food" selected onPress={tap("food")} />
+            <CategoryChoice name="Groceries" selected={false} onPress={tap("groceries")} />
+            <CategoryChoice name="Fuel" selected={false} onPress={tap("fuel")} />
+            <DashedChoice label="More" icon={LayoutGrid} a11y="More" onPress={tap("more")} />
+          </Row>
+          <FieldButton icon={User} label="Payee" value="Swiggy" placeholder="Add a payee" hint="payee" onPress={tap("payee")} />
+          <Row gap="xs" wrap>
+            <Chip label="UPI" variant="ink" />
+            <Chip label="Cash" variant="outlined" />
+            <DateChip value={date} onChange={setDate} />
+          </Row>
+        </Stack>
+      </Panel>
+
+      <Title size="cardTitle">Budget</Title>
+      <ReadyCard amount="₹4,860" line="₹50,000 in − ₹45,140 assigned" action={<PillButton label="Copy Aug" icon={Copy} onPress={tap("copy")} />} />
+      <Stack gap="xs">
+        <EnvelopeTab name="Rent" status={{ kind: "done", text: "₹18,000 / 18,000" }} onPress={tap("rent")} />
+        <EnvelopeTab name="Groceries" status={{ kind: "over", text: "125% · over ₹1,200" }} onPress={tap("groceries")} />
+        <EnvelopeTab name="Transport" status={{ kind: "unset", text: "not budgeted" }} onPress={tap("transport")} onSet={tap("set")} />
+      </Stack>
+      <Panel color="marigold" large>
+        <Stack gap="md">
+          <Meter height={12} percent={79} tooltip="79%" label="Food budget used" />
+          <BudgetedLine amount="₹8,000" onPress={tap("budgeted")} />
+        </Stack>
+      </Panel>
+
+      <Title size="cardTitle">Goals</Title>
+      <Toggle look="sage" options={[{ label: "Active", value: "active" }, { label: "Achieved", value: "completed" }] as const} value={view} onChange={setView} />
+      <Dial percent={67} title="New iPhone" amount="₹54,000" sub="of ₹80,000 · 67%" label="New iPhone, 67%" />
+      <Row gap="sm">
+        <Chip variant="creamLine" icon={Calendar} label="92 days left" />
+        <CircleButton icon={Pencil} variant="line" size={58} label="Edit" onPress={tap("edit (58)")} />
+        <CircleButton icon={ArrowLeft} variant="sage" label="Back" onPress={tap("back (sage)")} />
+      </Row>
+      <Row align="stretch">
+        <GoalTile icon={Plane} color="sky" title="Goa trip" amounts="₹9K of ₹25K" percent={36} onPress={tap("goa")} />
+        <GoalTile icon={Smartphone} color="mint" title="Emergency fund" amounts="₹40K of ₹1L" percent={40} onPress={tap("fund")} />
+      </Row>
     </Screen>
   );
 }

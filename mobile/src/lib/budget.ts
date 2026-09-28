@@ -4,7 +4,7 @@
 // so `npm test` can run it. Every figure is an integer in minor units.
 
 import type { BudgetCopyItem } from "./ledger.ts";
-import type { Budget, Category } from "./types";
+import type { Budget, Category, CategorySpending } from "./types";
 
 /** Income minus everything assigned to category budgets. Negative means over-assigned. */
 export function readyToAssign(income: number, budgets: readonly Pick<Budget, "budgeted_amount">[]) {
@@ -37,21 +37,78 @@ export function budgetProgress(budget: Pick<Budget, "budgeted_amount" | "spent">
   };
 }
 
-/** "₹1,200 left · 60% used" or "Over by ₹500 · 125% used": the words carry the meaning, colour only reinforces it. */
-export function budgetStatusText(progress: BudgetProgress, money: (minor: number) => string): string {
-  const head = progress.over ? `Over by ${money(progress.overBy)}` : `${money(progress.left)} left`;
-  return progress.usedPercent === null ? head : `${head} · ${progress.usedPercent}% used`;
+/** One envelope on the Budget screen: a category, its budget (null when it has none) and this month's spending. */
+export type Envelope = {
+  categoryId: string;
+  name: string;
+  budget: Budget | null;
+  /** Minor units. */
+  spent: number;
+  count: number;
+  /** The budget's category has since been archived. */
+  archived: boolean;
+};
+
+/**
+ * The Budget screen's envelopes: every budget of the month (in API order), then the unbudgeted
+ * active expense categories that have spending this month, most spent first. `rest` is every
+ * other unbudgeted category (the "N more" tab). Without `categories` (not loaded) only the
+ * budgets are known.
+ */
+export function envelopesFor(
+  budgets: readonly Budget[],
+  spending: readonly CategorySpending[],
+  categories: readonly Category[] | undefined,
+): { envelopes: Envelope[]; rest: Category[] } {
+  const byCategory = new Map(spending.map((row) => [row.category_id, row]));
+  const active = categories ? new Set(categories.filter((c) => c.is_active).map((c) => c.id)) : null;
+  const budgeted = budgets.map((budget) => ({
+    categoryId: budget.category_id,
+    name: budget.category ?? "Unknown category",
+    budget,
+    spent: budget.spent ?? 0,
+    count: byCategory.get(budget.category_id)?.transaction_count ?? 0,
+    archived: active ? !active.has(budget.category_id) : false,
+  }));
+  const open = categories ? unbudgetedCategories(categories, budgets) : [];
+  const spentIn = open
+    .filter((category) => (byCategory.get(category.id)?.amount ?? 0) > 0)
+    .map((category) => {
+      const row = byCategory.get(category.id);
+      return { categoryId: category.id, name: category.name, budget: null, spent: row?.amount ?? 0, count: row?.transaction_count ?? 0, archived: false };
+    })
+    .sort((a, b) => b.spent - a.spent);
+  const shown = new Set(spentIn.map((envelope) => envelope.categoryId));
+  return { envelopes: [...budgeted, ...spentIn], rest: open.filter((category) => !shown.has(category.id)) };
+}
+
+/** The envelope in front: the one picked, else the one with the most spent (the first on a tie). */
+export function frontEnvelope(envelopes: readonly Envelope[], pickedId: string | null): Envelope | undefined {
+  return envelopes.find((e) => e.categoryId === pickedId) ?? envelopes.reduce<Envelope | undefined>((best, e) => (!best || e.spent > best.spent ? e : best), undefined);
+}
+
+export type EnvelopeStatus = { kind: "done" | "over" | "progress" | "unset" | "more"; text: string };
+
+/**
+ * A back tab's state, in words (its colour only reinforces them): "125% · over ₹1,200",
+ * "₹18,000 / 18,000" (done when nothing is left), or "not budgeted".
+ */
+export function envelopeStatus(envelope: Envelope, money: (minor: number) => string): EnvelopeStatus {
+  const { budget } = envelope;
+  if (!budget) return { kind: "unset", text: "not budgeted" };
+  const progress = budgetProgress(budget);
+  if (progress.over) {
+    const over = `over ${money(progress.overBy)}`;
+    return { kind: "over", text: progress.usedPercent === null ? over : `${progress.usedPercent}% · ${over}` };
+  }
+  const text = `${money(envelope.spent)} / ${money(budget.budgeted_amount).replace(/^[^\d]+/, "")}`;
+  return { kind: budget.budgeted_amount > 0 && progress.left === 0 ? "done" : "progress", text };
 }
 
 /** Active expense categories that have no budget yet this month. */
 export function unbudgetedCategories(categories: readonly Category[], budgets: readonly Pick<Budget, "category_id">[]): Category[] {
   const budgeted = new Set(budgets.map((budget) => budget.category_id));
   return categories.filter((category) => category.is_active && category.type === "expense" && !budgeted.has(category.id));
-}
-
-/** A budget whose category has since been deactivated (it is no longer in the active expense list). */
-export function isArchivedBudget(budget: Pick<Budget, "category_id">, activeExpenseIds: ReadonlySet<string>): boolean {
-  return !activeExpenseIds.has(budget.category_id);
 }
 
 export type CopyRun = {

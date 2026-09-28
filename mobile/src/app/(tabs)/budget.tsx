@@ -1,167 +1,85 @@
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
+import { ArrowUpRight, Copy, Plus, RotateCw } from "lucide-react-native";
 import { useState } from "react";
 
 import { userMessage } from "@/lib/api";
-import {
-  budgetProgress,
-  budgetStatusText,
-  copySummary,
-  isArchivedBudget,
-  readyToAssign,
-  unbudgetedCategories,
-} from "@/lib/budget";
-import { currentMonth, monthShift, type MonthYear } from "@/lib/dates";
-import { formatMinor, formatMonth, minorToDisplay } from "@/lib/format";
+import { budgetProgress, copySummary, envelopesFor, envelopeStatus, frontEnvelope, readyToAssign } from "@/lib/budget";
+import { currentMonth, monthKey, monthShift, type MonthYear } from "@/lib/dates";
+import { formatMinor, formatMonth, formatMonthShort } from "@/lib/format";
+import { wholeIfRound } from "@/lib/home";
 import { useCopyBudgets } from "@/lib/mutations";
-import { categoriesQuery, monthBudgetsQuery, monthIncomeQuery, profileQuery, usePlanBudgetCopy } from "@/lib/queries";
-import type { Budget } from "@/lib/types";
+import { categoriesQuery, categorySpendingQuery, monthBudgetsQuery, monthIncomeQuery, profileQuery, usePlanBudgetCopy } from "@/lib/queries";
+import { escapeRich } from "@/lib/richText";
 import { useRefetchStaleOnFocus } from "@/lib/useRefetchStaleOnFocus";
 import {
-  Amount,
   Banner,
-  Button,
-  Card,
-  CategoryIcon,
+  BudgetedLine,
+  Chip,
+  CircleButton,
   confirm,
-  ErrorState,
+  EnvelopeFront,
+  EnvelopeStack,
+  EnvelopeTab,
   hapticSuccess,
-  Icon,
-  MonthSwitcher,
-  ProgressBar,
+  Illustration,
+  Meter,
+  OptionSheet,
+  Pill,
+  PillButton,
+  PrimaryButton,
+  ReadyCard,
+  RichText,
   Row,
   Screen,
+  SecondaryButton,
   Skeleton,
   Stack,
-  Text,
+  Title,
+  type OptionGroup,
 } from "@/ui";
 
-/** One of the three top tiles: an amount once its query has it, else a compact loading/error state. */
-function MoneyTile({
-  label,
-  minor,
-  currency,
-  error,
-  onRetry,
-}: {
-  label: string;
-  minor: number | undefined;
-  currency: string;
-  error: boolean;
-  onRetry: () => void;
-}) {
-  return (
-    <Card grow>
-      <Text variant="caption" tone="muted">
-        {label}
-      </Text>
-      {minor !== undefined ? (
-        <Amount variant="heading" value={minorToDisplay(minor)} currency={currency} />
-      ) : error ? (
-        <Button title="Try again" variant="link" onPress={onRetry} />
-      ) : (
-        <Skeleton height={24} />
-      )}
-    </Card>
-  );
-}
+// Budget (design/screens/05-budget.png, values from design/reference-html/Budget.html): title and
+// month pill, the "ready to assign" card with "Copy <last month>", then the envelope stack. Behind
+// the front card: every budget, then unbudgeted categories spent in this month, then "+N more".
+// The front card is the envelope picked (the most spent at first); the tab bar is marigold here.
 
-function BudgetRow({
-  budget,
-  archived,
-  currency,
-  onPress,
-}: {
-  budget: Budget;
-  archived: boolean;
-  currency: string;
-  onPress: () => void;
-}) {
-  const money = (minor: number) => formatMinor(minor, currency);
-  const progress = budgetProgress(budget);
-  // Meaning is in the words ("Over by ₹500 · 125% used"); the red bar only reinforces it.
-  const status = budgetStatusText(progress, money);
-  const spent = `${money(budget.spent ?? 0)} of ${money(budget.budgeted_amount)} spent`;
-  const name = budget.category ?? "Unknown category";
-
-  return (
-    <Card
-      onPress={onPress}
-      accessibilityLabel={`${name}${archived ? ", archived category" : ""}. ${spent}. ${status}. Tap to edit.`}
-    >
-      <Row justify="between">
-        <CategoryIcon name={budget.category} size={32} />
-        <Stack grow gap="xs">
-          <Text variant="heading">{name}</Text>
-          {archived ? (
-            <Text variant="caption" tone="muted">
-              Archived category
-            </Text>
-          ) : null}
-        </Stack>
-        <Icon name="create-outline" />
-      </Row>
-      <ProgressBar
-        percent={progress.barPercent}
-        tone={progress.over ? "negative" : undefined}
-        category={{ name: budget.category }}
-        label={`${name} budget used`}
-      />
-      <Text variant="caption" tone="muted">
-        {spent}
-      </Text>
-      <Text variant="caption" tone={progress.over ? "negative" : "muted"}>
-        {status}
-      </Text>
-    </Card>
-  );
-}
-
-function BudgetSkeleton() {
-  return (
-    <>
-      <Card>
-        <Skeleton width="40%" height={12} />
-        <Skeleton width="60%" height={40} />
-        <Skeleton width="80%" height={12} />
-      </Card>
-      {[0, 1, 2].map((i) => (
-        <Card key={i}>
-          <Skeleton width="50%" height={18} />
-          <Skeleton height={8} />
-          <Skeleton width="70%" height={12} />
-        </Card>
-      ))}
-    </>
-  );
-}
+const MONTHS_AHEAD = 3;
+const MONTHS_BACK = 11;
 
 export default function BudgetTab() {
   const router = useRouter();
-  const [period, setPeriod] = useState<MonthYear>(currentMonth);
+  const now = currentMonth();
+  const [period, setPeriod] = useState<MonthYear>(now);
+  const [picked, setPicked] = useState<string | null>(null);
+  const [sheet, setSheet] = useState<"month" | "more" | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [copyResult, setCopyResult] = useState<{ tone: "info" | "warning"; message: string } | null>(null);
 
   const budgets = useQuery(monthBudgetsQuery(period));
   const income = useQuery(monthIncomeQuery(period));
   const categories = useQuery(categoriesQuery("expense"));
+  const spending = useQuery(categorySpendingQuery(period));
   const profile = useQuery(profileQuery);
   const planCopy = usePlanBudgetCopy();
   const copy = useCopyBudgets();
   useRefetchStaleOnFocus();
 
   const currency = profile.data?.currency ?? "INR";
+  const money = (minor: number) => wholeIfRound(formatMinor(minor, currency));
   const monthLabel = formatMonth(period.month, period.year);
   const rows = budgets.data?.budgets;
   const expenseCategories = categories.data?.categories;
   const activeIds = expenseCategories ? new Set(expenseCategories.filter((c) => c.is_active).map((c) => c.id)) : null;
   const ready = rows && income.data ? readyToAssign(income.data.income, rows) : null;
-  const unbudgeted = rows && expenseCategories ? unbudgetedCategories(expenseCategories, rows) : null;
+  const { envelopes, rest } = rows ? envelopesFor(rows, spending.data ?? [], expenseCategories) : { envelopes: [], rest: [] };
+  const front = frontEnvelope(envelopes, picked);
+  const behind = envelopes.filter((e) => e !== front);
+  const previous = monthShift(period.month, period.year, -1);
 
-  const changeMonth = (delta: number) => {
-    setPeriod((p) => monthShift(p.month, p.year, delta));
-    setCopyResult(null);
-  };
+  const months = Array.from({ length: MONTHS_AHEAD + 1 + MONTHS_BACK }, (_, i) => monthShift(now.month, now.year, MONTHS_AHEAD - i));
+  const monthGroups: OptionGroup[] = [{ options: months.map((m) => ({ value: monthKey(m.month, m.year), label: formatMonth(m.month, m.year) })) }];
+  const moreGroups: OptionGroup[] = [{ options: rest.map((c) => ({ value: c.id, label: c.name })) }];
 
   const openSet = (categoryId: string) =>
     router.push({
@@ -169,11 +87,15 @@ export default function BudgetTab() {
       params: { categoryId, month: String(period.month), year: String(period.year) },
     });
 
+  // ↗: this envelope's expenses for the month, in Activity.
+  const openActivity = (categoryId: string) =>
+    router.navigate({ pathname: "/transactions", params: { type: "expense", category: categoryId, month: monthKey(period.month, period.year) } });
+
   const refresh = async () => {
     if (refreshing) return; // G4: ignore a second pull while one is running
     setRefreshing(true);
     try {
-      await Promise.all([budgets.refetch(), income.refetch(), categories.refetch()]);
+      await Promise.all([budgets.refetch(), income.refetch(), categories.refetch(), spending.refetch()]);
     } finally {
       setRefreshing(false);
     }
@@ -211,7 +133,7 @@ export default function BudgetTab() {
       plan.skipped > 0
         ? `${plan.skipped} will be skipped (already set, or an archived category). Budgets you've set won't change.`
         : "Budgets you've already set won't change.",
-      "Copy"
+      "Copy",
     );
     if (!yes) return;
 
@@ -224,99 +146,145 @@ export default function BudgetTab() {
     });
   };
 
+  const readyLine = ready
+    ? `${money(ready.income)} in − ${money(ready.assigned)} assigned${ready.ready < 0 ? " · over-assigned" : ""}`
+    : income.isError
+      ? userMessage(income.error, "load this month's income")
+      : "";
+
+  const progress = front?.budget ? budgetProgress(front.budget) : null;
+  const goals = <SecondaryButton label="Your goals →" onPress={() => router.push("/goals")} />;
+
   return (
-    <Screen title="Budget" tabBar onRefresh={refresh} refreshing={refreshing}>
-      <MonthSwitcher label={monthLabel} onPrevious={() => changeMonth(-1)} onNext={() => changeMonth(1)} />
+    <Screen surface="peri" tabBar bleed onRefresh={refresh} refreshing={refreshing}>
+      <Row justify="between">
+        <Title>Budget</Title>
+        <Pill label={formatMonthShort(period.month, period.year, 0)} onPress={() => setSheet("month")} />
+      </Row>
+
+      <ReadyCard
+        amount={ready ? `${ready.ready < 0 ? "−" : ""}${money(Math.abs(ready.ready))}` : income.isError ? "—" : null}
+        line={readyLine}
+        action={
+          income.isError && !income.data ? (
+            <PillButton label="Try again" icon={RotateCw} onPress={() => income.refetch()} />
+          ) : (
+            <PillButton
+              label={`Copy ${formatMonthShort(previous.month, previous.year, previous.year)}`}
+              icon={Copy}
+              requiresNetwork
+              disabled={!activeIds || copy.isPending}
+              onPress={copyFromLastMonth}
+            />
+          )
+        }
+      />
 
       {copyResult ? <Banner tone={copyResult.tone} message={copyResult.message} /> : null}
       {rows && budgets.isError ? <Banner tone="warning" message="Couldn't refresh. Showing your last known budgets." /> : null}
 
-      {!rows ? (
-        budgets.isError ? (
-          <ErrorState message={userMessage(budgets.error, "load your budgets")} onRetry={() => budgets.refetch()} />
-        ) : (
-          <BudgetSkeleton />
-        )
-      ) : (
-        <>
-          <Row align="stretch">
-            <MoneyTile label="Income" minor={income.data?.income} currency={currency} error={income.isError} onRetry={() => income.refetch()} />
-            <MoneyTile label="Assigned" minor={ready?.assigned} currency={currency} error={false} onRetry={() => budgets.refetch()} />
-            <MoneyTile label="Spent" minor={income.data?.expenses} currency={currency} error={income.isError} onRetry={() => income.refetch()} />
-          </Row>
-
-          <Card>
-            <Text variant="caption" tone="muted">
-              Ready to assign
-            </Text>
-            {ready ? (
-              <>
-                <Amount variant="display" value={minorToDisplay(ready.ready)} currency={currency} />
-                <Text variant="caption" tone="muted">
-                  {`Income ${formatMinor(ready.income, currency)} − Assigned ${formatMinor(ready.assigned, currency)} = ${
-                    ready.ready < 0 ? `${formatMinor(-ready.ready, currency)} over-assigned` : `${formatMinor(ready.ready, currency)} ready`
-                  }`}
-                </Text>
-              </>
-            ) : income.isError ? (
-              <Stack gap="xs">
-                <Text tone="muted">{userMessage(income.error, "load this month's income")}</Text>
-                <Button title="Try again" variant="link" onPress={() => income.refetch()} />
-              </Stack>
-            ) : (
-              <Skeleton height={40} />
-            )}
-          </Card>
-
-          <Text variant="heading">Budgeted</Text>
-          {rows.length === 0 ? (
-            <Text tone="muted">{`No budgets for ${monthLabel} yet. Set one below, or copy last month's.`}</Text>
-          ) : (
-            rows.map((budget) => (
-              <BudgetRow
-                key={budget.id}
-                budget={budget}
-                archived={activeIds ? isArchivedBudget(budget, activeIds) : false}
-                currency={currency}
-                onPress={() => openSet(budget.category_id)}
-              />
-            ))
-          )}
-
-          <Text variant="heading">Not budgeted yet</Text>
-          {categories.isError && !expenseCategories ? (
-            <Stack gap="xs">
-              <Text tone="muted">{userMessage(categories.error, "load your categories")}</Text>
-              <Button title="Try again" variant="link" onPress={() => categories.refetch()} />
-            </Stack>
-          ) : !unbudgeted ? (
-            <Skeleton height={44} />
-          ) : unbudgeted.length === 0 ? (
-            <Text tone="muted">Every expense category has a budget.</Text>
-          ) : (
-            unbudgeted.map((category) => (
-              <Card key={category.id} onPress={() => openSet(category.id)} accessibilityLabel={`Set a budget for ${category.name}`}>
-                <Row justify="between">
-                  <Stack grow>
-                    <Text>{category.name}</Text>
-                  </Stack>
-                  <Text tone="accent">Set</Text>
-                </Row>
-              </Card>
-            ))
-          )}
-
-          <Button
-            title="Copy from last month"
-            variant="secondary"
-            requiresNetwork
-            disabled={!activeIds || copy.isPending}
-            onPress={copyFromLastMonth}
+      <EnvelopeStack>
+        {behind.map((e) => (
+          <EnvelopeTab
+            key={e.categoryId}
+            name={e.name}
+            status={envelopeStatus(e, money)}
+            onPress={() => setPicked(e.categoryId)}
+            onSet={e.budget ? undefined : () => openSet(e.categoryId)}
           />
-        </>
-      )}
+        ))}
+        {rest.length > 0 ? (
+          <EnvelopeTab
+            name={`+${rest.length} more`}
+            status={{ kind: "more", text: "not budgeted" }}
+            onPress={() => setSheet("more")}
+            onSet={() => setSheet("more")}
+          />
+        ) : null}
 
-      <Button title="Goals →" variant="link" onPress={() => router.push("/goals")} />
+        <EnvelopeFront>
+          {!rows ? (
+            budgets.isError ? (
+              <>
+                <Title size="titleXL" tone="ink">{"Can't load\nbudgets"}</Title>
+                <RichText tone="ink">{escapeRich(userMessage(budgets.error, "load your budgets"))}</RichText>
+                <PrimaryButton label="Try again" onPress={() => budgets.refetch()} />
+              </>
+            ) : (
+              <>
+                <Skeleton tone="light" width="60%" height={64} />
+                <Skeleton tone="light" width="80%" height={28} round="pill" />
+                <Skeleton tone="light" height={12} round="pill" />
+              </>
+            )
+          ) : front ? (
+            <>
+              <Row justify="between" align="start">
+                <Stack grow>
+                  <Title size="titleXL" tone="ink">
+                    {front.name}
+                  </Title>
+                </Stack>
+                <CircleButton icon={ArrowUpRight} variant="ink" label={`${front.name} in Activity`} onPress={() => openActivity(front.categoryId)} />
+              </Row>
+              <Row gap="xs" wrap>
+                <Chip dot="tomato" label={`${money(front.spent)} spent`} />
+                {progress ? <Chip dot="peri" label={progress.over ? `${money(progress.overBy)} over` : `${money(progress.left)} left`} /> : null}
+                <Chip dot="forest" label={`${front.count} ${front.count === 1 ? "transaction" : "transactions"}`} />
+                {front.archived ? <Chip variant="creamLine" label="Archived category" /> : null}
+              </Row>
+              {progress ? (
+                <Meter
+                  height={12}
+                  percent={progress.barPercent}
+                  tooltip={progress.usedPercent === null ? undefined : `${progress.usedPercent}%`}
+                  label={`${front.name}: ${progress.usedPercent ?? 100}% of the budget used`}
+                />
+              ) : null}
+              <BudgetedLine amount={front.budget ? money(front.budget.budgeted_amount) : null} onPress={() => openSet(front.categoryId)} />
+              <Row justify="center">
+                <Illustration name="budget_plate" width={300} />
+              </Row>
+              {goals}
+            </>
+          ) : (
+            <>
+              <Title size="titleXL" tone="ink">{"No budgets\nyet"}</Title>
+              <RichText tone="ink">{`Nothing is budgeted for {dark:${escapeRich(monthLabel)}}. Set one, or copy last month's.`}</RichText>
+              <PrimaryButton label="Set a budget" icon={Plus} onPress={() => setSheet("more")} />
+              <Row justify="center">
+                <Illustration name="budget_plate" width={300} />
+              </Row>
+              {goals}
+            </>
+          )}
+        </EnvelopeFront>
+      </EnvelopeStack>
+
+      <OptionSheet
+        visible={sheet === "month"}
+        title="Month"
+        groups={monthGroups}
+        value={monthKey(period.month, period.year)}
+        onSelect={(key) => {
+          setPeriod(months.find((m) => monthKey(m.month, m.year) === key) ?? now);
+          setPicked(null);
+          setCopyResult(null);
+          setSheet(null);
+        }}
+        onClose={() => setSheet(null)}
+      />
+      <OptionSheet
+        visible={sheet === "more"}
+        title="Set a budget"
+        groups={moreGroups}
+        value=""
+        onSelect={(id) => {
+          setSheet(null);
+          openSet(id);
+        }}
+        onClose={() => setSheet(null)}
+      />
     </Screen>
   );
 }

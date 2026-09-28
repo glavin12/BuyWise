@@ -1,5 +1,5 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { Plus } from "lucide-react-native";
 import { useState } from "react";
 
@@ -39,7 +39,8 @@ import {
 
 // Activity (design/screens/03-activity.png, values from design/reference-html/Transactions.html):
 // title + category pill, search, type chips + month pill, count, day groups with their net.
-// The first-run coach mark above the centre tab is drawn by TabBar (`coachOn`).
+// The first-run coach mark above the centre tab is drawn by TabBar (`coachOn`). The filters live in
+// the URL (`type`, `category`, `month` as YYYY-MM), so Budget's ↗ can open an envelope's expenses here.
 
 type TypeFilter = "all" | "expense" | "income";
 
@@ -56,9 +57,14 @@ const ALL_CATEGORIES = "";
 export default function ActivityTab() {
   const router = useRouter();
   const now = currentMonth();
-  const [type, setType] = useState<TypeFilter>("all");
-  const [categoryId, setCategoryId] = useState<string | null>(null);
-  const [month, setMonth] = useState<MonthYear>(now);
+  const params = useLocalSearchParams<{ type?: string; category?: string; month?: string }>();
+  const months = Array.from({ length: MONTHS_BACK }, (_, i) => monthShift(now.month, now.year, -i));
+  const type: TypeFilter = TYPES.find((t) => t.value === params.type)?.value ?? "all";
+  const categoryId = params.category || null;
+  // A month outside the list (a future budget month) shows this month.
+  const month: MonthYear = months.find((m) => monthKey(m.month, m.year) === params.month) ?? now;
+  const setCategoryId = (id: string | null) => router.setParams({ category: id ?? undefined });
+  const setMonth = (m: MonthYear) => router.setParams({ month: monthKey(m.month, m.year) });
   const [sheet, setSheet] = useState<"category" | "month" | null>(null);
   const [search, setSearch] = useState("");
   const [refreshing, setRefreshing] = useState(false);
@@ -85,10 +91,8 @@ export default function ActivityTab() {
   const picked = [...expense, ...income].find((c) => c.id === categoryId);
 
   // A picked category of the other type would filter everything out, so it goes.
-  const changeType = (next: TypeFilter) => {
-    setType(next);
-    if (picked && next !== "all" && picked.type !== next) setCategoryId(null);
-  };
+  const changeType = (next: TypeFilter) =>
+    router.setParams({ type: next, ...(picked && next !== "all" && picked.type !== next ? { category: undefined } : {}) });
 
   const categoryGroups: OptionGroup[] = [
     { options: [{ value: ALL_CATEGORIES, label: "All categories" }] },
@@ -106,7 +110,6 @@ export default function ActivityTab() {
     setSheet("category");
   };
 
-  const months = Array.from({ length: MONTHS_BACK }, (_, i) => monthShift(now.month, now.year, -i));
   const monthGroups: OptionGroup[] = [{ options: months.map((m) => ({ value: monthKey(m.month, m.year), label: formatMonth(m.month, m.year) })) }];
 
   const total = list.data?.pages[0]?.total;

@@ -19,6 +19,8 @@ const CHIP = {
   peri: { bg: colors.peri2, fg: "#FFFFFF", border: undefined }, // dropdown on the peri card
   outlined: { bg: "transparent", fg: colors.ink, border: colors.ink }, // on cream / colour
   outlinedDark: { bg: "transparent", fg: colors.text, border: colors.line }, // on charcoal
+  mint: { bg: colors.mint, fg: colors.ink, border: undefined }, // QuickAdd suggestion
+  creamLine: { bg: colors.cream, fg: colors.ink, border: colors.ink }, // Goals corner chips
 } as const;
 export type ChipVariant = keyof typeof CHIP;
 
@@ -32,11 +34,13 @@ type ChipProps = {
   /** Makes it a button; `selected` is announced to screen readers. */
   onPress?: () => void;
   selected?: boolean;
+  /** Screen-reader label when the visible text alone is unclear ("Today" → "Date, Today"). */
+  accessibilityLabel?: string;
 };
 
 /** Pill-shaped label: filters, payment methods, legends, category tags. */
-export function Chip({ label, variant = "cream", dot, icon, onPress, selected }: ChipProps) {
-  return <ChipFrame {...{ label, variant, dot, icon, onPress, selected }} />;
+export function Chip(props: ChipProps) {
+  return <ChipFrame {...props} />;
 }
 
 /**
@@ -59,7 +63,7 @@ export function Pill({ knob, ...props }: Omit<ChipProps, "dot" | "selected"> & {
   );
 }
 
-function ChipFrame({ label, variant = "cream", dot, icon: Icon, onPress, selected, chevron }: ChipProps & { chevron?: boolean }) {
+function ChipFrame({ label, variant = "cream", dot, icon: Icon, onPress, selected, accessibilityLabel, chevron }: ChipProps & { chevron?: boolean }) {
   const look = CHIP[variant];
   const small = variant === "lavender";
   const body = (
@@ -76,13 +80,54 @@ function ChipFrame({ label, variant = "cream", dot, icon: Icon, onPress, selecte
     styles.chip,
     small && styles.chipSmall,
     { backgroundColor: look.bg },
-    look.border && { borderWidth: variant === "outlined" ? 1.4 : 1.5, borderColor: look.border },
+    look.border && { borderWidth: variant === "outlinedDark" ? 1.5 : 1.4, borderColor: look.border },
   ];
   if (!onPress) return <View style={style}>{body}</View>;
   return (
-    <PressableScale onPress={onPress} accessibilityLabel={label} accessibilityState={{ selected }} style={style}>
+    <PressableScale onPress={onPress} accessibilityLabel={accessibilityLabel ?? label} accessibilityState={{ selected }} style={style}>
       {body}
     </PressableScale>
+  );
+}
+
+// Two-way segmented switch. `ink` (QuickAdd Expense / Income): full width, tomato when on.
+// `sage` (Goals Active / Achieved): sized to its labels, ink when on.
+const TOGGLE = {
+  ink: { track: colors.ink, pad: 4, on: colors.tomato, onFg: colors.ink, offFg: colors.cream, offFont: fonts.monoMedium, size: 12, height: 40 },
+  sage: { track: colors.sage2, pad: 3, on: colors.ink, onFg: colors.cream, offFg: colors.ink, offFont: fonts.mono, size: 11, height: 30 },
+} as const;
+
+export function Toggle<T extends string>({
+  options,
+  value,
+  onChange,
+  look = "ink",
+}: {
+  options: readonly { label: string; value: T }[];
+  value: T;
+  onChange: (value: T) => void;
+  look?: keyof typeof TOGGLE;
+}) {
+  const t = TOGGLE[look];
+  const fill = look === "ink";
+  return (
+    <View accessibilityRole="tablist" style={[styles.toggle, { backgroundColor: t.track, padding: t.pad }, !fill && styles.toggleInline]}>
+      {options.map((option) => {
+        const on = option.value === value;
+        return (
+          <PressableScale
+            key={option.value}
+            onPress={() => onChange(option.value)}
+            accessibilityRole="tab"
+            accessibilityLabel={option.label}
+            accessibilityState={{ selected: on }}
+            style={[styles.toggleItem, { height: t.height, backgroundColor: on ? t.on : "transparent" }, fill ? styles.toggleFill : styles.toggleHug]}
+          >
+            <RNText style={{ fontFamily: on ? fonts.monoBold : t.offFont, fontSize: t.size, color: on ? t.onFg : t.offFg }}>{option.label}</RNText>
+          </PressableScale>
+        );
+      })}
+    </View>
   );
 }
 
@@ -179,6 +224,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  toggle: { flexDirection: "row", borderRadius: radius.pill },
+  toggleInline: { alignSelf: "flex-start" },
+  toggleItem: { borderRadius: radius.pill, alignItems: "center", justifyContent: "center" },
+  toggleFill: { flex: 1 },
+  toggleHug: { paddingHorizontal: 12 },
   inline: { borderRadius: radius.inlineChip, borderWidth: 1, paddingHorizontal: 6 },
   inlineText: { fontFamily: fonts.monoMedium, fontSize: 12, lineHeight: 17 },
   link: { textDecorationLine: "underline" },

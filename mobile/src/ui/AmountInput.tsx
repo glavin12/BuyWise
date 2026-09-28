@@ -1,9 +1,10 @@
 import type { Ref } from "react";
-import type { TextInput } from "react-native";
+import { StyleSheet, Text as RNText, TextInput, View } from "react-native";
 
 import { sanitizeAmountInput } from "@/lib/money";
 
 import { Input } from "./Input";
+import { colors, extra, fonts, type } from "./tokens";
 
 /**
  * Money text field. Every change is sanitised (typed or pasted) to digits and one
@@ -42,3 +43,55 @@ export function AmountInput({
     />
   );
 }
+
+/**
+ * The QuickAdd amount (design v3): a muted currency symbol, then the typed figure at 86 with a
+ * tomato caret, centred. Sanitised like AmountInput.
+ */
+export function EntryAmount({
+  value,
+  onChange,
+  symbol,
+  autoFocus,
+  ref,
+}: {
+  value: string;
+  onChange: (text: string) => void;
+  symbol: string;
+  autoFocus?: boolean;
+  ref?: Ref<TextInput>;
+}) {
+  return (
+    <View style={styles.entry}>
+      <RNText style={styles.symbol}>{symbol}</RNText>
+      <TextInput
+        ref={ref}
+        value={value}
+        onChangeText={(text) => onChange(sanitizeAmountInput(text))}
+        keyboardType="decimal-pad"
+        autoCorrect={false}
+        autoFocus={autoFocus}
+        placeholder="0"
+        placeholderTextColor={extra.dashedOnCream}
+        accessibilityLabel="Amount"
+        selectionColor={colors.tomato}
+        cursorColor={colors.tomato}
+        style={styles.figure}
+      />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  entry: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 },
+  symbol: { fontFamily: fonts.number, fontSize: 40, color: extra.symbolOnCream, marginTop: 22 },
+  figure: {
+    fontFamily: type.entryAmount.fontFamily,
+    fontSize: type.entryAmount.fontSize,
+    letterSpacing: -1,
+    color: colors.ink,
+    minWidth: 50,
+    padding: 0,
+    includeFontPadding: false,
+  },
+});

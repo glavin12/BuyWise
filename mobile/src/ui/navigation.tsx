@@ -13,11 +13,12 @@ export const sheetScreenOptions = { presentation: "modal" } as const;
 
 /**
  * QuickAdd (the add-transaction route, opened by holding the centre tab): a native sheet
- * with the design's 34 top radius (DESIGN.md §3 `Sheet`). The grabber is iOS-only.
+ * with the design's 34 top radius (DESIGN.md §3 `Sheet`). The screen draws the design's own
+ * handle (the native grabber is iOS-only and a different size).
  */
 export const quickAddSheetOptions = {
   presentation: "formSheet" as const,
   sheetAllowedDetents: [0.92],
   sheetCornerRadius: radius.sheet,
-  sheetGrabberVisible: true,
+  sheetGrabberVisible: false,
 };

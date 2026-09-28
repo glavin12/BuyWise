@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { BackHandler, FlatList, Pressable, StyleSheet } from "react-native";
+import { useEffect, useState, type ReactNode } from "react";
+import { BackHandler, FlatList, Pressable, StyleSheet, View } from "react-native";
 
 import { userMessage } from "@/lib/errors";
 
@@ -14,6 +14,26 @@ import { Text } from "./Text";
 import { theme } from "./theme";
 
 export type PickerItem = { id: string; label: string };
+
+/**
+ * A screen with a chooser (a PickerList) opened over it. The screen underneath stays mounted, so
+ * nothing typed is lost and the keyboard does not re-open when the chooser closes; it is hidden
+ * from screen readers while the chooser is up.
+ */
+export function Overlaid({ overlay, children }: { overlay: ReactNode; children: ReactNode }) {
+  return (
+    <View style={styles.list}>
+      <View style={styles.list} importantForAccessibility={overlay ? "no-hide-descendants" : "auto"} accessibilityElementsHidden={!!overlay}>
+        {children}
+      </View>
+      {overlay ? (
+        <View style={StyleSheet.absoluteFill} accessibilityViewIsModal>
+          {overlay}
+        </View>
+      ) : null}
+    </View>
+  );
+}
 
 /**
  * A full-screen "choose one" list with search. Virtualised (FlatList), so a long

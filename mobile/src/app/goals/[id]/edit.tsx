@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 
-import { userMessage } from "@/lib/api";
+import { isNotFound, userMessage } from "@/lib/api";
 import { formatCurrency } from "@/lib/format";
 import { goalDraftFromGoal, goalDraftKey, goalEditPatch, justAchieved, validateGoalDraft } from "@/lib/goals";
 import { isUuid } from "@/lib/ids";
@@ -11,7 +11,9 @@ import { categoriesQuery, profileQuery, useOpenedGoal } from "@/lib/queries";
 import type { Goal } from "@/lib/types";
 import {
   Celebration,
+  confirm,
   ErrorState,
+  goBack,
   GoalEditor,
   hapticSuccess,
   NotFoundScreen,
@@ -82,6 +84,26 @@ function EditForm({ goal }: { goal: Goal }) {
     router.back();
   };
 
+  // There is no DELETE for goals: archiving is the only way to remove one.
+  const archive = async () => {
+    const yes = await confirm(`Archive "${goal.title}"?`, "It will be removed from your goals. You can't undo this here.", "Archive", true);
+    if (!yes) return;
+    setFailure(null);
+    try {
+      await update.mutateAsync({ id: goal.id, patch: { status: "archived" } });
+    } catch (err) {
+      if (!isNotFound(err)) {
+        setFailure(userMessage(err, "archive this goal"));
+        return;
+      }
+      // Already gone elsewhere: the goal is met, so carry on as a success.
+    }
+    hapticSuccess();
+    showToast("Goal archived");
+    allowLeave();
+    goBack();
+  };
+
   return (
     <Celebration
       show={reached !== null}
@@ -106,6 +128,7 @@ function EditForm({ goal }: { goal: Goal }) {
         errors={errors}
         formError={failure}
         primary={{ label: "Save changes", onPress: save, disabled: !changed || update.isPending }}
+        danger={{ label: "Archive goal", onPress: archive }}
       />
     </Celebration>
   );

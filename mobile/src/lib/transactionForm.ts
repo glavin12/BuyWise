@@ -34,8 +34,23 @@ export type TransactionDraft = {
 export const DESCRIPTION_MAX = 500; // backend TransactionCreate.description
 export const NOTES_MAX = 2000; // backend TransactionCreate.notes
 
-export function emptyDraft(today: string): TransactionDraft {
-  return { type: "expense", amount: "", category: null, payee: null, method: null, date: today, description: "", notes: "" };
+export function emptyDraft(today: string, method: PaymentMethod | null = null): TransactionDraft {
+  return { type: "expense", amount: "", category: null, payee: null, method, date: today, description: "", notes: "" };
+}
+
+/** QuickAdd starts on the method of the newest transaction (even none), or UPI when there is none yet. */
+export function defaultMethod(newest: Pick<Transaction, "payment_method"> | undefined): PaymentMethod | null {
+  return newest ? newest.payment_method : "upi";
+}
+
+/**
+ * QuickAdd's category row: the `n` most used (`usage` counts; ties keep the list's order),
+ * always including the chosen one, which goes first when it would not otherwise be there.
+ */
+export function quickCategories<C extends { id: string }>(categories: readonly C[], usage: ReadonlyMap<string, number>, selectedId: string | null, n = 4): C[] {
+  const top = [...categories].sort((a, b) => (usage.get(b.id) ?? 0) - (usage.get(a.id) ?? 0)).slice(0, n);
+  const selected = categories.find((c) => c.id === selectedId);
+  return !selected || top.includes(selected) ? top : [selected, ...top.slice(0, n - 1)];
 }
 
 export function draftFromTransaction(tx: Transaction): TransactionDraft {
