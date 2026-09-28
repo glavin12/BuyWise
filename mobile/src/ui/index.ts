@@ -35,7 +35,6 @@ export { EmptyState, ErrorState, NotFoundScreen } from "./States";
 export { Text } from "./Text";
 export { showToast } from "./toast";
 export { TransactionEditor, type ChoiceList } from "./TransactionEditor";
-export { TransactionRow } from "./TransactionRow";
 export { useDiscardGuard } from "./useDiscardGuard";
 // Chat
 export { ChatInput } from "./ChatInput";
@@ -43,11 +42,13 @@ export { ChatThread } from "./ChatThread";
 export { ConversationRow } from "./ConversationRow";
 export { Markdown } from "./Markdown";
 // Design v3 kit (DESIGN.md §3). Screens pass lucide-react-native icons to it.
-export { HeroAmount, IconTile, MiniTile, Panel, SectionLabel, Title } from "./Blocks";
+export { DayHeader, HeroAmount, IconTile, MiniTile, Note, Panel, SectionLabel, Title, TxRow } from "./Blocks";
 export { CategoryTile, categoryTone } from "./CategoryTile";
 export { AreaChart, PulseBubbles, type PulseDay } from "./SpendPulse";
 export { CircleButton, PrimaryButton, SecondaryButton } from "./Buttons";
 export { Chip, InlineChip, Pill, RichText, type ChipVariant, type Hue } from "./Chips";
 export { Illustration, type IllustrationName } from "./Illustration";
+export { OptionSheet, type OptionGroup } from "./OptionSheet";
 export { PressableScale } from "./PressableScale";
+export { SearchField } from "./SearchField";
 export { TabBar } from "./TabBar";

@@ -1,16 +1,17 @@
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
+import * as SecureStore from "expo-secure-store";
 import type { BottomTabBarProps } from "expo-router/js-tabs";
 import { useEffect, useState } from "react";
-import { Keyboard, StyleSheet, View } from "react-native";
+import { Keyboard, Platform, StyleSheet, Text as RNText, View } from "react-native";
 import Animated, { Easing, useAnimatedProps, useReducedMotion, useSharedValue, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle, Path, Rect } from "react-native-svg";
 
 import { Illustration } from "./Illustration";
 import { PressableScale } from "./PressableScale";
-import { colors, extra, motion, radius, tabSurface } from "./tokens";
+import { colors, extra, fonts, motion, radius, tabSurface } from "./tokens";
 
 // The v3 tab bar (DESIGN.md §5): no container, border or rule. Icons float over a fade of
 // the screen colour. Centre = AI chat: tap opens Chat, hold (350 ms) opens the QuickAdd sheet.
@@ -47,16 +48,53 @@ export function useTabBarSpace() {
   return keyboard ? 0 : rowBottom(insets.bottom) + ROW + 14;
 }
 
+// The first-run coach mark ("tap to chat · hold to add ₹") stays until the centre button is
+// first used or the hint is tapped. SecureStore is the only on-device store installed (web: localStorage).
+const COACH_KEY = "coach.centre-tab";
+
+function readCoachSeen() {
+  try {
+    return (Platform.OS === "web" ? globalThis.localStorage?.getItem(COACH_KEY) : SecureStore.getItem(COACH_KEY)) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function rememberCoachSeen() {
+  try {
+    if (Platform.OS === "web") globalThis.localStorage?.setItem(COACH_KEY, "1");
+    else SecureStore.setItem(COACH_KEY, "1");
+  } catch {
+    // Not saved: the hint shows again next launch, which is harmless.
+  }
+}
+
 const fadeAt = (rgb: string, alpha: number) => rgb.replace("rgb(", "rgba(").replace(")", `,${alpha})`);
 
-/** Pass as `<Tabs tabBar>`. `surfaces` gives a route its own bar colours (Budget: `marigold`). */
-export function TabBar({ state, descriptors, navigation, surfaces = {} }: BottomTabBarProps & { surfaces?: Partial<Record<string, TabSurface>> }) {
+/**
+ * Pass as `<Tabs tabBar>`. `surfaces` gives a route its own bar colours (Budget: `marigold`);
+ * `coachOn` is the route that shows the first-run coach mark above the centre button.
+ */
+export function TabBar({
+  state,
+  descriptors,
+  navigation,
+  surfaces = {},
+  coachOn,
+}: BottomTabBarProps & { surfaces?: Partial<Record<string, TabSurface>>; coachOn?: string }) {
   const insets = useSafeAreaInsets();
   const keyboard = useKeyboardVisible();
   const focused = state.routes[state.index];
   const surfaceName = surfaces[focused.name] ?? "dark";
   const surface = tabSurface[surfaceName];
   const bottom = rowBottom(insets.bottom);
+  const [coachSeen, setCoachSeen] = useState(readCoachSeen);
+
+  const dismissCoach = () => {
+    if (coachSeen) return;
+    setCoachSeen(true);
+    rememberCoachSeen();
+  };
 
   if (keyboard) return null; // it would ride up over the chat input
 
@@ -74,7 +112,9 @@ export function TabBar({ state, descriptors, navigation, surfaces = {} }: Bottom
             const event = navigation.emit({ type: "tabPress", target: route.key, canPreventDefault: true });
             if (!isFocused && !event.defaultPrevented) navigation.navigate(route.name, route.params);
           };
-          if (route.name === "chat") return <CentreButton key={route.key} onPress={open} chatOpen={isFocused} surface={surface} />;
+          if (route.name === "chat") {
+            return <CentreButton key={route.key} onPress={open} onUse={dismissCoach} chatOpen={isFocused} surface={surface} />;
+          }
           return (
             <PressableScale
               key={route.key}
@@ -90,6 +130,27 @@ export function TabBar({ state, descriptors, navigation, surfaces = {} }: Bottom
           );
         })}
       </View>
+      {coachOn === focused.name && !coachSeen && <CoachMark bottom={bottom + ROW + 18} onPress={dismissCoach} />}
+    </View>
+  );
+}
+
+/** "tap to chat · hold to add ₹" in a cream bubble pointing at the centre button. Tapping it dismisses it. */
+function CoachMark({ bottom, onPress }: { bottom: number; onPress: () => void }) {
+  return (
+    <View style={[styles.coachWrap, styles.passThrough, { bottom }]}>
+      <PressableScale onPress={onPress} accessibilityLabel="Tip: tap the centre button to chat, hold it to add a transaction. Tap to dismiss." style={styles.coach}>
+        <View style={styles.coachPlus}>
+          <Svg width={10} height={10} viewBox="0 0 24 24">
+            <Path d="M12 5v14M5 12h14" stroke={colors.ink} strokeWidth={4} strokeLinecap="round" />
+          </Svg>
+        </View>
+        <RNText style={styles.coachText}>
+          {"tap to chat · "}
+          <RNText style={styles.coachBold}>hold to add ₹</RNText>
+        </RNText>
+        <View style={styles.coachTail} />
+      </PressableScale>
     </View>
   );
 }
@@ -143,10 +204,13 @@ function openQuickAdd() {
 /** The 62 circle: speech bubble + sparkle, `+` badge. Tomato while Chat is open. */
 function CentreButton({
   onPress,
+  onUse,
   chatOpen,
   surface,
 }: {
   onPress: () => void;
+  /** Called on a tap or a hold: the coach mark's job is done. */
+  onUse: () => void;
   chatOpen: boolean;
   surface: (typeof tabSurface)[TabSurface];
 }) {
@@ -158,8 +222,14 @@ function CentreButton({
 
   return (
     <PressableScale
-      onPress={onPress}
-      onLongPress={openQuickAdd}
+      onPress={() => {
+        onUse();
+        onPress();
+      }}
+      onLongPress={() => {
+        onUse();
+        openQuickAdd();
+      }}
       delayLongPress={motion.longPressMs}
       onPressIn={() => {
         if (!reduceMotion) fill.set(withTiming(1, { duration: motion.longPressMs, easing: Easing.linear }));
@@ -170,7 +240,11 @@ function CentreButton({
       accessibilityLabel={CENTRE_LABEL}
       accessibilityState={{ selected: chatOpen }}
       accessibilityActions={[{ name: "longpress", label: "Add a transaction" }]}
-      onAccessibilityAction={(e) => e.nativeEvent.actionName === "longpress" && openQuickAdd()}
+      onAccessibilityAction={(e) => {
+        if (e.nativeEvent.actionName !== "longpress") return;
+        onUse();
+        openQuickAdd();
+      }}
       style={[styles.centre, { backgroundColor: bg }]}
     >
       {/* Rotated -90° as a whole so the ring starts at 12 o'clock (an `origin` prop breaks on web). */}
@@ -222,6 +296,39 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     boxShadow: `0 10px 24px ${extra.shadow}`,
+  },
+  coachWrap: { position: "absolute", left: 0, right: 0, alignItems: "center" },
+  coach: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: colors.cream,
+    boxShadow: `0 8px 20px ${extra.coachShadow}`,
+  },
+  coachPlus: {
+    width: 18,
+    height: 18,
+    borderRadius: radius.pill,
+    borderWidth: 1.5,
+    borderColor: colors.ink,
+    backgroundColor: colors.marigold,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  coachText: { fontFamily: fonts.mono, fontSize: 11, color: colors.ink },
+  coachBold: { fontFamily: fonts.monoBold },
+  coachTail: {
+    position: "absolute",
+    bottom: -6,
+    left: "50%",
+    marginLeft: -6,
+    width: 12,
+    height: 12,
+    backgroundColor: colors.cream,
+    transform: [{ rotate: "45deg" }],
   },
   ring: { position: "absolute", left: -6, top: -6, pointerEvents: "none", transform: [{ rotate: "-90deg" }] },
   badge: {

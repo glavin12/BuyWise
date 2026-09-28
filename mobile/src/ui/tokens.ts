@@ -93,4 +93,6 @@ export const extra = {
   handle: '#C9C1AF',       // sheet handle
   track: '#E4DCCB',        // dial / progress track on cream
   shadow: 'rgba(0,0,0,0.28)',
+  coachShadow: 'rgba(0,0,0,0.35)', // the first-run coach mark (Transactions.html)
+  scrim: 'rgba(0,0,0,0.45)', // behind an OptionSheet (ours: the design has no dropdown menu)
 } as const;

@@ -2,11 +2,12 @@ import type { LucideIcon } from "lucide-react-native";
 import type { ReactNode } from "react";
 import { StyleSheet, Text as RNText, View, type StyleProp, type ViewStyle } from "react-native";
 
-import type { Hue } from "./Chips";
+import { Chip, InlineChip, type Hue } from "./Chips";
 import { PressableScale } from "./PressableScale";
 import { colors, fonts, radius, type } from "./tokens";
 
-// Title, Panel and IconTile (DESIGN.md §3), plus the Home screen's HeroAmount, SectionLabel and MiniTile.
+// Title, Panel and IconTile (DESIGN.md §3), plus the Home screen's HeroAmount, SectionLabel and MiniTile
+// and the Activity screen's TxRow and DayHeader.
 
 /** Condensed uppercase heading. Put "\n" in the text for the two-line titles ("MONEY\nBUDDY"). */
 export function Title({
@@ -128,6 +129,69 @@ export function MiniTile({
   );
 }
 
+/** A line of small muted mono text ("47 transactions found"). */
+export function Note({ children }: { children: string }) {
+  return <RNText style={styles.note}>{children}</RNText>;
+}
+
+/** One Activity row: tile, uppercase name, mono meta line, lavender category tag, amount on the right. */
+export function TxRow({
+  tile,
+  title,
+  meta,
+  tag,
+  amount,
+  tone = "text",
+  onPress,
+  label,
+}: {
+  tile: ReactNode;
+  title: string;
+  meta: string;
+  tag: string | null;
+  amount: string;
+  tone?: "text" | "mint";
+  onPress: () => void;
+  label: string;
+}) {
+  return (
+    <PressableScale onPress={onPress} accessibilityLabel={label} style={styles.tx}>
+      {tile}
+      <View style={styles.txText}>
+        <RNText style={styles.txTitle} numberOfLines={1}>
+          {title}
+        </RNText>
+        {meta ? (
+          <RNText style={styles.txMeta} numberOfLines={1}>
+            {meta}
+          </RNText>
+        ) : null}
+        {tag ? (
+          <View style={styles.txTag}>
+            <Chip label={tag} variant="lavender" />
+          </View>
+        ) : null}
+      </View>
+      <RNText style={[type.rowAmount, { color: colors[tone] }]} numberOfLines={1}>
+        {amount}
+      </RNText>
+    </PressableScale>
+  );
+}
+
+/** A day's header in a list: "TODAY" on the left, "net" and the day's total in an inline chip on the right. */
+export function DayHeader({ label, net, kind }: { label: string; net: string; kind: "coral" | "mint" | "dark" }) {
+  return (
+    <View style={styles.day} accessibilityRole="header" accessible accessibilityLabel={`${label}, net ${net}`}>
+      <RNText style={styles.dayLabel}>{label}</RNText>
+      <View style={styles.dayNet}>
+        <RNText style={styles.dayNetWord}>net</RNText>
+        <InlineChip kind={kind} text={net} />
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   panel: { padding: 14 },
   panelTitle: { ...type.cardTitle, fontSize: 24, lineHeight: 23 },
@@ -152,4 +216,15 @@ const styles = StyleSheet.create({
   miniText: { flex: 1, minWidth: 0 },
   miniName: { ...type.meta, color: colors.muted },
   miniAmount: { fontFamily: fonts.number, fontSize: 16, lineHeight: 19 },
+  note: { ...type.meta, color: colors.muted },
+  tx: { flexDirection: "row", alignItems: "center", gap: 12, padding: 12, borderRadius: radius.row, backgroundColor: colors.card },
+  txText: { flex: 1, minWidth: 0 },
+  txTitle: { ...type.rowTitle, color: colors.text },
+  txMeta: { ...type.meta, marginTop: 4, color: colors.muted },
+  txTag: { marginTop: 6 },
+  // Opaque so rows scroll under it while it sticks.
+  day: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingTop: 6, backgroundColor: colors.screen },
+  dayLabel: { fontFamily: fonts.monoBold, fontSize: 10.5, letterSpacing: 1, textTransform: "uppercase", color: colors.text },
+  dayNet: { flexDirection: "row", alignItems: "center", gap: 6 },
+  dayNetWord: { ...type.meta, color: colors.muted },
 });

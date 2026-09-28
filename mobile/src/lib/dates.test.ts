@@ -5,12 +5,12 @@ import {
   currentMonth,
   daysUntil,
   isOverAYearAgo,
-  isValidRange,
+  loggedTime,
+  monthBounds,
   monthKey,
   monthShift,
   parseDateOnly,
   parseMonthYear,
-  rangeFor,
   relativeDayLabel,
   shiftDays,
   todayLocal,
@@ -53,17 +53,22 @@ test("monthShift clamps to the years the backend accepts (2020-2100)", () => {
   assert.deepEqual(monthShift(11, 2100, 1), { month: 12, year: 2100 });
 });
 
-test("rangeFor gives explicit inclusive local-calendar bounds", () => {
-  const now = new Date(2026, 8, 24, 14, 0); // 24 Sep 2026
-  assert.deepEqual(rangeFor("this_month", now), { date_from: "2026-09-01", date_to: "2026-09-30" });
-  assert.deepEqual(rangeFor("last_month", now), { date_from: "2026-08-01", date_to: "2026-08-31" });
-  assert.deepEqual(rangeFor("last_3_months", now), { date_from: "2026-07-01", date_to: "2026-09-30" });
+test("monthBounds gives explicit inclusive local-calendar bounds, leap February too", () => {
+  assert.deepEqual(monthBounds(9, 2026), { date_from: "2026-09-01", date_to: "2026-09-30" });
+  assert.deepEqual(monthBounds(12, 2025), { date_from: "2025-12-01", date_to: "2025-12-31" });
+  assert.deepEqual(monthBounds(2, 2026), { date_from: "2026-02-01", date_to: "2026-02-28" });
+  assert.deepEqual(monthBounds(2, 2028), { date_from: "2028-02-01", date_to: "2028-02-29" });
 });
 
-test("rangeFor handles year boundaries and leap February", () => {
-  assert.deepEqual(rangeFor("last_month", new Date(2026, 0, 15)), { date_from: "2025-12-01", date_to: "2025-12-31" });
-  assert.deepEqual(rangeFor("last_3_months", new Date(2026, 1, 10)), { date_from: "2025-12-01", date_to: "2026-02-28" });
-  assert.deepEqual(rangeFor("this_month", new Date(2028, 1, 10)), { date_from: "2028-02-01", date_to: "2028-02-29" });
+test("loggedTime shows the time only when the row was logged on its own date", () => {
+  const at = (h: number, m: number, day = 28) => new Date(2026, 8, day, h, m).toISOString();
+  assert.equal(loggedTime(at(21, 40), "2026-09-28"), "9:40 pm");
+  assert.equal(loggedTime(at(0, 5), "2026-09-28"), "12:05 am");
+  assert.equal(loggedTime(at(12, 0), "2026-09-28"), "12:00 pm");
+  assert.equal(loggedTime(at(9, 7), "2026-09-28"), "9:07 am");
+  assert.equal(loggedTime(at(21, 40, 29), "2026-09-28"), null); // backdated: logged the next day
+  assert.equal(loggedTime(null, "2026-09-28"), null);
+  assert.equal(loggedTime("junk", "2026-09-28"), null);
 });
 
 test("shiftDays and relativeDayLabel", () => {
@@ -75,11 +80,8 @@ test("shiftDays and relativeDayLabel", () => {
   assert.equal(relativeDayLabel("2026-12-31", "2027-01-01"), "Yesterday");
 });
 
-test("monthKey and range validation", () => {
+test("monthKey", () => {
   assert.equal(monthKey(3, 2026), "2026-03");
-  assert.ok(isValidRange({ date_from: "2026-01-01", date_to: "2026-01-01" }));
-  assert.ok(!isValidRange({ date_from: "2026-02-01", date_to: "2026-01-01" }));
-  assert.ok(!isValidRange({ date_from: "2026-02-30", date_to: "2026-03-01" }));
 });
 
 test("isOverAYearAgo flags likely typos only", () => {

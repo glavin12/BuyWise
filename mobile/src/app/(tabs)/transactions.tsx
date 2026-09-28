@@ -1,33 +1,45 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
+import { Plus } from "lucide-react-native";
 import { useState } from "react";
 
 import { userMessage } from "@/lib/api";
-import { currentMonth, isValidRange, monthShift, rangeFor, relativeDayLabel, todayLocal, type DateRange, type RangeKind } from "@/lib/dates";
-import { formatDate, formatMinor } from "@/lib/format";
+import { currentMonth, loggedTime, monthBounds, monthKey, monthShift, relativeDayLabel, todayLocal, type MonthYear } from "@/lib/dates";
+import { formatCurrency, formatDate, formatMinor, formatMonth, formatMonthShort } from "@/lib/format";
+import { wholeIfRound } from "@/lib/home";
+import { METHOD_LABEL, TYPE_LABEL } from "@/lib/labels";
 import { flattenPages, groupByDay, matchesSearch, type DaySection } from "@/lib/ledger";
-import { categoriesQuery, monthIncomeQuery, profileQuery, transactionsListQuery, type TransactionFilters } from "@/lib/queries";
+import { categoriesQuery, profileQuery, transactionsListQuery } from "@/lib/queries";
+import { escapeRich } from "@/lib/richText";
+import type { Transaction } from "@/lib/types";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
 import { useRefetchStaleOnFocus } from "@/lib/useRefetchStaleOnFocus";
 import {
-  Amount,
   Banner,
-  Button,
-  Chips,
-  DateField,
-  EmptyState,
-  ErrorState,
-  Input,
+  CategoryTile,
+  Chip,
+  DayHeader,
+  Note,
+  OptionSheet,
+  Panel,
+  Pill,
+  PrimaryButton,
+  RichText,
   Row,
   Screen,
+  SearchField,
   SectionedList,
-  SectionHeader,
-  Segmented,
+  showToast,
   Skeleton,
   Stack,
-  Text,
-  TransactionRow,
+  Title,
+  TxRow,
+  type OptionGroup,
 } from "@/ui";
+
+// Activity (design/screens/03-activity.png, values from design/reference-html/Transactions.html):
+// title + category pill, search, type chips + month pill, count, day groups with their net.
+// The first-run coach mark above the centre tab is drawn by TabBar (`coachOn`).
 
 type TypeFilter = "all" | "expense" | "income";
 
@@ -37,44 +49,28 @@ const TYPES = [
   { label: "Income", value: "income" },
 ] as const;
 
-const RANGES = [
-  { label: "This month", value: "this_month" },
-  { label: "Last month", value: "last_month" },
-  { label: "3 months", value: "last_3_months" },
-  { label: "Custom", value: "custom" },
-] as const;
-
-// The chip that means "every category". Empty string can never be a real category id.
+const MONTHS_BACK = 12;
+// The "every category" choice in the sheet. An empty string can never be a real category id.
 const ALL_CATEGORIES = "";
-const VISIBLE_CATEGORIES = 4;
 
-export default function TransactionsTab() {
+export default function ActivityTab() {
   const router = useRouter();
+  const now = currentMonth();
   const [type, setType] = useState<TypeFilter>("all");
   const [categoryId, setCategoryId] = useState<string | null>(null);
-  const [categoriesExpanded, setCategoriesExpanded] = useState(false);
-  const [range, setRange] = useState<RangeKind>("this_month");
-  const [custom, setCustom] = useState<DateRange>(() => rangeFor("this_month"));
+  const [month, setMonth] = useState<MonthYear>(now);
+  const [sheet, setSheet] = useState<"category" | "month" | null>(null);
   const [search, setSearch] = useState("");
   const [refreshing, setRefreshing] = useState(false);
   const query = useDebouncedValue(search.trim(), 300);
 
-  // Categories are per type, so switching type drops whatever category was picked.
-  const changeType = (next: TypeFilter) => {
-    setType(next);
-    setCategoryId(null);
-    setCategoriesExpanded(false);
-  };
-
-  // Dates are always explicit and computed on the phone: the server's own
-  // "this month" follows its UTC clock, not the user's calendar.
-  const dates = range === "custom" ? custom : rangeFor(range);
-  const validRange = isValidRange(dates);
-  const filters: TransactionFilters = { type: type === "all" ? undefined : type, category_id: categoryId ?? undefined, ...dates };
-
-  const list = useInfiniteQuery({ ...transactionsListQuery(filters), enabled: validRange });
+  // Dates are explicit and computed on the phone: the server's "this month" follows its UTC clock.
+  const list = useInfiniteQuery(
+    transactionsListQuery({ type: type === "all" ? undefined : type, category_id: categoryId ?? undefined, ...monthBounds(month.month, month.year) }),
+  );
   const profile = useQuery(profileQuery);
-  const categoriesForType = useQuery({ ...categoriesQuery(type === "income" ? "income" : "expense"), enabled: type !== "all" });
+  const expenseCategories = useQuery(categoriesQuery("expense"));
+  const incomeCategories = useQuery(categoriesQuery("income"));
   useRefetchStaleOnFocus();
 
   const currency = profile.data?.currency ?? "INR";
@@ -83,28 +79,45 @@ export default function TransactionsTab() {
   const sections = groupByDay(shown);
   const today = todayLocal();
 
-  const activeCategories = categoriesForType.data?.categories.filter((c) => c.is_active) ?? [];
-  const visibleCategories = categoriesExpanded ? activeCategories : activeCategories.slice(0, VISIBLE_CATEGORIES);
-  const categoryChipOptions = [{ label: "All", value: ALL_CATEGORIES }, ...visibleCategories.map((c) => ({ label: c.name, value: c.id }))];
+  const active = (data: typeof expenseCategories.data) => data?.categories.filter((c) => c.is_active) ?? [];
+  const expense = active(expenseCategories.data);
+  const income = active(incomeCategories.data);
+  const picked = [...expense, ...income].find((c) => c.id === categoryId);
 
-  // ponytail: there is no range-analytics endpoint, only whole-month, so the money
-  // breakdown only shows for this/last month and only with no category narrowing it.
-  const summaryMonth = range === "this_month" ? currentMonth() : range === "last_month" ? monthShift(currentMonth().month, currentMonth().year, -1) : null;
-  const showMonthlyBreakdown = summaryMonth !== null && !categoryId;
-  const monthly = useQuery({ ...monthIncomeQuery(summaryMonth ?? currentMonth()), enabled: showMonthlyBreakdown });
+  // A picked category of the other type would filter everything out, so it goes.
+  const changeType = (next: TypeFilter) => {
+    setType(next);
+    if (picked && next !== "all" && picked.type !== next) setCategoryId(null);
+  };
+
+  const categoryGroups: OptionGroup[] = [
+    { options: [{ value: ALL_CATEGORIES, label: "All categories" }] },
+    ...(type !== "income" ? [{ title: "Expenses", options: expense.map((c) => ({ value: c.id, label: c.name })) }] : []),
+    ...(type !== "expense" ? [{ title: "Income", options: income.map((c) => ({ value: c.id, label: c.name })) }] : []),
+  ];
+
+  const openCategories = () => {
+    const failed = [expenseCategories, incomeCategories].find((q) => q.isError && !q.data);
+    if (failed) {
+      showToast(userMessage(failed.error, "load your categories"));
+      void failed.refetch();
+      return;
+    }
+    setSheet("category");
+  };
+
+  const months = Array.from({ length: MONTHS_BACK }, (_, i) => monthShift(now.month, now.year, -i));
+  const monthGroups: OptionGroup[] = [{ options: months.map((m) => ({ value: monthKey(m.month, m.year), label: formatMonth(m.month, m.year) })) }];
 
   const total = list.data?.pages[0]?.total;
-  const entriesText = total !== undefined ? `${total} ${total === 1 ? "entry" : "entries"}` : null;
-  const summaryText =
-    entriesText === null
+  const found =
+    total === undefined
       ? null
-      : showMonthlyBreakdown && monthly.data
-        ? type === "expense"
-          ? `${entriesText} · ${formatMinor(monthly.data.expenses, currency)} spent`
-          : type === "income"
-            ? `${entriesText} · ${formatMinor(monthly.data.income, currency)} in`
-            : `${entriesText} · ${formatMinor(monthly.data.expenses, currency)} spent · ${formatMinor(monthly.data.income, currency)} in`
-        : entriesText;
+      : query
+        ? list.hasNextPage
+          ? `${shown.length} found in the ${rows.length} loaded so far. Scroll for more.`
+          : `${shown.length} found`
+        : `${total} ${total === 1 ? "transaction" : "transactions"} found`;
 
   const refresh = async () => {
     if (refreshing) return; // G4: ignore a second pull while one is running
@@ -120,106 +133,81 @@ export default function TransactionsTab() {
     if (list.hasNextPage && !list.isFetchingNextPage) void list.fetchNextPage();
   };
 
-  const openTransaction = (id: string) => router.push(`/transaction/${id}`);
-
   const header = (
-    <Stack>
-      <Segmented options={TYPES} value={type} onChange={changeType} />
-      {type !== "all" && activeCategories.length > 0 ? (
-        <Stack gap="xs">
-          <Chips
-            label="Category"
-            options={categoryChipOptions}
-            value={categoryId ?? ALL_CATEGORIES}
-            onChange={(next) => setCategoryId(next && next !== ALL_CATEGORIES ? next : null)}
-          />
-          {activeCategories.length > VISIBLE_CATEGORIES ? (
-            <Button
-              title={categoriesExpanded ? "Fewer" : "More"}
-              variant="link"
-              onPress={() => setCategoriesExpanded((e) => !e)}
-            />
-          ) : null}
-        </Stack>
-      ) : null}
-      <Segmented options={RANGES} value={range} onChange={setRange} />
-      {range === "custom" ? (
-        <Row align="start">
-          <Stack grow>
-            <DateField label="From" value={custom.date_from} onChange={(date_from) => setCustom({ ...custom, date_from })} />
-          </Stack>
-          <Stack grow>
-            <DateField label="To" value={custom.date_to} onChange={(date_to) => setCustom({ ...custom, date_to })} />
-          </Stack>
-        </Row>
-      ) : null}
-      {validRange ? null : <Banner tone="warning" message="The end date is before the start date." />}
-      {summaryText ? (
-        <Text variant="caption" tone="muted">
-          {summaryText}
-        </Text>
-      ) : null}
-      <Input
-        label="Search"
+    <Stack gap="md">
+      <Row justify="between">
+        <Title>Activity</Title>
+        <Pill label={picked?.name ?? "all"} onPress={openCategories} />
+      </Row>
+      <SearchField
         value={search}
         onChangeText={setSearch}
-        placeholder="Payee, category, description or notes"
-        autoCorrect={false}
-        returnKeyType="search"
+        placeholder="Search by payee or note"
+        label="Search transactions"
+        onVoice={() => showToast("Voice search — coming soon")}
       />
-      {/* Search only sees what has been loaded, so say so instead of showing a false "no results". */}
-      {query && list.hasNextPage ? (
-        <Text variant="caption" tone="muted">
-          {`Searching the ${rows.length} transactions loaded so far. Scroll down to load more.`}
-        </Text>
-      ) : null}
-      {list.isError && list.data && !list.isFetchNextPageError ? (
-        <Banner tone="warning" message="Couldn't refresh. Showing what we have." />
-      ) : null}
+      <Row justify="between">
+        <Row gap="xs">
+          {TYPES.map((t) => (
+            <Chip key={t.value} label={t.label} variant={type === t.value ? "cream" : "card"} selected={type === t.value} onPress={() => changeType(t.value)} />
+          ))}
+        </Row>
+        <Pill variant="outlinedDark" label={formatMonthShort(month.month, month.year, now.year)} onPress={() => setSheet("month")} />
+      </Row>
+      {found ? <Note>{found}</Note> : null}
+      {/* C8: a refresh failed but rows are cached, so keep showing them. */}
+      {list.isError && list.data && !list.isFetchNextPageError ? <Banner tone="warning" message="Couldn't refresh. Showing what we have." /> : null}
     </Stack>
   );
 
-  const empty =
-    list.isPending && validRange ? (
-      <Stack>
-        {[0, 1, 2, 3, 4].map((i) => (
-          <Skeleton key={i} height={44} />
-        ))}
+  const empty = list.isPending ? (
+    <Stack gap="sm">
+      {[0, 1, 2, 3].map((i) => (
+        <Skeleton key={i} tone="dark" height={82} round="row" />
+      ))}
+    </Stack>
+  ) : list.isError && !list.data ? (
+    <Panel>
+      <Stack gap="md">
+        <Title size="cardTitle">{"Can't load\nactivity"}</Title>
+        <RichText tone="card">{escapeRich(userMessage(list.error, "load your transactions"))}</RichText>
+        <PrimaryButton label="Try again" onPress={() => list.refetch()} />
       </Stack>
-    ) : list.isError && !list.data ? (
-      <ErrorState message={userMessage(list.error, "load your transactions")} onRetry={() => list.refetch()} />
-    ) : query ? (
-      <EmptyState
-        icon="search-outline"
-        title="No matches"
-        message={list.hasNextPage ? "Nothing loaded so far matches. Scroll down to load more." : "Nothing matches that search."}
-      />
-    ) : (
-      <EmptyState
-        icon="receipt-outline"
-        title="No transactions"
-        message="Nothing here for these filters yet."
-        actionLabel="Add transaction"
-        onAction={() => router.push("/add-transaction")}
-      />
-    );
+    </Panel>
+  ) : query ? (
+    <Panel>
+      <RichText tone="card">{list.hasNextPage ? "Nothing loaded so far matches. Scroll down to load more." : "Nothing matches that search."}</RichText>
+    </Panel>
+  ) : (
+    <Panel>
+      <Stack gap="md">
+        <RichText tone="card">
+          {`Nothing logged in ${escapeRich(formatMonth(month.month, month.year))}${type !== "all" || picked ? " for these filters" : ""}. Add one here, or hold the {hi:+} button below any time.`}
+        </RichText>
+        <PrimaryButton label="Add transaction" icon={Plus} onPress={() => router.push("/add-transaction")} />
+      </Stack>
+    </Panel>
+  );
 
   const footer = list.isFetchingNextPage ? (
-    <Skeleton height={44} />
+    <Skeleton tone="dark" height={82} round="row" />
   ) : list.isFetchNextPageError ? (
-    <Button title="Couldn't load more. Try again" variant="link" onPress={() => list.fetchNextPage()} />
+    <RichText links={{ retry: () => list.fetchNextPage() }}>{"Couldn't load more. {dark@retry:Try again}"}</RichText>
   ) : null;
 
   return (
-    <Screen title="Transactions" scroll={false} tabBar>
+    <Screen surface="screen" tabBar scroll={false}>
       <SectionedList
+        v3
         sections={sections}
         keyExtractor={(tx) => tx.id}
-        renderItem={(tx) => <TransactionRow tx={tx} fallbackCurrency={currency} onPress={openTransaction} />}
+        renderItem={(tx) => <ActivityRow tx={tx} currency={currency} onPress={() => router.push(`/transaction/${tx.id}`)} />}
         renderSectionHeader={(section: DaySection) => (
-          <SectionHeader title={relativeDayLabel(section.date, today) ?? formatDate(section.date, "medium")}>
-            <Amount variant="caption" value={section.net / 100} currency={currency} signed />
-          </SectionHeader>
+          <DayHeader
+            label={relativeDayLabel(section.date, today) ?? formatDate(section.date, "medium")}
+            net={`${section.net < 0 ? "−" : section.net > 0 ? "+" : ""}${wholeIfRound(formatMinor(Math.abs(section.net), currency))}`}
+            kind={section.net < 0 ? "coral" : section.net > 0 ? "mint" : "dark"}
+          />
         )}
         header={header}
         footer={footer}
@@ -228,6 +216,54 @@ export default function TransactionsTab() {
         onRefresh={refresh}
         onEndReached={loadMore}
       />
+      <OptionSheet
+        visible={sheet === "category"}
+        title="Category"
+        groups={categoryGroups}
+        value={categoryId ?? ALL_CATEGORIES}
+        onSelect={(id) => {
+          setCategoryId(id === ALL_CATEGORIES ? null : id);
+          setSheet(null);
+        }}
+        onClose={() => setSheet(null)}
+      />
+      <OptionSheet
+        visible={sheet === "month"}
+        title="Month"
+        groups={monthGroups}
+        value={monthKey(month.month, month.year)}
+        onSelect={(key) => {
+          setMonth(months.find((m) => monthKey(m.month, m.year) === key) ?? now);
+          setSheet(null);
+        }}
+        onClose={() => setSheet(null)}
+      />
     </Screen>
+  );
+}
+
+/** Payee, then "note · method · time", the category tag, the signed amount (income in mint). */
+function ActivityRow({ tx, currency, onPress }: { tx: Transaction; currency: string; onPress: () => void }) {
+  const title = tx.payee || tx.category || TYPE_LABEL[tx.transaction_type];
+  // With no payee the category is already the title, so it isn't repeated as the tag.
+  const tag = tx.payee ? tx.category : null;
+  const meta = [tx.description, tx.payment_method && METHOD_LABEL[tx.payment_method], loggedTime(tx.created_at, tx.transaction_date)]
+    .filter(Boolean)
+    .join(" · ");
+  const money = wholeIfRound(formatCurrency(tx.display_amount, tx.currency || currency));
+  const sign = tx.transaction_type === "expense" ? "−" : tx.transaction_type === "income" ? "+" : "";
+  const spoken = tx.transaction_type === "expense" ? "spent" : tx.transaction_type === "income" ? "received" : "starting balance";
+
+  return (
+    <TxRow
+      tile={<CategoryTile name={tx.category} size={46} />}
+      title={title}
+      meta={meta}
+      tag={tag}
+      amount={`${sign}${money}`}
+      tone={tx.transaction_type === "income" ? "mint" : "text"}
+      label={[title, `${spoken} ${money}`, tag, meta].filter(Boolean).join(", ")}
+      onPress={onPress}
+    />
   );
 }

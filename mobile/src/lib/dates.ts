@@ -7,7 +7,6 @@
 
 export type MonthYear = { month: number; year: number };
 export type DateRange = { date_from: string; date_to: string };
-export type RangeKind = "this_month" | "last_month" | "last_3_months" | "custom";
 
 // The backend rejects budget years outside this window (budget_entries_year_check).
 export const MIN_YEAR = 2020;
@@ -84,32 +83,22 @@ export function relativeDayLabel(ymd: string, today: string): "Today" | "Yesterd
   return null;
 }
 
-function monthBounds(month: number, year: number): DateRange {
+/** A month's first and last day as explicit, inclusive dates (the backend compares with >= and <=). */
+export function monthBounds(month: number, year: number): DateRange {
   const lastDay = new Date(year, month, 0).getDate(); // day 0 of next month = last day of this one
   return { date_from: `${year}-${pad2(month)}-01`, date_to: `${year}-${pad2(month)}-${pad2(lastDay)}` };
 }
 
 /**
- * Explicit, inclusive date_from/date_to for a preset (the backend compares
- * with >= and <=, and its own period helpers use the server's UTC clock, so the
- * app always sends dates computed on the phone). "Last 3 months" is the current
- * calendar month plus the two before it.
+ * "9:40 pm": when a row was logged (`created_at`), but only if that was on its own
+ * calendar date. Transactions store a date, not a time, so a backdated entry shows none.
  */
-export function rangeFor(kind: Exclude<RangeKind, "custom">, now: Date = new Date()): DateRange {
-  const month = now.getMonth() + 1;
-  const year = now.getFullYear();
-  if (kind === "this_month") return monthBounds(month, year);
-  if (kind === "last_month") {
-    const last = monthShift(month, year, -1);
-    return monthBounds(last.month, last.year);
-  }
-  const start = monthShift(month, year, -2);
-  return { date_from: monthBounds(start.month, start.year).date_from, date_to: monthBounds(month, year).date_to };
-}
-
-/** True when a custom range is usable: both real dates and from <= to. */
-export function isValidRange(range: DateRange): boolean {
-  return parseDateOnly(range.date_from) !== null && parseDateOnly(range.date_to) !== null && range.date_from <= range.date_to;
+export function loggedTime(createdAt: string | null, ymd: string): string | null {
+  if (!createdAt) return null;
+  const at = new Date(createdAt);
+  if (isNaN(at.getTime()) || toYmd(at) !== ymd) return null;
+  const hours = at.getHours();
+  return `${hours % 12 || 12}:${pad2(at.getMinutes())} ${hours < 12 ? "am" : "pm"}`;
 }
 
 /** True when `ymd` is more than a year before `today` (a likely typo worth a hint). */

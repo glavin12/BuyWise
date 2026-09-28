@@ -87,6 +87,12 @@ export function formatMonth(month: number, year: number): string {
   return d.toLocaleDateString("en-US", { month: "long", year: "numeric" });
 }
 
+/** A month for a pill: "Sep", or "Sep 2025" outside `currentYear`. */
+export function formatMonthShort(month: number, year: number, currentYear = new Date().getFullYear()): string {
+  const name = new Date(year, month - 1).toLocaleDateString("en-US", { month: "short" });
+  return year === currentYear ? name : `${name} ${year}`;
+}
+
 /**
  * Relative time label (e.g. "2 hours ago").
  */
