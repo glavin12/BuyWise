@@ -38,8 +38,6 @@ export type ScreenProps = {
   tabBar?: boolean;
   /** Design v3 background. Omitted = the old cream background, until every screen has moved over. */
   surface?: "screen" | "sage" | "peri" | "cream";
-  /** The last block runs to the bottom edge and keeps itself clear of the tab bar (Budget's front envelope). */
-  bleed?: boolean;
   /** A floating button (`Fab`) over the content; the content gets room to scroll clear of it. */
   fab?: ReactNode;
 };
@@ -63,14 +61,13 @@ export function Screen({
   keyboard = false,
   tabBar = false,
   surface,
-  bleed = false,
   fab,
 }: ScreenProps) {
   const insets = useSafeAreaInsets();
   const online = useOnline();
   const barSpace = useTabBarSpace();
   // Scrolling tab roots pad their content instead, so it can pass under the bar's fade.
-  const bottom = bleed ? 0 : tabBar ? (scroll ? 0 : barSpace) : insets.bottom;
+  const bottom = tabBar ? (scroll ? 0 : barSpace) : insets.bottom;
 
   // While offline the OfflineBanner sits above the app and already covers the
   // status-bar area, so the screen must not add the top inset a second time.
@@ -99,7 +96,7 @@ export function Screen({
     ) : null;
 
   const body = scroll ? (
-    <ScrollBody onRefresh={onRefresh} refreshing={refreshing} bottom={(tabBar && !bleed ? barSpace : 0) + (fab ? FAB_SPACE : 0)} v3={!!surface} bleed={bleed}>
+    <ScrollBody onRefresh={onRefresh} refreshing={refreshing} bottom={(tabBar ? barSpace : 0) + (fab ? FAB_SPACE : 0)} v3={!!surface}>
       {children}
     </ScrollBody>
   ) : (
@@ -135,7 +132,6 @@ function ScrollBody({
   refreshing,
   bottom,
   v3,
-  bleed,
 }: {
   children: ReactNode;
   onRefresh?: () => void;
@@ -143,7 +139,6 @@ function ScrollBody({
   bottom: number;
   /** Design v3 spacing (18 side, 8 top, 12 between blocks) and a light spinner for the dark surfaces. */
   v3: boolean;
-  bleed: boolean;
 }) {
   const ref = useRef<ScrollView>(null);
   useScrollToTop(ref); // N7: tapping the tab you're on scrolls it back to the top (a no-op outside the tabs)
@@ -151,7 +146,7 @@ function ScrollBody({
   return (
     <ScrollView
       ref={ref}
-      contentContainerStyle={[styles.scrollContent, v3 && styles.v3Content, (bottom > 0 || bleed) && { paddingBottom: bottom }]}
+      contentContainerStyle={[styles.scrollContent, v3 && styles.v3Content, bottom > 0 && { paddingBottom: bottom }]}
       keyboardShouldPersistTaps="handled" // F2: a tap outside the field dismisses the keyboard
       refreshControl={onRefresh ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={v3 ? colors.text : undefined} colors={v3 ? [colors.ink] : undefined} progressBackgroundColor={v3 ? colors.cream : undefined} /> : undefined}
     >

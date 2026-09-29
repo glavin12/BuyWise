@@ -3,7 +3,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import type { BottomTabBarProps } from "expo-router/js-tabs";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useState } from "react";
 import { Keyboard, Platform, StyleSheet, Text as RNText, View } from "react-native";
 import Animated, { Easing, useAnimatedProps, useReducedMotion, useSharedValue, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -17,32 +17,7 @@ import { colors, extra, fonts, motion, radius, tabSurface } from "./tokens";
 // the screen colour. Centre = AI chat: tap opens Chat, hold (350 ms) opens the QuickAdd sheet.
 // Shapes, sizes and the icon paths come from design/reference-html/Dashboard.html.
 
-// Ours: the Budget bar takes its front envelope's colour, and tabSurface only has marigold.
-const SURFACES = {
-  ...tabSurface,
-  tomato: { ...tabSurface.marigold, fade: "rgb(240,96,74)", badge: colors.marigold },
-  mint: { ...tabSurface.marigold, fade: "rgb(190,227,203)" },
-  envelopeDark: { ...tabSurface.dark, fade: "rgb(43,43,46)" },
-};
-
-export type TabSurface = keyof typeof SURFACES;
-
-// A tab root can recolour its own bar while it shows (Budget: the front envelope, `EnvelopeFront`).
-let chosen: Partial<Record<string, TabSurface>> = {};
-const listeners = new Set<() => void>();
-const subscribe = (listener: () => void) => {
-  listeners.add(listener);
-  return () => void listeners.delete(listener);
-};
-
-/** Gives `route` this bar surface (over `TabBar`'s `surfaces`) until it sets another. */
-export function useTabSurface(route: string, surface: TabSurface) {
-  useEffect(() => {
-    if (chosen[route] === surface) return;
-    chosen = { ...chosen, [route]: surface };
-    listeners.forEach((listener) => listener());
-  }, [route, surface]);
-}
+export type TabSurface = keyof typeof tabSurface;
 
 const ROW = 62; // the centre circle, the tallest thing in the row
 const FADE = 128;
@@ -96,23 +71,12 @@ function rememberCoachSeen() {
 
 const fadeAt = (rgb: string, alpha: number) => rgb.replace("rgb(", "rgba(").replace(")", `,${alpha})`);
 
-/**
- * Pass as `<Tabs tabBar>`. `surfaces` gives a route its own bar colours (Budget: `marigold`);
- * `coachOn` is the route that shows the first-run coach mark above the centre button.
- */
-export function TabBar({
-  state,
-  descriptors,
-  navigation,
-  surfaces = {},
-  coachOn,
-}: BottomTabBarProps & { surfaces?: Partial<Record<string, TabSurface>>; coachOn?: string }) {
+/** Pass as `<Tabs tabBar>`. `coachOn` is the route that shows the first-run coach mark above the centre button. */
+export function TabBar({ state, descriptors, navigation, coachOn }: BottomTabBarProps & { coachOn?: string }) {
   const insets = useSafeAreaInsets();
   const keyboard = useKeyboardVisible();
   const focused = state.routes[state.index];
-  const overrides = useSyncExternalStore(subscribe, () => chosen);
-  const surfaceName = overrides[focused.name] ?? surfaces[focused.name] ?? "dark";
-  const surface = SURFACES[surfaceName];
+  const surface = tabSurface.dark;
   const bottom = rowBottom(insets.bottom);
   const [coachSeen, setCoachSeen] = useState(readCoachSeen);
 
@@ -129,7 +93,7 @@ export function TabBar({
       <LinearGradient
         colors={[fadeAt(surface.fade, 0), fadeAt(surface.fade, 0.92), surface.fade]}
         locations={[0, 0.42, 0.7]}
-        style={[styles.fade, { height: FADE + bottom - 20 }, surfaceName !== "dark" && styles.fadeInset]}
+        style={[styles.fade, { height: FADE + bottom - 20 }]}
       />
       <View style={[styles.row, styles.passThrough, { bottom }]} accessibilityRole="tablist">
         {state.routes.map((route, i) => {
@@ -238,7 +202,7 @@ function CentreButton({
   /** Called on a tap or a hold: the coach mark's job is done. */
   onUse: () => void;
   chatOpen: boolean;
-  surface: (typeof SURFACES)[TabSurface];
+  surface: (typeof tabSurface)[TabSurface];
 }) {
   const reduceMotion = useReducedMotion();
   const fill = useSharedValue(0); // 0..1 of the hold ring
@@ -303,7 +267,6 @@ function CentreButton({
 const styles = StyleSheet.create({
   passThrough: { pointerEvents: "box-none" },
   fade: { position: "absolute", left: 0, right: 0, bottom: 0, pointerEvents: "none" },
-  fadeInset: { left: 12, right: 12 }, // matches the Budget front card's width
   row: {
     position: "absolute",
     left: 14,

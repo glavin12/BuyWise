@@ -48,7 +48,7 @@ export { CircleButton, Fab, PillButton, PrimaryButton, SecondaryButton } from ".
 export { Chip, InlineChip, Pill, RichText, Toggle, type ChipVariant, type Hue } from "./Chips";
 export { DateChip } from "./DateChip";
 export { Dial } from "./Dial";
-export { BudgetedLine, EnvelopeFront, EnvelopeStack, EnvelopeTab, ReadyCard } from "./Envelopes";
+export { BudgetRow, BudgetTable, ReadyCard } from "./BudgetList";
 export { FieldButton, FieldInput } from "./Field";
 export { Illustration, type IllustrationName } from "./Illustration";
 export { OptionSheet, Sheet, SheetHandle, type OptionGroup } from "./OptionSheet";

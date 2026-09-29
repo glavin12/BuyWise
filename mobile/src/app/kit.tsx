@@ -4,15 +4,14 @@ import { useState } from "react";
 
 import { todayLocal } from "@/lib/dates";
 import {
-  BudgetedLine,
+  BudgetRow,
+  BudgetTable,
   CategoryChoice,
   DashedChoice,
   DateChip,
   Dial,
-  EnvelopeTab,
   FieldButton,
   GoalTile,
-  Meter,
   PillButton,
   ReadyCard,
   Toggle,
@@ -168,18 +167,18 @@ export default function KitScreen() {
       </Panel>
 
       <Title size="cardTitle">Budget</Title>
-      <ReadyCard amount="₹4,860" line="₹50,000 in − ₹45,140 assigned" action={<PillButton label="Copy Aug" icon={Copy} onPress={tap("copy")} />} />
-      <Stack gap="xs">
-        <EnvelopeTab name="Rent" status={{ kind: "done", text: "₹18,000 / 18,000" }} onPress={tap("rent")} />
-        <EnvelopeTab name="Groceries" status={{ kind: "over", text: "125% · over ₹1,200" }} onPress={tap("groceries")} />
-        <EnvelopeTab name="Transport" status={{ kind: "unset", text: "not budgeted" }} onPress={tap("transport")} onSet={tap("set")} />
-      </Stack>
-      <Panel color="marigold" large>
-        <Stack gap="md">
-          <Meter height={12} percent={79} tooltip="79%" label="Food budget used" />
-          <BudgetedLine amount="₹8,000" onPress={tap("budgeted")} />
-        </Stack>
-      </Panel>
+      <ReadyCard
+        amount="₹4,860"
+        line="give every rupee a job"
+        action={<PillButton label="Copy Aug" icon={Copy} onPress={tap("copy")} />}
+        secondary={<Chip variant="outlined" icon={Sparkles} label="Auto-assign · soon" onPress={tap("auto-assign")} />}
+      />
+      <BudgetTable>
+        <BudgetRow first name="Rent" dot="peri" assigned="₹18,000" state={{ kind: "done", available: "₹0", line: "fully spent", barPercent: 100 }} onPress={tap("rent")} />
+        <BudgetRow name="Food" dot="tomato" assigned="₹8,000" state={{ kind: "left", available: "₹1,700", line: "₹6,300 of ₹8,000 spent", barPercent: 79 }} onPress={tap("food")} />
+        <BudgetRow name="Groceries" dot="mint" assigned="₹5,000" state={{ kind: "over", available: "−₹1,200", line: "overspent by ₹1,200", barPercent: 100 }} onPress={tap("groceries")} />
+      </BudgetTable>
+      <BudgetTable loading />
 
       <Title size="cardTitle">Goals</Title>
       <Toggle look="sage" options={[{ label: "Active", value: "active" }, { label: "Achieved", value: "completed" }] as const} value={view} onChange={setView} />

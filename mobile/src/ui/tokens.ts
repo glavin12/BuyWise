@@ -96,11 +96,7 @@ export const extra = {
   coachShadow: 'rgba(0,0,0,0.35)', // the first-run coach mark (Transactions.html)
   scrim: 'rgba(0,0,0,0.45)', // behind an OptionSheet (ours: the design has no dropdown menu)
   symbolOnCream: '#8C8473', // the ₹ before the QuickAdd amount
-  proseOnCream: '#4E4A42',  // Budget "₹50,000 in − ₹45,140 assigned"
   mutedOnSage: '#5A564D',   // Goals dial "of ₹80,000 · 67%"
   errorOnCream: '#B3261E',  // ours: form errors on a cream sheet (the design draws none; tomato is too light for text)
   trackOnColour: 'rgba(22,22,22,0.14)', // progress track on a colour card
-  trackOnDark: 'rgba(243,241,234,0.16)', // ours: that track on the over-budget envelope
-  envelopeDark: '#2B2B2E',  // the over-budget envelope tab
-  envelopeShadow: 'rgba(0,0,0,0.12)',
 } as const;

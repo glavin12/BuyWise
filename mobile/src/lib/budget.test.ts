@@ -3,17 +3,15 @@ import { test } from "node:test";
 
 import {
   budgetProgress,
+  budgetRow,
+  byAssigned,
   copyBudgets,
   copySummary,
-  envelopesFor,
-  envelopeStack,
-  envelopeStatus,
-  frontEnvelope,
   readyToAssign,
   unbudgetedCategories,
 } from "./budget.ts";
 import type { BudgetCopyItem } from "./ledger.ts";
-import type { Budget, Category, CategorySpending } from "./types";
+import type { Budget, Category } from "./types";
 
 function category(id: string, name: string, extra: Partial<Category> = {}): Category {
   return { id, name, type: "expense", icon: null, color: null, is_active: true, created_at: null, updated_at: null, ...extra };
@@ -77,66 +75,20 @@ function budget(categoryId: string, budgeted: number, spent: number): Budget {
   };
 }
 
-const spend = (categoryId: string, amount: number, count: number): CategorySpending => ({
-  category_id: categoryId,
-  category: categoryId,
-  icon: null,
-  color: null,
-  amount,
-  display_amount: amount / 100,
-  transaction_count: count,
-  percent_of_total: 0,
+test("byAssigned: the most assigned first, ties by name", () => {
+  const sorted = byAssigned([budget("fuel", 100, 0), budget("rent", 1800000, 0), budget("bus", 100, 0), budget("food", 800000, 0)]);
+  assert.deepEqual(sorted.map((b) => b.category_id), ["rent", "food", "bus", "fuel"]);
 });
 
-test("envelopesFor: budgets first, then unbudgeted categories with spending (most first), the rest apart", () => {
-  const cats = [category("food", "Food"), category("rent", "Rent"), category("fuel", "Fuel"), category("bus", "Bus"), category("pets", "Pets")];
-  const { envelopes, rest } = envelopesFor(
-    [budget("rent", 1800000, 1800000), budget("gone", 1000, 0)],
-    [spend("food", 630000, 14), spend("rent", 1800000, 1), spend("bus", 900000, 3)],
-    cats,
-  );
-  assert.deepEqual(envelopes.map((e) => [e.categoryId, e.spent, e.count, e.archived]), [
-    ["rent", 1800000, 1, false],
-    ["gone", 0, 0, true], // its category is no longer in the active list
-    ["bus", 900000, 3, false],
-    ["food", 630000, 14, false],
-  ]);
-  assert.deepEqual(rest.map((c) => c.id), ["fuel", "pets"]);
-  // Categories not loaded: only the budgets are known, none marked archived.
-  assert.deepEqual(envelopesFor([budget("rent", 1, 0)], [], undefined), {
-    envelopes: [{ categoryId: "rent", name: "rent", budget: budget("rent", 1, 0), spent: 0, count: 0, archived: false }],
-    rest: [],
-  });
-});
-
-test("frontEnvelope: the picked one, else the most spent", () => {
-  const { envelopes } = envelopesFor([budget("a", 100, 10), budget("b", 100, 50), budget("c", 100, 50)], [], []);
-  assert.equal(frontEnvelope(envelopes, null)?.categoryId, "b"); // a tie keeps the first
-  assert.equal(frontEnvelope(envelopes, "a")?.categoryId, "a");
-  assert.equal(frontEnvelope(envelopes, "gone")?.categoryId, "b");
-  assert.equal(frontEnvelope([], null), undefined);
-});
-
-test("envelopeStack: a tapped card comes to the front, the old front goes to the end of the tabs", () => {
-  const { envelopes } = envelopesFor([budget("rent", 100, 10), budget("food", 100, 90), budget("bus", 100, 20), budget("fuel", 100, 5)], [], []);
-  const ids = (s: ReturnType<typeof envelopeStack>) => [s.behind.map((e) => e.categoryId), s.front?.categoryId];
-  assert.deepEqual(ids(envelopeStack(envelopes, [])), [["rent", "bus", "fuel"], "food"]); // most spent in front
-  assert.deepEqual(ids(envelopeStack(envelopes, ["bus"])), [["rent", "fuel", "food"], "bus"]);
-  assert.deepEqual(ids(envelopeStack(envelopes, ["bus", "rent"])), [["fuel", "food", "bus"], "rent"]);
-  assert.deepEqual(ids(envelopeStack(envelopes, ["bus", "rent", "food"])), [["fuel", "bus", "rent"], "food"]);
-  assert.deepEqual(ids(envelopeStack(envelopes, ["gone", "bus"])), [["rent", "fuel", "food"], "bus"]); // an envelope no longer there is ignored
-  assert.deepEqual(ids(envelopeStack([], ["bus"])), [[], undefined]);
-});
-
-test("envelopeStatus says the state in words", () => {
+test("budgetRow says the state in words, with what is available", () => {
   const money = (minor: number) => `₹${(minor / 100).toLocaleString("en-IN")}`;
-  const status = (b: Budget | null, spent = b?.spent ?? 0) =>
-    envelopeStatus({ categoryId: "x", name: "X", budget: b, spent, count: 0, archived: false }, money);
-  assert.deepEqual(status(budget("x", 1800000, 1800000)), { kind: "done", text: "₹18,000 / 18,000" });
-  assert.deepEqual(status(budget("x", 800000, 630000)), { kind: "progress", text: "₹6,300 / 8,000" });
-  assert.deepEqual(status(budget("x", 480000, 600000)), { kind: "over", text: "125% · over ₹1,200" });
-  assert.deepEqual(status(budget("x", 0, 300)), { kind: "over", text: "over ₹3" }); // no budget to divide by, so no percent
-  assert.deepEqual(status(null, 500), { kind: "unset", text: "not budgeted" });
+  const row = (budgeted: number, spent: number) => budgetRow(budget("x", budgeted, spent), money);
+  assert.deepEqual(row(150000, 124000), { kind: "left", available: "₹260", line: "₹1,240 of ₹1,500 spent", barPercent: 83 });
+  assert.deepEqual(row(1800000, 1800000), { kind: "done", available: "₹0", line: "fully spent", barPercent: 100 });
+  assert.deepEqual(row(500000, 620000), { kind: "over", available: "−₹1,200", line: "overspent by ₹1,200", barPercent: 100 });
+  assert.deepEqual(row(0, 0), { kind: "done", available: "₹0", line: "nothing assigned", barPercent: 0 });
+  assert.deepEqual(row(0, 300), { kind: "over", available: "−₹3", line: "overspent by ₹3", barPercent: 100 });
+  assert.equal(row(800000, 0).line, "₹0 of ₹8,000 spent");
 });
 
 test("copyBudgets writes in order and carries on past an individual failure", async () => {

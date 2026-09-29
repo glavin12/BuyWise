@@ -7,7 +7,7 @@ import { TabBar } from "@/ui";
 // shows the first-run coach mark for it (design/screens/03-activity.png).
 export default function TabsLayout() {
   return (
-    <Tabs screenOptions={{ headerShown: false }} tabBar={(props) => <TabBar {...props} surfaces={{ budget: "marigold" }} coachOn="transactions" />}>
+    <Tabs screenOptions={{ headerShown: false }} tabBar={(props) => <TabBar {...props} coachOn="transactions" />}>
       <Tabs.Screen name="index" options={{ title: "Home" }} />
       <Tabs.Screen name="transactions" options={{ title: "Activity" }} />
       <Tabs.Screen name="chat" options={{ title: "Chat" }} />

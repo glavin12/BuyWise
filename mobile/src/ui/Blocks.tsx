@@ -140,34 +140,21 @@ export function Note({ children, tone = "muted" }: { children: string; tone?: ke
   );
 }
 
-/** Ink progress bar on a colour card, with an optional ink tooltip ("79%") above the fill's end. `tone` text on a dark card. */
-export function Meter({
-  percent,
-  height = 8,
-  tooltip,
-  label,
-  tone = "ink",
-}: {
-  percent: number;
-  height?: 8 | 12;
-  tooltip?: string;
-  label: string;
-  tone?: "ink" | "text";
-}) {
-  const light = tone === "text";
+/** Ink progress bar on a colour card, with an optional ink tooltip ("79%") above the fill's end. */
+export function Meter({ percent, height = 8, tooltip, label }: { percent: number; height?: 8 | 12; tooltip?: string; label: string }) {
   const p = Math.max(0, Math.min(100, percent));
   return (
     <View
       accessibilityRole="progressbar"
       accessibilityLabel={label}
       accessibilityValue={{ min: 0, max: 100, now: Math.round(p) }}
-      style={[styles.meter, { height }, tooltip && styles.meterTipRoom, light && styles.meterOnDark]}
+      style={[styles.meter, { height }, tooltip && styles.meterTipRoom]}
     >
-      <View style={[styles.meterFill, { width: `${p}%`, backgroundColor: colors[tone] }]} />
+      <View style={[styles.meterFill, { width: `${p}%` }]} />
       {tooltip ? (
         // A 60-wide anchor centred on the fill's end centres the tip over it.
         <View style={[styles.tipAnchor, { left: `${p}%` }]}>
-          <RNText style={[styles.tip, light && styles.tipOnDark]}>{tooltip}</RNText>
+          <RNText style={styles.tip}>{tooltip}</RNText>
         </View>
       ) : null}
     </View>
@@ -300,8 +287,7 @@ const styles = StyleSheet.create({
   goalAmounts: { fontFamily: fonts.mono, fontSize: 10.5, color: colors.ink },
   meter: { borderRadius: radius.pill, backgroundColor: extra.trackOnColour },
   meterTipRoom: { marginTop: 22 },
-  meterOnDark: { backgroundColor: extra.trackOnDark },
-  meterFill: { height: "100%", borderRadius: radius.pill },
+  meterFill: { height: "100%", borderRadius: radius.pill, backgroundColor: colors.ink },
   tipAnchor: { position: "absolute", top: -26, width: 60, marginLeft: -30, alignItems: "center" },
   tip: {
     fontFamily: fonts.mono,
@@ -313,7 +299,6 @@ const styles = StyleSheet.create({
     color: colors.cream,
     backgroundColor: colors.ink,
   },
-  tipOnDark: { color: colors.ink, backgroundColor: colors.text },
   tx: { flexDirection: "row", alignItems: "center", gap: 12, padding: 12, borderRadius: radius.row, backgroundColor: colors.card },
   txText: { flex: 1, minWidth: 0 },
   txTitle: { ...type.rowTitle, color: colors.text },
