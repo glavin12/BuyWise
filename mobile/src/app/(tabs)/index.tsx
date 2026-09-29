@@ -302,7 +302,7 @@ function RecentTile({ tx, currency, onPress }: { tx: Transaction; currency: stri
   const sign = tx.transaction_type === "expense" ? "−" : tx.transaction_type === "income" ? "+" : "";
   return (
     <MiniTile
-      tile={<CategoryTile name={tx.category} size={30} />}
+      tile={<CategoryTile name={tx.category} icon={tx.category_icon} size={30} />}
       name={name}
       amount={`${sign}${compactMoney(tx.amount, tx.currency || currency)}`}
       tone={tx.transaction_type === "income" ? "mint" : "text"}

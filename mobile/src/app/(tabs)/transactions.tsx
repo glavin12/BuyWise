@@ -259,7 +259,7 @@ function ActivityRow({ tx, currency, onPress }: { tx: Transaction; currency: str
 
   return (
     <TxRow
-      tile={<CategoryTile name={tx.category} size={46} />}
+      tile={<CategoryTile name={tx.category} icon={tx.category_icon} size={46} />}
       title={title}
       meta={meta}
       tag={tag}

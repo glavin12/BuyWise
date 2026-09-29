@@ -234,6 +234,7 @@ export default function AddTransactionModal() {
                   key={c.id}
                   name={c.name}
                   color={c.color}
+                  icon={c.icon}
                   selected={c.id === draft.category?.id}
                   onPress={() => chooseCategory({ id: c.id, name: c.name, icon: c.icon })}
                 />
