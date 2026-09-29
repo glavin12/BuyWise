@@ -21,6 +21,8 @@ export function EmptyState({
   icon?: IconName;
   actionLabel?: string;
   onAction?: () => void;
+  /** What it sits on: default dark (charcoal screens); "cream" on a form sheet. */
+  surface?: "dark" | "cream";
 }) {
   return (
     <View style={styles.center}>
@@ -47,6 +49,8 @@ export function ErrorState({
   title?: string;
   message: string;
   onRetry: () => void | Promise<unknown>;
+  /** What it sits on: default dark (charcoal screens); "cream" on a form sheet. */
+  surface?: "dark" | "cream";
 }) {
   return (
     <View style={styles.center}>
