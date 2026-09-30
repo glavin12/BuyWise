@@ -1,13 +1,15 @@
+import { Check, User } from "lucide-react-native";
+
 import { TYPE_LABEL } from "@/lib/labels";
 import { PAYEE_NAME_MAX, type PayeeDraft, type PayeeErrors } from "@/lib/settings";
 
 import { Banner } from "./Banner";
-import { Button } from "./Button";
-import { Input } from "./Input";
+import { Note } from "./Blocks";
+import { PrimaryButton, SecondaryButton } from "./Buttons";
+import { Toggle } from "./Chips";
+import { FieldInput } from "./Field";
 import { Stack } from "./Layout";
-import { Screen } from "./Screen";
-import { Segmented } from "./Controls";
-import { Text } from "./Text";
+import { SheetScreen } from "./SheetScreen";
 
 const TYPE_OPTIONS = [
   { label: TYPE_LABEL.expense, value: "expense" as const },
@@ -15,8 +17,8 @@ const TYPE_OPTIONS = [
 ];
 
 /**
- * The payee form shared by New and Edit: name and type. The API's PayeeUpdate
- * only takes a name, so the type picker locks once the payee exists.
+ * The payee form shared by New and Edit, on the cream sheet QuickAdd uses: type and name. The API's
+ * PayeeUpdate only takes a name, so the type is a line of text once the payee exists.
  */
 export function PayeeEditor({
   title,
@@ -36,37 +38,36 @@ export function PayeeEditor({
   autoFocusName?: boolean;
   errors: PayeeErrors;
   formError: string | null;
-  primary: { label: string; onPress: () => Promise<unknown>; disabled?: boolean };
-  /** Edit only: the Delete action, rendered below Save. */
+  primary: { onPress: () => Promise<unknown>; disabled?: boolean };
+  /** Edit only: the Delete action, below Save. */
   danger?: { label: string; onPress: () => Promise<unknown>; disabled?: boolean };
 }) {
   return (
-    <Screen title={title} back keyboard>
-      {formError ? <Banner tone="error" message={formError} /> : null}
+    <SheetScreen title={title}>
+      {formError ? <Banner tone="error" surface="cream" message={formError} /> : null}
 
-      <Input
-        label="Name"
-        value={draft.name}
-        onChangeText={(name) => onChange({ ...draft, name })}
-        maxLength={PAYEE_NAME_MAX}
-        autoFocus={autoFocusName}
-        returnKeyType="done"
-        error={errors.name}
-      />
+      {editing ? (
+        <Note tone="cream">{`${TYPE_LABEL[draft.type]} payee. The type can't be changed.`}</Note>
+      ) : (
+        <Toggle options={TYPE_OPTIONS} value={draft.type} onChange={(type) => onChange({ ...draft, type })} />
+      )}
 
       <Stack gap="xs">
-        <Text variant="caption" tone="muted">
-          Type
-        </Text>
-        {editing ? (
-          <Text>{TYPE_LABEL[draft.type]}</Text>
-        ) : (
-          <Segmented options={TYPE_OPTIONS} value={draft.type} onChange={(type) => onChange({ ...draft, type })} />
-        )}
+        <FieldInput
+          icon={User}
+          accessibilityLabel="Name"
+          placeholder="Payee name"
+          value={draft.name}
+          onChangeText={(name) => onChange({ ...draft, name })}
+          maxLength={PAYEE_NAME_MAX}
+          autoFocus={autoFocusName}
+          returnKeyType="done"
+        />
+        {errors.name ? <Note tone="error">{errors.name}</Note> : null}
       </Stack>
 
-      <Button title={primary.label} onPress={primary.onPress} disabled={primary.disabled} requiresNetwork />
-      {danger ? <Button title={danger.label} variant="danger" onPress={danger.onPress} disabled={danger.disabled} requiresNetwork /> : null}
-    </Screen>
+      <PrimaryButton label="Save" icon={Check} onPress={primary.onPress} disabled={primary.disabled} requiresNetwork />
+      {danger ? <SecondaryButton label={danger.label} danger onPress={danger.onPress} disabled={danger.disabled} requiresNetwork /> : null}
+    </SheetScreen>
   );
 }

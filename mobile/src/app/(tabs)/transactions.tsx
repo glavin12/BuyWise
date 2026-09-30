@@ -201,7 +201,6 @@ export default function ActivityTab() {
   return (
     <Screen surface="screen" tabBar scroll={false}>
       <SectionedList
-        v3
         sections={sections}
         keyExtractor={(tx) => tx.id}
         renderItem={(tx) => <ActivityRow tx={tx} currency={currency} onPress={() => router.push(`/transaction/${tx.id}`)} />}
@@ -259,7 +258,7 @@ function ActivityRow({ tx, currency, onPress }: { tx: Transaction; currency: str
 
   return (
     <TxRow
-      tile={<CategoryTile name={tx.category} size={46} />}
+      tile={<CategoryTile name={tx.category} icon={tx.category_icon} size={46} />}
       title={title}
       meta={meta}
       tag={tag}

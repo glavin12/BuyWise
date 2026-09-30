@@ -1,16 +1,23 @@
 import { StyleSheet, Text as RNText, View } from "react-native";
+import Animated, { useAnimatedProps } from "react-native-reanimated";
 import Svg, { Circle, Line } from "react-native-svg";
 
+import { useDraw } from "./motion";
 import { colors, extra, fonts, type } from "./tokens";
 
 // The Goals dial (DESIGN.md §3 `Dial`; geometry from design/reference-html/Goals.html, a 310 box):
 // cream face, 120 ticks (every 10th longer and darker), a 30-wide tomato arc over its track,
-// an ink inner ring and an ink knob with a marigold centre at the arc's end.
+// an ink inner ring and an ink knob with a marigold centre at the arc's end. The arc draws from 0 on
+// mount and sweeps to a new goal's percent (§6.4); the knob rides its end.
 
 const C = 155;
 const ARC_R = 105;
 const CIRCUMFERENCE = 2 * Math.PI * ARC_R;
-const point = (r: number, turn: number) => ({ x: C + r * Math.sin(turn * 2 * Math.PI), y: C - r * Math.cos(turn * 2 * Math.PI) });
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+const point = (r: number, turn: number) => {
+  "worklet"; // the knob's animated props call it on the UI thread
+  return { x: C + r * Math.sin(turn * 2 * Math.PI), y: C - r * Math.cos(turn * 2 * Math.PI) };
+};
 
 const TICKS = Array.from({ length: 120 }, (_, i) => {
   const major = i % 10 === 0;
@@ -22,8 +29,12 @@ const TICKS = Array.from({ length: 120 }, (_, i) => {
 /** In the middle: the goal's name, the saved amount and a line under it ("of ₹80,000 · 67%"). */
 export function Dial({ percent, title, amount, sub, label }: { percent: number; title: string; amount: string; sub: string; label: string }) {
   const size = 310;
-  const p = Math.max(0, Math.min(100, percent)) / 100;
-  const knob = point(ARC_R, p);
+  const drawn = useDraw(Math.max(0, Math.min(100, percent)) / 100); // how far round the arc is now: 0 to the goal's share
+  const arc = useAnimatedProps(() => ({ strokeDashoffset: CIRCUMFERENCE * (1 - drawn.get()) }));
+  const knob = useAnimatedProps(() => {
+    const { x, y } = point(ARC_R, drawn.get());
+    return { cx: x, cy: y };
+  });
   return (
     <View style={{ width: size, height: size }} accessible accessibilityRole="image" accessibilityLabel={label}>
       <Svg width={size} height={size} viewBox="0 0 310 310">
@@ -42,20 +53,21 @@ export function Dial({ percent, title, amount, sub, label }: { percent: number; 
           />
         ))}
         <Circle cx={C} cy={C} r={ARC_R} fill="none" stroke={extra.track} strokeWidth={30} />
-        <Circle
+        <AnimatedCircle
           cx={C}
           cy={C}
           r={ARC_R}
           fill="none"
           stroke={colors.tomato}
           strokeWidth={30}
-          strokeDasharray={`${CIRCUMFERENCE * p} ${CIRCUMFERENCE}`}
+          strokeDasharray={CIRCUMFERENCE}
+          animatedProps={arc}
           transform={`rotate(-90 ${C} ${C})`}
         />
         <Circle cx={C} cy={C} r={90} fill="none" stroke={colors.ink} strokeWidth={2.4} />
         <Circle cx={C} cy={C} r={120} fill="none" stroke={colors.ink} strokeWidth={1.4} opacity={0.35} />
-        <Circle cx={knob.x} cy={knob.y} r={11} fill={colors.ink} />
-        <Circle cx={knob.x} cy={knob.y} r={4} fill={colors.marigold} />
+        <AnimatedCircle r={11} fill={colors.ink} animatedProps={knob} />
+        <AnimatedCircle r={4} fill={colors.marigold} animatedProps={knob} />
       </Svg>
       <View style={styles.centre}>
         <RNText style={styles.title} numberOfLines={1}>

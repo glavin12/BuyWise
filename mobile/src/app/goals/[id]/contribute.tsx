@@ -1,50 +1,49 @@
 import { useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { Plus, Sparkle } from "lucide-react-native";
 import { useState } from "react";
 
 import { userMessage } from "@/lib/api";
 import { formatCurrency, formatMinor } from "@/lib/format";
-import { contributionPreview, justAchieved } from "@/lib/goals";
+import { contributionPreview, justAchieved, percentOf } from "@/lib/goals";
+import { currencySymbol, wholeIfRound } from "@/lib/home";
 import { isUuid } from "@/lib/ids";
 import { parsePositiveAmount } from "@/lib/money";
 import { useUpdateGoal } from "@/lib/mutations";
 import { profileQuery, useOpenedGoal } from "@/lib/queries";
 import type { Goal } from "@/lib/types";
 import {
-  AmountInput,
   Banner,
-  Button,
-  Card,
   Celebration,
-  ErrorState,
+  Chip,
+  EntryAmount,
   hapticSuccess,
-  NotFoundScreen,
-  Screen,
+  Meter,
+  Note,
+  PrimaryButton,
+  Row,
+  SheetLoading,
+  SheetNotFound,
+  SheetScreen,
   showToast,
-  Skeleton,
-  Text,
+  Stack,
+  Title,
   useDiscardGuard,
 } from "@/ui";
 
+// Contribute: a cream sheet over the Goals screen. Reaching the target shows the celebration.
+
 export default function ContributeRoute() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  if (!isUuid(id)) return <NotFoundScreen title="Contribute" what="Goal" />;
+  if (!isUuid(id)) return <SheetNotFound title="Contribute" what="Goal" />;
   return <ContributeLoader id={id} />;
 }
 
 function ContributeLoader({ id }: { id: string }) {
   const lookup = useOpenedGoal(id);
   if (lookup.goal) return <ContributeForm goal={lookup.goal} />;
-  if (lookup.missing) return <NotFoundScreen title="Contribute" what="Goal" />;
-  return (
-    <Screen title="Contribute" back>
-      {lookup.error ? (
-        <ErrorState message={userMessage(lookup.error, "load this goal")} onRetry={lookup.refetch} />
-      ) : (
-        <Skeleton height={160} />
-      )}
-    </Screen>
-  );
+  if (lookup.missing) return <SheetNotFound title="Contribute" what="Goal" />;
+  return <SheetLoading title="Contribute" error={lookup.error ? userMessage(lookup.error, "load this goal") : null} onRetry={lookup.refetch} />;
 }
 
 function ContributeForm({ goal }: { goal: Goal }) {
@@ -58,6 +57,7 @@ function ContributeForm({ goal }: { goal: Goal }) {
   const { allowLeave } = useDiscardGuard(text.trim() !== "");
 
   const currency = profile.data?.currency ?? "INR";
+  const money = (display: number) => wholeIfRound(formatCurrency(display, currency));
   const { minor, error } = parsePositiveAmount(text);
   const preview = minor === null ? null : contributionPreview(goal.current_amount, goal.target_amount, minor);
 
@@ -90,36 +90,33 @@ function ContributeForm({ goal }: { goal: Goal }) {
     <Celebration
       show={reached !== null}
       title="Goal reached!"
-      message={reached ? `You've saved ${formatCurrency(reached.display_target_amount, currency)} for "${reached.title}".` : ""}
+      message={reached ? `You've saved ${money(reached.display_target_amount)} for "${reached.title}".` : ""}
       onDone={() => router.back()}
     >
-      <Screen title="Contribute" back keyboard>
-        {failure ? <Banner tone="error" message={failure} /> : null}
+      <SheetScreen title="Contribute">
+        {failure ? <Banner tone="error" surface="cream" message={failure} /> : null}
 
-        <Card>
-          <Text variant="heading">{goal.title}</Text>
-          <Text tone="muted">{`${formatCurrency(goal.display_current_amount, currency)} of ${formatCurrency(goal.display_target_amount, currency)} saved`}</Text>
-        </Card>
+        <Stack gap="sm">
+          <Title size="cardTitle" tone="ink">
+            {goal.title}
+          </Title>
+          <Note tone="cream">{`${money(goal.display_current_amount)} of ${money(goal.display_target_amount)} saved`}</Note>
+          <Meter percent={percentOf(goal.current_amount, goal.target_amount)} label={`${goal.title} progress`} />
+        </Stack>
 
-        <AmountInput
-          label={`Amount to add (${currency})`}
-          value={text}
-          onChange={setText}
-          currency={currency}
-          error={attempted ? error : null}
-          autoFocus
-        />
+        <Stack gap="xs">
+          <EntryAmount value={text} onChange={setText} symbol={currencySymbol(currency)} label="Amount to add" autoFocus />
+          {attempted && error ? <Note tone="error">{error}</Note> : null}
+          {preview ? (
+            <Row justify="center" gap="xs" wrap>
+              <Chip variant="outlined" label={`New total ${wholeIfRound(formatMinor(preview.total, currency))} · ${preview.percent}%`} />
+              {preview.achieves ? <Chip variant="mint" icon={Sparkle} label="This reaches your goal!" /> : null}
+            </Row>
+          ) : null}
+        </Stack>
 
-        {preview ? (
-          <Text tone={preview.achieves ? "positive" : "muted"}>
-            {preview.achieves
-              ? `New total ${formatMinor(preview.total, currency)} · this reaches your goal!`
-              : `New total ${formatMinor(preview.total, currency)} · ${preview.percent}%`}
-          </Text>
-        ) : null}
-
-        <Button title="Add to goal" onPress={save} disabled={update.isPending} requiresNetwork />
-      </Screen>
+        <PrimaryButton label="Contribute" icon={Plus} onPress={save} disabled={update.isPending} requiresNetwork />
+      </SheetScreen>
     </Celebration>
   );
 }

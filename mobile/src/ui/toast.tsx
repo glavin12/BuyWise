@@ -1,9 +1,8 @@
 import { useSyncExternalStore } from "react";
-import { StyleSheet, View } from "react-native";
+import { StyleSheet, Text as RNText, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { Text } from "./Text";
-import { theme } from "./theme";
+import { colors, extra, fonts, radius, space } from "./tokens";
 
 // One message at a time. Any screen calls showToast(); <ToastHost /> in the app
 // shell shows it above whatever is on screen, then clears it.
@@ -30,6 +29,7 @@ function subscribe(listener: () => void) {
   };
 }
 
+/** A cream pill with a soft shadow, like the first-run coach mark (Transactions.html): cream reads on charcoal, and the shadow keeps it apart on sage and cream. */
 export function ToastHost() {
   const text = useSyncExternalStore(subscribe, () => message, () => null);
   const insets = useSafeAreaInsets();
@@ -38,21 +38,21 @@ export function ToastHost() {
   return (
     <View pointerEvents="none" style={[styles.wrap, { bottom: insets.bottom + 88 }]}>
       <View accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.toast}>
-        <Text tone="onAccent" align="center">
-          {text}
-        </Text>
+        <RNText style={styles.text}>{text}</RNText>
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { position: "absolute", left: 0, right: 0, alignItems: "center", paddingHorizontal: theme.space.lg },
+  wrap: { position: "absolute", left: 0, right: 0, alignItems: "center", paddingHorizontal: space.screenX },
   toast: {
-    maxWidth: theme.maxContentWidth,
-    paddingVertical: theme.space.md,
-    paddingHorizontal: theme.space.lg,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.color.text,
+    maxWidth: 420,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: radius.tile,
+    backgroundColor: colors.cream,
+    boxShadow: `0 8px 20px ${extra.coachShadow}`,
   },
+  text: { fontFamily: fonts.monoMedium, fontSize: 12, lineHeight: 18, textAlign: "center", color: colors.ink },
 });

@@ -48,7 +48,7 @@ export default function NewCategorySheet() {
       autoFocusName
       errors={attempted ? errors : {}}
       formError={create.isError ? userMessage(create.error, "create this category") : null}
-      primary={{ label: "Create category", onPress: save, disabled: create.isPending }}
+      primary={{ onPress: save, disabled: create.isPending }}
     />
   );
 }

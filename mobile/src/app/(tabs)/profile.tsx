@@ -1,113 +1,168 @@
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
+import { Globe, LayoutGrid, Pencil, User } from "lucide-react-native";
+import { useState } from "react";
 
 import { userMessage } from "@/lib/api";
 import { useUpdateProfile } from "@/lib/mutations";
 import { useOnline } from "@/lib/network";
-import { profileQuery } from "@/lib/queries";
+import { categoriesQuery, payeesQuery, profileQuery } from "@/lib/queries";
+import { displayName, regionLabel, sinceLabel } from "@/lib/settings";
+import { useRefetchStaleOnFocus } from "@/lib/useRefetchStaleOnFocus";
 import { useAuth } from "@/providers/AuthProvider";
-import { Button, Card, confirm, Screen, SettingsRow, showToast, Stack, Text } from "@/ui";
+import {
+  Banner,
+  CircleButton,
+  confirm,
+  ErrorState,
+  Illustration,
+  Note,
+  Panel,
+  Row,
+  Screen,
+  SectionLabel,
+  showToast,
+  SignOutButton,
+  Skeleton,
+  Stack,
+  Ticket,
+  TicketStack,
+  Title,
+} from "@/ui";
 
-// Phase 5; the Profile tab since design v3 (was the Settings stack screen). Profile, Categories, Payees and the Budget alerts switch are wired
-// to the backend; everything else here has no backend field yet and shows a
-// "Coming soon" toast, matching the web (frontend/lib/coming-soon.ts).
+// Profile (design/screens/09-profile.png, values from design/reference-html/Settings.html): the profile card,
+// four tilted tickets (Categories, Payees, Budget alerts, Region) and Sign out. Each ticket opens its list
+// or form; the alerts ticket is the switch itself. The web's "coming soon" rows are gone: the backend has
+// nothing behind them.
+
 export default function ProfileScreen() {
   const router = useRouter();
   const { session, signOut } = useAuth();
   const profile = useQuery(profileQuery);
+  // The two chips that count things: every active category and every payee, expense and income together.
+  const expenseCategories = useQuery(categoriesQuery("expense"));
+  const incomeCategories = useQuery(categoriesQuery("income"));
+  const expensePayees = useQuery(payeesQuery("expense"));
+  const incomePayees = useQuery(payeesQuery("income"));
   const updateProfile = useUpdateProfile();
   const online = useOnline();
+  const [refreshing, setRefreshing] = useState(false);
+  useRefetchStaleOnFocus();
+
+  const data = profile.data;
+  const categoryCount =
+    expenseCategories.data && incomeCategories.data
+      ? [...expenseCategories.data.categories, ...incomeCategories.data.categories].filter((c) => c.is_active).length
+      : null;
+  const payeeCount = expensePayees.data && incomePayees.data ? expensePayees.data.payees.length + incomePayees.data.payees.length : null;
+  const active = categoryCount === null ? null : `${categoryCount} active`;
+  const saved = payeeCount === null ? null : `${payeeCount} saved`;
+
+  const refresh = async () => {
+    if (refreshing) return; // G4: ignore a second pull while one is running
+    setRefreshing(true);
+    try {
+      await Promise.all([profile.refetch(), expenseCategories.refetch(), incomeCategories.refetch(), expensePayees.refetch(), incomePayees.refetch()]);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const onSignOut = async () => {
     const yes = await confirm("Sign out?", "You'll need to log in again to see your data.", "Sign out", true);
     if (yes) await signOut(); // the route guard then returns to the login screen
   };
 
-  /** R3: the Switch flips at once (useUpdateProfile is optimistic) and settles on the server's answer either way. */
-  const toggleBudgetAlerts = async (next: boolean) => {
+  /** R3: the switch flips at once (useUpdateProfile is optimistic) and settles on the server's answer either way. */
+  const toggleBudgetAlerts = async () => {
     try {
-      await updateProfile.mutateAsync({ budget_alerts: next });
+      await updateProfile.mutateAsync({ budget_alerts: !data?.budget_alerts });
     } catch (err) {
       showToast(userMessage(err, "save that setting"));
     }
   };
 
-  const soon = (feature: string) => () => showToast(`${feature} — coming soon`);
-  // C1: writes are off offline, like every `requiresNetwork` button.
-  const alertsDisabled = !profile.data || updateProfile.isPending || !online;
-
   return (
-    <Screen title="Profile" tabBar>
-      <Stack gap="xs">
-        <Text variant="caption" tone="muted">
-          Email
-        </Text>
-        <Text>{session?.user.email ?? "—"}</Text>
-      </Stack>
+    <Screen surface="screen" tabBar onRefresh={refresh} refreshing={refreshing}>
+      <Title>Profile</Title>
 
-      <Card>
-        <SettingsRow label="Profile" value={profile.data?.full_name || undefined} onPress={() => router.push("/settings/profile")} />
-        <SettingsRow label="Categories" onPress={() => router.push("/settings/categories")} />
-        <SettingsRow label="Payees" onPress={() => router.push("/settings/payees")} />
-      </Card>
+      {/* C8: a background refresh failed but the profile is cached, so keep showing it. */}
+      {data && profile.isError ? <Banner tone="warning" message="Couldn't refresh. Showing your last known profile." /> : null}
 
-      <Stack gap="sm">
-        <Text variant="caption" tone="muted">
-          Notifications
-        </Text>
-        <Card>
-          <SettingsRow
-            label="Budget alerts"
-            switchValue={profile.data?.budget_alerts ?? false}
-            onSwitchChange={toggleBudgetAlerts}
-            disabled={alertsDisabled}
-          />
-          <SettingsRow label="Weekly recap" switchValue={false} onSwitchChange={soon("Weekly recap")} />
-          <SettingsRow label="Unusual transaction alerts" switchValue={false} onSwitchChange={soon("Unusual transaction alerts")} />
-          <SettingsRow label="Goal milestone alerts" switchValue={false} onSwitchChange={soon("Goal milestone alerts")} />
-        </Card>
-      </Stack>
+      {data ? (
+        <>
+          <Panel>
+            <Row>
+              <Illustration name="avatar_user" width={56} />
+              <Stack grow gap="xs">
+                <Title size="panelTitle">{displayName(data.full_name, session?.user.email) || "You"}</Title>
+                <Note>{[session?.user.email, sinceLabel(data.created_at)].filter(Boolean).join(" · ")}</Note>
+              </Stack>
+              <CircleButton icon={Pencil} size={38} label="Edit profile" onPress={() => router.push("/settings/profile")} />
+            </Row>
+          </Panel>
 
-      <Stack gap="sm">
-        <Text variant="caption" tone="muted">
-          AI assistant
-        </Text>
-        <Card>
-          <SettingsRow label="Auto-categorize" switchValue={false} onSwitchChange={soon("Auto-categorize")} />
-          <SettingsRow label="Envelope suggestions" switchValue={false} onSwitchChange={soon("Envelope suggestions")} />
-          <SettingsRow label="Chat-added transactions" switchValue={false} onSwitchChange={soon("Chat-added transactions")} />
-          <SettingsRow label="Chat envelope transfers" switchValue={false} onSwitchChange={soon("Chat envelope transfers")} />
-        </Card>
-      </Stack>
-
-      <Stack gap="sm">
-        <Text variant="caption" tone="muted">
-          Data & security
-        </Text>
-        <Card>
-          <SettingsRow label="Two-factor authentication" onPress={soon("Two-factor authentication")} />
-          <SettingsRow label="Active sessions" onPress={soon("Active sessions")} />
-          <SettingsRow label="Export ledger CSV" onPress={soon("Export ledger CSV")} />
-          <SettingsRow label="Delete account" onPress={soon("Delete account")} />
-        </Card>
-      </Stack>
-
-      <Stack gap="sm">
-        <Text variant="caption" tone="muted">
-          Billing
-        </Text>
-        <Card>
-          <SettingsRow label="Manage billing" onPress={soon("Billing")} />
-        </Card>
-      </Stack>
-
-      {__DEV__ && (
-        <Card>
-          <SettingsRow label="Design kit (dev only)" onPress={() => router.push("/kit")} />
-        </Card>
+          <TicketStack>
+            <Ticket
+              title="Categories"
+              color="tomato"
+              tilt={-5}
+              order={0}
+              chip={active ?? "…"}
+              stub={{ icon: LayoutGrid, label: "edit" }}
+              onPress={() => router.push("/settings/categories")}
+              label={["Categories", active, "edit"].filter(Boolean).join(", ")}
+            />
+            <Ticket
+              title="Payees"
+              color="marigold"
+              tilt={3}
+              order={1}
+              chip={saved ?? "…"}
+              check={saved !== null}
+              stub={{ icon: User, label: "search" }}
+              onPress={() => router.push("/settings/payees")}
+              label={["Payees", saved, "search"].filter(Boolean).join(", ")}
+            />
+            {/* Only the on / off preference is stored and nothing sends alerts yet, so the chip does not promise a rule. C1: writes are off offline. */}
+            <Ticket
+              title="Budget alerts"
+              color="sky"
+              tilt={-3}
+              order={2}
+              chip="alerts arrive soon"
+              soft
+              stub={{ on: data.budget_alerts }}
+              onPress={toggleBudgetAlerts}
+              disabled={updateProfile.isPending || !online}
+              label="Budget alerts, alerts arrive soon"
+            />
+            <Ticket
+              title="Region"
+              color="mint"
+              tilt={4}
+              order={3}
+              chip={regionLabel(data.currency, data.timezone)}
+              stub={{ icon: Globe, label: "change" }}
+              onPress={() => router.push("/settings/profile")}
+              label={`Region, ${regionLabel(data.currency, data.timezone)}, change`}
+            />
+          </TicketStack>
+        </>
+      ) : profile.isError ? (
+        <ErrorState message={userMessage(profile.error, "load your profile")} onRetry={() => profile.refetch()} />
+      ) : (
+        <>
+          <Skeleton tone="dark" height={84} round="card" />
+          {[0, 1, 2, 3].map((i) => (
+            <Skeleton key={i} tone="dark" height={104} round="card" />
+          ))}
+        </>
       )}
 
-      <Button title="Sign out" variant="danger" onPress={onSignOut} />
+      <SignOutButton onPress={onSignOut} />
+
+      {__DEV__ ? <SectionLabel label="Dev only" link="Design kit" onLink={() => router.push("/kit")} /> : null}
     </Screen>
   );
 }

@@ -1,32 +1,30 @@
+import { Check, Flag, PenLine, PiggyBank, Tag } from "lucide-react-native";
 import { useState } from "react";
-import { StyleSheet, View } from "react-native";
 
+import { currencySymbol } from "@/lib/home";
 import { GOAL_DESCRIPTION_MAX, GOAL_TITLE_MAX, type GoalDraft, type GoalErrors } from "@/lib/goals";
 import { GOAL_TYPE_LABEL, GOAL_TYPES, PRIORITY_LABEL } from "@/lib/labels";
-import type { GoalPriority } from "@/lib/types";
+import { sanitizeAmountInput } from "@/lib/money";
+import type { Category, GoalPriority } from "@/lib/types";
 
-import { AmountInput } from "./AmountInput";
+import { EntryAmount } from "./AmountInput";
 import { Banner } from "./Banner";
-import { Button } from "./Button";
-import { Chips } from "./Controls";
-import { DateField } from "./DateField";
-import { Input } from "./Input";
-import { PickerList, type PickerItem } from "./PickerList";
-import { Screen } from "./Screen";
-import { SelectField } from "./SelectField";
+import { Note, SectionLabel } from "./Blocks";
+import { PrimaryButton, SecondaryButton } from "./Buttons";
+import { Chip } from "./Chips";
+import { DateChip } from "./DateChip";
+import { FieldButton, FieldInput } from "./Field";
+import { Row, Stack } from "./Layout";
+import { Overlaid, PickerList, type PickerItem } from "./PickerList";
+import { SheetScreen } from "./SheetScreen";
 import type { ChoiceList } from "./TransactionEditor";
 
-const TYPE_OPTIONS = GOAL_TYPES.map((type) => ({ label: GOAL_TYPE_LABEL[type], value: type }));
-const PRIORITY_OPTIONS = (Object.keys(PRIORITY_LABEL) as GoalPriority[]).map((priority) => ({
-  label: PRIORITY_LABEL[priority],
-  value: priority,
-}));
+const PRIORITIES = Object.keys(PRIORITY_LABEL) as GoalPriority[];
 
 /**
- * The goal form shared by New and Edit: name, type, priority, target, amount
- * already saved, optional expense category, optional target date and
- * description. The caller owns the draft and every network call, like
- * TransactionEditor.
+ * The goal form shared by New and Edit, as a cream sheet in the QuickAdd look: name, target amount, amount
+ * already saved, optional expense category, type, priority, optional target date and description. The caller
+ * owns the draft and every network call, like TransactionEditor.
  */
 export function GoalEditor({
   title,
@@ -49,7 +47,7 @@ export function GoalEditor({
   /** "Starting amount" when creating, "Saved so far" when editing. */
   savedLabel: string;
   autoFocusTitle?: boolean;
-  categories: ChoiceList<{ id: string; name: string }>;
+  categories: ChoiceList<Pick<Category, "id" | "name" | "color" | "icon">>;
   /** The goal's saved category, kept only for its name in case it has since been archived (dropped from `categories`). */
   categoryFallback?: { id: string; name: string } | null;
   errors: GoalErrors;
@@ -70,106 +68,110 @@ export function GoalEditor({
     setPickingCategory(false);
   };
 
-  return (
-    <View style={styles.fill}>
-      <View
-        style={styles.fill}
-        importantForAccessibility={pickingCategory ? "no-hide-descendants" : "auto"}
-        accessibilityElementsHidden={pickingCategory}
-      >
-        <Screen title={title} back keyboard>
-          {formError ? <Banner tone="error" message={formError} /> : null}
+  const overlay = pickingCategory ? (
+    <PickerList
+      title="Category"
+      searchLabel="Search categories"
+      noun="category"
+      emptyMessage="No expense categories yet."
+      items={categories.items.map((c) => ({ id: c.id, label: c.name, color: c.color, icon: c.icon }))}
+      loading={categories.loading}
+      error={categories.error}
+      onRetry={categories.onRetry}
+      onSelect={chooseCategory}
+      onClose={() => setPickingCategory(false)}
+    />
+  ) : null;
 
-          <Input
-            label="Goal name"
+  return (
+    <Overlaid overlay={overlay}>
+      <SheetScreen title={title}>
+        {formError ? <Banner tone="error" surface="cream" message={formError} /> : null}
+
+        <Stack gap="xs">
+          <FieldInput
+            icon={Flag}
+            accessibilityLabel="Goal name"
+            placeholder="Name your goal"
             value={draft.title}
             onChangeText={(text) => onChange({ ...draft, title: text })}
             maxLength={GOAL_TITLE_MAX}
             autoFocus={autoFocusTitle}
             returnKeyType="next"
-            error={errors.title}
           />
+          {errors.title ? <Note tone="error">{errors.title}</Note> : null}
+        </Stack>
 
-          <AmountInput
-            label={`Target amount (${currency})`}
-            value={draft.target}
-            onChange={(target) => onChange({ ...draft, target })}
-            currency={currency}
-            error={errors.target}
-          />
+        <Stack gap="xs">
+          <SectionLabel label="Target amount" light />
+          <EntryAmount value={draft.target} onChange={(target) => onChange({ ...draft, target })} symbol={currencySymbol(currency)} label="Target amount" />
+          {errors.target ? <Note tone="error">{errors.target}</Note> : null}
+        </Stack>
 
-          <AmountInput
-            label={`${savedLabel} (${currency}, optional)`}
+        <Stack gap="xs">
+          <FieldInput
+            icon={PiggyBank}
+            accessibilityLabel={`${savedLabel} (optional)`}
+            placeholder={`${savedLabel} (optional)`}
             value={draft.saved}
-            onChange={(saved) => onChange({ ...draft, saved })}
-            currency={currency}
-            error={errors.saved}
+            onChangeText={(saved) => onChange({ ...draft, saved: sanitizeAmountInput(saved) })}
+            keyboardType="decimal-pad"
+            autoCorrect={false}
           />
+          {errors.saved ? <Note tone="error">{errors.saved}</Note> : null}
+        </Stack>
 
-          <SelectField
-            label="Category (optional)"
-            value={categoryName}
-            placeholder="Choose a category"
-            onPress={() => setPickingCategory(true)}
-          />
-          {draft.categoryId ? (
-            <Button title="Remove category" variant="link" onPress={() => onChange({ ...draft, categoryId: null })} />
-          ) : null}
+        <FieldButton
+          icon={Tag}
+          label="Category"
+          value={categoryName}
+          placeholder="Add a category (optional)"
+          hint="category"
+          onPress={() => setPickingCategory(true)}
+          onClear={() => onChange({ ...draft, categoryId: null })}
+        />
 
-          <Chips
-            label="Type (optional)"
-            options={TYPE_OPTIONS}
-            value={draft.type}
-            onChange={(type) => onChange({ ...draft, type })}
-          />
+        <Stack gap="sm">
+          <SectionLabel label="Type (optional)" light />
+          <Row gap="xs" wrap>
+            {GOAL_TYPES.map((type) => {
+              const on = draft.type === type;
+              // Tapping the chosen type again clears it: the type is optional.
+              return <Chip key={type} label={GOAL_TYPE_LABEL[type]} variant={on ? "ink" : "outlined"} selected={on} onPress={() => onChange({ ...draft, type: on ? null : type })} />;
+            })}
+          </Row>
+        </Stack>
 
-          <Chips
-            label="Priority"
-            options={PRIORITY_OPTIONS}
-            value={draft.priority}
-            onChange={(priority) => onChange({ ...draft, priority })}
-          />
+        <Stack gap="sm">
+          <SectionLabel label="Priority" light />
+          <Row gap="xs" wrap>
+            {PRIORITIES.map((priority) => {
+              const on = draft.priority === priority;
+              return <Chip key={priority} label={PRIORITY_LABEL[priority]} variant={on ? "ink" : "outlined"} selected={on} onPress={() => onChange({ ...draft, priority: on ? null : priority })} />;
+            })}
+          </Row>
+        </Stack>
 
-          <DateField
-            label="Target date (optional)"
-            value={draft.date}
-            onChange={(date) => onChange({ ...draft, date })}
-            onClear={() => onChange({ ...draft, date: null })}
-          />
+        <Stack gap="sm">
+          <SectionLabel label="Target date (optional)" light />
+          <Row gap="xs" wrap>
+            <DateChip value={draft.date} emptyLabel="Pick a date" withYear onChange={(date) => onChange({ ...draft, date })} onClear={() => onChange({ ...draft, date: null })} />
+          </Row>
+        </Stack>
 
-          <Input
-            label="Description (optional)"
-            value={draft.description}
-            onChangeText={(description) => onChange({ ...draft, description })}
-            maxLength={GOAL_DESCRIPTION_MAX}
-            multiline
-          />
+        <FieldInput
+          grow
+          icon={PenLine}
+          accessibilityLabel="Description (optional)"
+          placeholder="Add a description"
+          value={draft.description}
+          onChangeText={(description) => onChange({ ...draft, description })}
+          maxLength={GOAL_DESCRIPTION_MAX}
+        />
 
-          <Button title={primary.label} onPress={primary.onPress} disabled={primary.disabled} requiresNetwork />
-          {danger ? <Button title={danger.label} variant="danger" onPress={danger.onPress} requiresNetwork /> : null}
-        </Screen>
-      </View>
-
-      {pickingCategory ? (
-        <View style={StyleSheet.absoluteFill} accessibilityViewIsModal>
-          <PickerList
-            title="Category"
-            searchLabel="Search categories"
-            noun="category"
-            emptyMessage="No expense categories yet."
-            items={categories.items.map((c) => ({ id: c.id, label: c.name }))}
-            loading={categories.loading}
-            error={categories.error}
-            onRetry={categories.onRetry}
-            onSelect={chooseCategory}
-            onClose={() => setPickingCategory(false)}
-          />
-        </View>
-      ) : null}
-    </View>
+        <PrimaryButton label={primary.label} icon={Check} onPress={primary.onPress} disabled={primary.disabled} requiresNetwork />
+        {danger ? <SecondaryButton label={danger.label} danger onPress={danger.onPress} requiresNetwork /> : null}
+      </SheetScreen>
+    </Overlaid>
   );
 }
-
-const styles = StyleSheet.create({
-  fill: { flex: 1 },
-});

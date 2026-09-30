@@ -1,5 +1,5 @@
 import DateTimePicker, { DateTimePickerAndroid } from "@react-native-community/datetimepicker";
-import { Calendar } from "lucide-react-native";
+import { Calendar, X } from "lucide-react-native";
 import { useState } from "react";
 import { Platform } from "react-native";
 
@@ -15,11 +15,26 @@ import { colors, fonts, radius } from "./tokens";
  * The QuickAdd date chip: shows the date ("Today", "Yesterday", "12 Sep") and picks another.
  * Android opens the system dialog; iOS shows the inline calendar in a cream sheet; the web build
  * (no native picker there) uses the browser's date input in the same sheet. "YYYY-MM-DD" in and out.
+ *
+ * An optional date (a goal's target): `value` may be null, the chip then reads `emptyLabel`, and while
+ * a date is set a "Clear" chip beside it calls `onClear`. `withYear` shows the year ("12 Sep 2027").
  */
-export function DateChip({ value, onChange }: { value: string; onChange: (ymd: string) => void }) {
+export function DateChip({
+  value,
+  onChange,
+  onClear,
+  emptyLabel = "Pick a date",
+  withYear,
+}: {
+  value: string | null;
+  onChange: (ymd: string) => void;
+  onClear?: () => void;
+  emptyLabel?: string;
+  withYear?: boolean;
+}) {
   const [open, setOpen] = useState(false);
-  const date = parseDateOnly(value) ?? new Date();
-  const label = relativeDayLabel(value, todayLocal()) ?? formatDate(value);
+  const date = (value ? parseDateOnly(value) : null) ?? new Date();
+  const label = value ? (relativeDayLabel(value, todayLocal()) ?? formatDate(value, withYear ? "medium" : "short")) : emptyLabel;
 
   const pick = () =>
     Platform.OS === "android"
@@ -29,6 +44,7 @@ export function DateChip({ value, onChange }: { value: string; onChange: (ymd: s
   return (
     <>
       <Chip label={label} icon={Calendar} variant="outlined" onPress={pick} accessibilityLabel={`Date: ${label}. Tap to change`} />
+      {value && onClear ? <Chip label="Clear" icon={X} variant="outlined" onPress={onClear} accessibilityLabel="Remove the date" /> : null}
       {Platform.OS === "android" ? null : (
         <Sheet visible={open} title="Date" onClose={() => setOpen(false)}>
           {Platform.OS === "ios" ? (
@@ -43,7 +59,7 @@ export function DateChip({ value, onChange }: { value: string; onChange: (ymd: s
           ) : (
             <input
               type="date"
-              value={value}
+              value={value ?? ""}
               aria-label="Date"
               onChange={(event) => {
                 if (event.target.value) onChange(event.target.value);

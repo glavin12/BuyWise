@@ -64,63 +64,85 @@ const V3: Record<CategoryHue, Hue> = {
   neutral: "sage",
 };
 
-/** The seeded categories (ai_service DEFAULT_CATEGORIES); anything else gets a tag. */
-const GLYPH: Record<string, LucideIcon> = {
-  Food: Utensils,
-  Transport: Bus,
-  Shopping: ShoppingBag,
-  Bills: Receipt,
-  Entertainment: Clapperboard,
-  Healthcare: Stethoscope,
-  Education: GraduationCap,
-  Travel: Plane,
-  "Personal Care": Sparkles,
-  "Gifts & Donations": Gift,
-  Family: Users,
-  "Fees & Charges": BadgePercent,
-  "Other Expense": Tag,
-  Groceries: ShoppingCart,
-  Restaurants: Soup,
-  Coffee,
-  Rent: House,
-  Electricity: Zap,
-  Internet: Wifi,
-  "Mobile/Phone": Smartphone,
-  Fuel,
-  "Public Transit": TramFront,
-  Clothing: Shirt,
-  Electronics: Laptop,
-  Insurance: Shield,
-  Subscriptions: Repeat,
-  Fitness: Dumbbell,
-  Household: Sofa,
-  Pets: PawPrint,
-  Salary: Briefcase,
-  Freelance: PenTool,
-  Business: Store,
-  Investments: TrendingUp,
-  Interest: Landmark,
-  Refunds: Undo2,
-  "Other Income": Banknote,
-};
+/** The seeded categories (ai_service DEFAULT_CATEGORIES): icon keyword, name, glyph. The keywords are what `icon` saves. */
+const SEEDED: [key: string, name: string, glyph: LucideIcon][] = [
+  ["food", "Food", Utensils],
+  ["transport", "Transport", Bus],
+  ["shopping", "Shopping", ShoppingBag],
+  ["bills", "Bills", Receipt],
+  ["entertainment", "Entertainment", Clapperboard],
+  ["healthcare", "Healthcare", Stethoscope],
+  ["education", "Education", GraduationCap],
+  ["travel", "Travel", Plane],
+  ["personal-care", "Personal Care", Sparkles],
+  ["gifts", "Gifts & Donations", Gift],
+  ["family", "Family", Users],
+  ["fees", "Fees & Charges", BadgePercent],
+  ["other", "Other Expense", Tag],
+  ["groceries", "Groceries", ShoppingCart],
+  ["restaurants", "Restaurants", Soup],
+  ["coffee", "Coffee", Coffee],
+  ["rent", "Rent", House],
+  ["electricity", "Electricity", Zap],
+  ["internet", "Internet", Wifi],
+  ["mobile-phone", "Mobile/Phone", Smartphone],
+  ["fuel", "Fuel", Fuel],
+  ["public-transit", "Public Transit", TramFront],
+  ["clothing", "Clothing", Shirt],
+  ["electronics", "Electronics", Laptop],
+  ["insurance", "Insurance", Shield],
+  ["subscriptions", "Subscriptions", Repeat],
+  ["fitness", "Fitness", Dumbbell],
+  ["household", "Household", Sofa],
+  ["pets", "Pets", PawPrint],
+  ["salary", "Salary", Briefcase],
+  ["freelance", "Freelance", PenTool],
+  ["business", "Business", Store],
+  ["investments", "Investments", TrendingUp],
+  ["interest", "Interest", Landmark],
+  ["refunds", "Refunds", Undo2],
+  ["other-income", "Other Income", Banknote],
+];
+const BY_KEY = new Map(SEEDED.map(([key, , glyph]) => [key, glyph]));
+const BY_NAME = new Map(SEEDED.map(([, name, glyph]) => [name, glyph]));
+
+/** What the category editor's icon picker offers: each keyword (saved as the category's `icon`) and its glyph. */
+export const CATEGORY_GLYPHS = SEEDED.map(([key, , glyph]) => ({ key, glyph }));
+
+/** A category's glyph: its saved icon keyword, else its seeded name (emoji and older icons), else a tag. No category (a starting balance) is a wallet. */
+export function categoryGlyph(name: string | null | undefined, icon?: string | null): LucideIcon {
+  if (!name) return Wallet;
+  return (icon && BY_KEY.get(icon)) || BY_NAME.get(name) || Tag;
+}
 
 /** A category's v3 colour, for tiles and legend dots. */
 export function categoryTone(name: string | null | undefined, color?: string | null): Hue {
   return V3[categoryHue(name, color)];
 }
 
-/** A category's glyph on its colour tile. No category (a starting balance) is a wallet. */
-export function CategoryTile({ name, color, size = 44 }: { name: string | null; color?: string | null; size?: 30 | 44 | 46 | 58 }) {
-  const icon = name ? (GLYPH[name] ?? Tag) : Wallet;
-  return <IconTile icon={icon} color={name ? categoryTone(name, color) : "sage"} size={size} />;
+/** A category's glyph on its colour tile. */
+export function CategoryTile({ name, color, icon, size = 44 }: { name: string | null; color?: string | null; icon?: string | null; size?: 30 | 44 | 46 | 58 }) {
+  return <IconTile icon={categoryGlyph(name, icon)} color={name ? categoryTone(name, color) : "sage"} size={size} />;
 }
 
 /** A 58 category tile with its name under it (QuickAdd). Chosen: an ink ring and a ✓ badge, the name bold. */
-export function CategoryChoice({ name, color, selected, onPress }: { name: string; color?: string | null; selected: boolean; onPress: () => void }) {
+export function CategoryChoice({
+  name,
+  color,
+  icon,
+  selected,
+  onPress,
+}: {
+  name: string;
+  color?: string | null;
+  icon?: string | null;
+  selected: boolean;
+  onPress: () => void;
+}) {
   return (
     <PressableScale onPress={onPress} accessibilityLabel={name} accessibilityState={{ selected }} style={styles.choice}>
       <View>
-        <CategoryTile name={name} color={color} size={58} />
+        <CategoryTile name={name} color={color} icon={icon} size={58} />
         {selected ? (
           <>
             <View style={styles.ring} />

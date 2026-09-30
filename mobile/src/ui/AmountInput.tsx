@@ -3,61 +3,27 @@ import { StyleSheet, Text as RNText, TextInput, View } from "react-native";
 
 import { sanitizeAmountInput } from "@/lib/money";
 
-import { Input } from "./Input";
 import { colors, extra, fonts, type } from "./tokens";
 
 /**
- * Money text field. Every change is sanitised (typed or pasted) to digits and one
- * decimal separator, so what it shows is exactly what parseAmountToMinor reads.
- * Callers keep the text and turn it into minor units only on submit.
- */
-export function AmountInput({
-  value,
-  onChange,
-  currency,
-  label,
-  error,
-  autoFocus,
-  ref,
-}: {
-  value: string;
-  onChange: (text: string) => void;
-  currency: string;
-  /** Defaults to "Amount (INR)"; say what the amount is when a screen has more than one. */
-  label?: string;
-  error?: string | null;
-  autoFocus?: boolean;
-  ref?: Ref<TextInput>;
-}) {
-  return (
-    <Input
-      ref={ref}
-      label={label ?? `Amount (${currency})`}
-      value={value}
-      onChangeText={(text) => onChange(sanitizeAmountInput(text))}
-      keyboardType="decimal-pad"
-      autoCorrect={false}
-      autoFocus={autoFocus}
-      placeholder="0.00"
-      error={error}
-    />
-  );
-}
-
-/**
  * The QuickAdd amount (design v3): a muted currency symbol, then the typed figure at 86 with a
- * tomato caret, centred. Sanitised like AmountInput.
+ * tomato caret, centred. Every change (typed or pasted) is sanitised to digits and one decimal
+ * separator, so what it shows is exactly what parseAmountToMinor reads. Callers keep the text and
+ * turn it into minor units only on submit.
  */
 export function EntryAmount({
   value,
   onChange,
   symbol,
+  label = "Amount",
   autoFocus,
   ref,
 }: {
   value: string;
   onChange: (text: string) => void;
   symbol: string;
+  /** What screen readers call the field, when a screen has more than one amount or it is not a plain "Amount". */
+  label?: string;
   autoFocus?: boolean;
   ref?: Ref<TextInput>;
 }) {
@@ -73,7 +39,7 @@ export function EntryAmount({
         autoFocus={autoFocus}
         placeholder="0"
         placeholderTextColor={extra.dashedOnCream}
-        accessibilityLabel="Amount"
+        accessibilityLabel={label}
         selectionColor={colors.tomato}
         cursorColor={colors.tomato}
         style={styles.figure}

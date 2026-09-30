@@ -1,7 +1,8 @@
+import type { ChipKind } from "./richText.ts";
 import type { Conversation, Message, ToolCall } from "./types.ts";
 
-// Pure chat helpers: grouping the History list, which rows become bubbles, and
-// which caches an AI reply made stale.
+// Pure chat helpers: grouping the History list, which rows become bubbles, which
+// caches an AI reply made stale, the greeting and the figure chips in a reply.
 
 export type ConversationSection = { title: "Today" | "This week" | "Older"; data: Conversation[] };
 
@@ -193,4 +194,116 @@ export function toolSummary(call: Pick<ToolCall, "tool_name" | "tool_output">): 
     }
   }
   return fallback;
+}
+
+// The new chat's greeting and the bubbles' clock: phone-side only, never saved or sent to the AI.
+
+/** "Hi, Bhagy. Ask me anything about your money." (the name's first word; just "Hi." without a name). */
+export function greeting(fullName: string | null | undefined): string {
+  const first = fullName?.trim().split(/\s+/)[0];
+  return `${first ? `Hi, ${first}.` : "Hi."} Ask me anything about your money.`;
+}
+
+/** "9:41 pm" for a bubble's "buddy · 9:41 pm"; empty when the timestamp does not parse. */
+export function clockTime(at: Date | string): string {
+  const date = typeof at === "string" ? new Date(at) : at;
+  if (isNaN(date.getTime())) return "";
+  const hours = date.getHours();
+  return `${hours % 12 || 12}:${String(date.getMinutes()).padStart(2, "0")} ${hours < 12 ? "am" : "pm"}`;
+}
+
+// Figures in an AI reply become inline chips on the phone. This works on the text at render time,
+// so old conversations get them too (nothing is stored). React Native cannot pad or round text
+// nested in text, so a paragraph with a figure is laid out as a wrapping row of words and chips
+// (like RichText does).
+
+/** A piece of reply text: plain, or a figure the chat draws as an inline chip. */
+export type FigureSegment = { text: string; chip?: ChipKind };
+
+// 1,24,860 or 1,240,500 or 300, then an optional fraction. A comma group has 2 or 3 digits, so a number never ends in a comma.
+const NUMBER = "(?:\\d{1,3}(?:,\\d{2,3})+|\\d+)(?:\\.\\d+)?";
+const isWordChar = (c: string | undefined) => c !== undefined && /\w/.test(c);
+
+/**
+ * Splits reply text into plain runs and figures: an amount written with one of `symbols` (`₹1,240.50`,
+ * `$12`) or a percentage (`79%`). A leading + makes the chip mint, a - or − coral, none dark. A figure
+ * inside a longer word (`v2%`) stays plain, and so does the dash of a range (`₹500-₹700`).
+ */
+export function splitFigures(text: string, symbols: readonly string[]): FigureSegment[] {
+  const escaped = symbols.filter(Boolean).map((s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  const amount = escaped.length ? `(?:${escaped.join("|")})[ \\u00A0]?${NUMBER}|` : "";
+  const figure = new RegExp(`([+\\-\\u2212]?)(?:${amount}${NUMBER}%)`, "g");
+  const out: FigureSegment[] = [];
+  let last = 0;
+  for (const m of text.matchAll(figure)) {
+    let start = m.index;
+    let sign = m[1];
+    if (sign && isWordChar(text[start - 1])) {
+      start += 1; // "₹500-₹700": that dash is a range, not a minus
+      sign = "";
+    } else if (!sign && isWordChar(text[start - 1])) {
+      continue; // inside a longer word ("v2%")
+    }
+    if (start > last) out.push({ text: text.slice(last, start) });
+    last = m.index + m[0].length;
+    out.push({ text: text.slice(start, last), chip: sign === "+" ? "mint" : sign ? "coral" : "dark" });
+  }
+  if (last < text.length) out.push({ text: text.slice(last) });
+  return out;
+}
+
+/**
+ * Reply text with the styles it carries (`marks`: the caller's own names, "bold", "code", ...). `plain` text
+ * (inline code) never gets chips. A run of "\n" is a line break.
+ */
+export type ProseRun = { text: string; marks?: readonly string[]; plain?: boolean };
+
+/** One word or chip of a paragraph with figures. A chip keeps the punctuation typed against it (`lead`, `trail`), so a line never breaks inside "(79%).". */
+export type ProsePiece =
+  | { kind: "word"; text: string; marks: readonly string[]; space: boolean }
+  | { kind: "chip"; text: string; chip: ChipKind; lead: string; trail: string; space: boolean }
+  | { kind: "break" };
+
+/**
+ * A paragraph's words and figure chips in order, `space` saying whether whitespace follows. `null` when the
+ * text has no figure: the caller then keeps its own flowing text (selectable across the paragraph). The
+ * first chip, when it is a plain one, is the marigold highlight, as in the design.
+ */
+export function prosePieces(runs: readonly ProseRun[], symbols: readonly string[]): ProsePiece[] | null {
+  const pieces: ProsePiece[] = [];
+  for (const run of runs) {
+    if (run.text === "\n") {
+      pieces.push({ kind: "break" });
+      continue;
+    }
+    const segments: FigureSegment[] = run.plain ? [{ text: run.text }] : splitFigures(run.text, symbols);
+    for (const segment of segments) {
+      const prev = pieces[pieces.length - 1];
+      if (segment.chip) {
+        const lead = prev?.kind === "word" && !prev.space ? prev.text : "";
+        if (lead) pieces.pop();
+        pieces.push({ kind: "chip", text: segment.text, chip: segment.chip, lead, trail: "", space: false });
+        continue;
+      }
+      // Whitespace at the start of this text belongs after the previous piece.
+      if (/^\s/.test(segment.text) && prev && prev.kind !== "break") prev.space = true;
+      (segment.text.match(/\S+\s*/g) ?? []).forEach((chunk, i) => {
+        const text = chunk.trimEnd();
+        const space = text.length < chunk.length;
+        const before = pieces[pieces.length - 1];
+        if (i === 0 && before?.kind === "chip" && !before.space && !before.trail) {
+          before.trail = text; // punctuation typed right after a chip goes with it
+          before.space = space;
+        } else {
+          pieces.push({ kind: "word", text, marks: run.marks ?? [], space });
+        }
+      });
+    }
+  }
+  for (const piece of pieces) {
+    if (piece.kind !== "chip") continue;
+    if (piece.chip === "dark") piece.chip = "hi";
+    return pieces;
+  }
+  return null;
 }

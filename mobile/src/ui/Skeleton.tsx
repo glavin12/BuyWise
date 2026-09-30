@@ -1,17 +1,19 @@
 import { useEffect, useState } from "react";
 import { Animated, Platform, type DimensionValue } from "react-native";
 
-import { theme } from "./theme";
-import { colors, radius as radii } from "./tokens";
+import { colors, extra, radius as radii } from "./tokens";
 
-// `tone` is what it sits on: the cream screens, charcoal, or a colour card (a translucent white).
-const TONE = { cream: theme.color.skeleton, dark: colors.card2, light: "rgba(255,255,255,0.22)" } as const;
+// `tone` is what it sits on: a sage screen (Goals, the default), charcoal, a colour card (a translucent white), a cream
+// form sheet, or `ink` for a pale colour card (mint) where white would vanish.
+const TONE = { sage: colors.sage2, dark: colors.card2, light: "rgba(255,255,255,0.22)", sheet: colors.creamField, ink: extra.trackOnColour } as const;
+
+const CORNER = 8; // the small default corner (the design's radii have no 8)
 
 /** Pulsing placeholder block shown while the first load is in flight. */
 export function Skeleton({
   width = "100%",
   height = 16,
-  tone = "cream",
+  tone = "sage",
   round,
 }: {
   width?: DimensionValue;
@@ -38,7 +40,7 @@ export function Skeleton({
     <Animated.View
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
-      style={{ width, height, opacity, borderRadius: round ? radii[round] : theme.radius.sm, backgroundColor: TONE[tone] }}
+      style={{ width, height, opacity, borderRadius: round ? radii[round] : CORNER, backgroundColor: TONE[tone] }}
     />
   );
 }

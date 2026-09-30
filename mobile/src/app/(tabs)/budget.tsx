@@ -63,6 +63,7 @@ export default function BudgetTab() {
 
   const currency = profile.data?.currency ?? "INR";
   const money = (minor: number) => wholeIfRound(formatMinor(minor, currency));
+  const signedMoney = (minor: number) => `${minor < 0 ? "−" : ""}${money(Math.abs(minor))}`;
   const monthLabel = formatMonth(period.month, period.year);
   const rows = budgets.data?.budgets;
   const expenseCategories = categories.data?.categories;
@@ -149,15 +150,15 @@ export default function BudgetTab() {
       : "";
   const left = `${rest.length} ${rest.length === 1 ? "category" : "categories"}`;
 
-  return (
-    <Screen surface="screen" tabBar onRefresh={refresh} refreshing={refreshing}>
+  const screen = (
+    <Screen surface="screen" tabBar enter onRefresh={refresh} refreshing={refreshing}>
       <Row justify="between">
         <Title>Budget</Title>
         <Pill label={formatMonthShort(period.month, period.year, 0)} onPress={() => setSheet("month")} />
       </Row>
 
       <ReadyCard
-        amount={ready ? `${ready.ready < 0 ? "−" : ""}${money(Math.abs(ready.ready))}` : summary.isError ? "—" : null}
+        amount={ready ? { to: ready.ready, format: (n) => signedMoney(Math.round(n)) } : summary.isError ? "—" : null}
         line={readyLine}
         action={
           summary.isError && !summary.data ? (
@@ -240,7 +241,13 @@ export default function BudgetTab() {
         </Panel>
       ) : null}
       <SecondaryButton label="Your goals →" surface="dark" onPress={() => router.push("/goals")} />
+    </Screen>
+  );
 
+  return (
+    <>
+      {screen}
+      {/* The modals sit outside the Screen: inside it each would take an empty slot in its entrance. */}
       <OptionSheet
         visible={sheet === "month"}
         title="Month"
@@ -264,6 +271,6 @@ export default function BudgetTab() {
         }}
         onClose={() => setSheet(null)}
       />
-    </Screen>
+    </>
   );
 }

@@ -1,8 +1,8 @@
 import { Component, Fragment, type ErrorInfo, type ReactNode } from "react";
+import { StyleSheet, View } from "react-native";
 
-import { Button } from "./Button";
 import { Screen } from "./Screen";
-import { EmptyState } from "./States";
+import { ErrorState } from "./States";
 
 type State = { hasError: boolean; attempt: number };
 
@@ -28,13 +28,15 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
   render() {
     if (this.state.hasError) {
       return (
-        <Screen scroll={false}>
-          <EmptyState
-            icon="warning-outline"
-            title="Something went wrong"
-            message="BuyWise hit an unexpected problem. Your data is safe."
-          />
-          <Button title="Restart" onPress={this.restart} />
+        <Screen surface="screen" scroll={false}>
+          <View style={styles.center}>
+            <ErrorState
+              title="Something went wrong"
+              message="BuyWise hit an unexpected problem. Your data is safe."
+              retryLabel="Restart"
+              onRetry={this.restart}
+            />
+          </View>
         </Screen>
       );
     }
@@ -42,3 +44,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
     return <Fragment key={this.state.attempt}>{this.props.children}</Fragment>;
   }
 }
+
+const styles = StyleSheet.create({
+  center: { flex: 1, justifyContent: "center" },
+});

@@ -5,27 +5,19 @@ import { useState } from "react";
 import { isNotFound, userMessage } from "@/lib/api";
 import { formatCurrency } from "@/lib/format";
 import { goalDraftFromGoal, goalDraftKey, goalEditPatch, justAchieved, validateGoalDraft } from "@/lib/goals";
+import { wholeIfRound } from "@/lib/home";
 import { isUuid } from "@/lib/ids";
 import { useUpdateGoal } from "@/lib/mutations";
 import { categoriesQuery, profileQuery, useOpenedGoal } from "@/lib/queries";
 import type { Goal } from "@/lib/types";
-import {
-  Celebration,
-  confirm,
-  ErrorState,
-  goBack,
-  GoalEditor,
-  hapticSuccess,
-  NotFoundScreen,
-  Screen,
-  showToast,
-  Skeleton,
-  useDiscardGuard,
-} from "@/ui";
+import { Celebration, confirm, goBack, GoalEditor, hapticSuccess, SheetLoading, SheetNotFound, showToast, useDiscardGuard } from "@/ui";
+
+// Edit goal: a cream sheet over the Goals screen. Archiving lives here (goals have no DELETE), and
+// lowering the target below what is saved can complete the goal, which shows the celebration.
 
 export default function EditGoalRoute() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  if (!isUuid(id)) return <NotFoundScreen title="Edit goal" what="Goal" />;
+  if (!isUuid(id)) return <SheetNotFound title="Edit goal" what="Goal" />;
   return <EditLoader id={id} />;
 }
 
@@ -34,16 +26,8 @@ export default function EditGoalRoute() {
 function EditLoader({ id }: { id: string }) {
   const lookup = useOpenedGoal(id);
   if (lookup.goal) return <EditForm goal={lookup.goal} />;
-  if (lookup.missing) return <NotFoundScreen title="Edit goal" what="Goal" />;
-  return (
-    <Screen title="Edit goal" back>
-      {lookup.error ? (
-        <ErrorState message={userMessage(lookup.error, "load this goal")} onRetry={lookup.refetch} />
-      ) : (
-        <Skeleton height={240} />
-      )}
-    </Screen>
-  );
+  if (lookup.missing) return <SheetNotFound title="Edit goal" what="Goal" />;
+  return <SheetLoading title="Edit goal" error={lookup.error ? userMessage(lookup.error, "load this goal") : null} onRetry={lookup.refetch} />;
 }
 
 function EditForm({ goal }: { goal: Goal }) {
@@ -108,7 +92,7 @@ function EditForm({ goal }: { goal: Goal }) {
     <Celebration
       show={reached !== null}
       title="Goal reached!"
-      message={reached ? `"${reached.title}" is complete: ${formatCurrency(reached.display_target_amount, currency)} saved.` : ""}
+      message={reached ? `"${reached.title}" is complete: ${wholeIfRound(formatCurrency(reached.display_target_amount, currency))} saved.` : ""}
       onDone={() => router.back()}
     >
       <GoalEditor

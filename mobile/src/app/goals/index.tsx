@@ -100,7 +100,7 @@ export default function GoalsScreen() {
   const newGoal = () => router.push("/goals/new");
 
   return (
-    <Screen surface="sage" onRefresh={refresh} refreshing={refreshing} fab={<Fab label="New goal" onPress={newGoal} />}>
+    <Screen surface="sage" enter onRefresh={refresh} refreshing={refreshing} fab={<Fab label="New goal" onPress={newGoal} />}>
       <Row>
         <CircleButton icon={ArrowLeft} variant="sage" label="Go back" onPress={goBack} />
         <Stack grow>

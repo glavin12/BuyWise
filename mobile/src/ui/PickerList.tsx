@@ -1,22 +1,26 @@
+import { Search } from "lucide-react-native";
 import { useEffect, useState, type ReactNode } from "react";
-import { BackHandler, FlatList, Pressable, StyleSheet, View } from "react-native";
+import { BackHandler, FlatList, StyleSheet, Text as RNText, View } from "react-native";
 
 import { userMessage } from "@/lib/errors";
+import { payeeInitial } from "@/lib/settings";
 
 import { Banner } from "./Banner";
-import { Button } from "./Button";
-import { Input } from "./Input";
-import { Stack } from "./Layout";
-import { Screen } from "./Screen";
+import { IconTile, Note } from "./Blocks";
+import { SecondaryButton } from "./Buttons";
+import { CategoryTile, categoryTone } from "./CategoryTile";
+import { FieldInput } from "./Field";
+import { PressableScale } from "./PressableScale";
+import { SheetScreen } from "./SheetScreen";
 import { Skeleton } from "./Skeleton";
 import { ErrorState } from "./States";
-import { Text } from "./Text";
-import { theme } from "./theme";
+import { colors, fonts, radius } from "./tokens";
 
-export type PickerItem = { id: string; label: string };
+/** `color` and `icon` are a category's own, for its tile. */
+export type PickerItem = { id: string; label: string; color?: string | null; icon?: string | null };
 
 /**
- * A screen with a chooser (a PickerList) opened over it. The screen underneath stays mounted, so
+ * A form (a SheetScreen) with a chooser (a PickerList) opened over it. The form underneath stays mounted, so
  * nothing typed is lost and the keyboard does not re-open when the chooser closes; it is hidden
  * from screen readers while the chooser is up.
  */
@@ -36,8 +40,8 @@ export function Overlaid({ overlay, children }: { overlay: ReactNode; children: 
 }
 
 /**
- * A full-screen "choose one" list with search. Virtualised (FlatList), so a long
- * payee list stays cheap. With `onCreate`, a name that matches nothing exactly
+ * A "choose one" list with search, drawn as a cream sheet over the form that opened it. Virtualised
+ * (FlatList), so a long payee list stays cheap. With `onCreate`, a name that matches nothing exactly
  * offers to be created and chosen.
  */
 export function PickerList({
@@ -61,8 +65,8 @@ export function PickerList({
   onRetry: () => void;
   onSelect: (item: PickerItem) => void;
   onClose: () => void;
-  /** Singular, for messages: "create this category". */
-  noun: string;
+  /** What is chosen: names the messages ("create this category") and picks the row's tile. */
+  noun: "category" | "payee";
   emptyMessage: string;
   onCreate?: (name: string) => Promise<void>;
 }) {
@@ -94,25 +98,23 @@ export function PickerList({
   };
 
   return (
-    <Screen title={title} back onBack={onClose} scroll={false} keyboard>
-      <Input
-        label={searchLabel}
+    <SheetScreen title={title} onClose={onClose} scroll={false}>
+      <FieldInput
+        icon={Search}
+        accessibilityLabel={searchLabel}
+        placeholder={searchLabel}
         value={query}
         onChangeText={setQuery}
         autoCorrect={false}
         returnKeyType="search"
       />
-      {createError ? <Banner tone="error" message={createError} /> : null}
-      {canCreate ? <Button title={`Create "${name}"`} variant="secondary" requiresNetwork onPress={create} /> : null}
+      {createError ? <Banner tone="error" surface="cream" message={createError} /> : null}
+      {canCreate ? <SecondaryButton label={`Create "${name}"`} requiresNetwork onPress={create} /> : null}
 
       {loading ? (
-        <Stack>
-          {[0, 1, 2, 3, 4].map((i) => (
-            <Skeleton key={i} height={theme.minHit} />
-          ))}
-        </Stack>
+        [0, 1, 2, 3, 4].map((i) => <Skeleton key={i} tone="sheet" height={56} round="row" />)
       ) : error ? (
-        <ErrorState message={error} onRetry={onRetry} />
+        <ErrorState surface="cream" message={error} onRetry={onRetry} />
       ) : (
         <FlatList
           style={styles.list}
@@ -120,34 +122,26 @@ export function PickerList({
           keyExtractor={(item) => item.id}
           keyboardShouldPersistTaps="handled"
           renderItem={({ item }) => (
-            <Pressable
-              onPress={() => onSelect(item)}
-              accessibilityRole="button"
-              accessibilityLabel={item.label}
-              style={({ pressed }) => [styles.row, pressed && styles.pressed]}
-            >
-              <Text numberOfLines={1}>{item.label}</Text>
-            </Pressable>
+            <PressableScale onPress={() => onSelect(item)} accessibilityLabel={item.label} style={styles.row}>
+              {noun === "category" ? (
+                <CategoryTile name={item.label} color={item.color} icon={item.icon} />
+              ) : (
+                <IconTile icon={payeeInitial(item.label)} color={categoryTone(item.label)} />
+              )}
+              <RNText style={styles.label} numberOfLines={1}>
+                {item.label}
+              </RNText>
+            </PressableScale>
           )}
-          ListEmptyComponent={
-            <Text tone="muted" align="center">
-              {needle ? `Nothing matches "${name}".` : emptyMessage}
-            </Text>
-          }
+          ListEmptyComponent={<Note tone="cream">{needle ? `Nothing matches "${name}".` : emptyMessage}</Note>}
         />
       )}
-    </Screen>
+    </SheetScreen>
   );
 }
 
 const styles = StyleSheet.create({
   list: { flex: 1 },
-  row: {
-    minHeight: theme.minHit,
-    justifyContent: "center",
-    paddingHorizontal: theme.space.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: theme.color.border,
-  },
-  pressed: { opacity: 0.6 },
+  row: { flexDirection: "row", alignItems: "center", gap: 12, padding: 6, borderRadius: radius.field },
+  label: { flex: 1, fontFamily: fonts.monoMedium, fontSize: 12.5, color: colors.ink },
 });

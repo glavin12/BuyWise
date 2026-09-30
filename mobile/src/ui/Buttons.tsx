@@ -1,12 +1,45 @@
 import { ArrowUpRight, Plus, type LucideIcon } from "lucide-react-native";
+import { useRef, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text as RNText, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { useGuardedPress } from "./Button";
+import { useOnline } from "@/lib/network";
+
 import { PressableScale } from "./PressableScale";
 import { colors, extra, fonts, radius } from "./tokens";
 
 // Design v3 buttons (DESIGN.md §3). Sizes come from design/reference-html.
+
+/**
+ * The press guard every writing button shares: disabled while offline (C1, when
+ * `requiresNetwork`), and busy until an async `onPress` settles so a double tap
+ * cannot run it twice.
+ */
+export function useGuardedPress(
+  onPress: () => void | Promise<unknown>,
+  { loading = false, disabled = false, requiresNetwork = false }: { loading?: boolean; disabled?: boolean; requiresNetwork?: boolean },
+) {
+  const online = useOnline();
+  const [busy, setBusy] = useState(false);
+  const locked = useRef(false);
+  const inactive = disabled || loading || busy || (requiresNetwork && !online);
+
+  const handlePress = async () => {
+    // F8/G2: the ref closes the window between two taps in the same frame,
+    // before the `busy` state has re-rendered the button as disabled.
+    if (locked.current) return;
+    locked.current = true;
+    setBusy(true);
+    try {
+      await onPress();
+    } finally {
+      locked.current = false;
+      setBusy(false);
+    }
+  };
+
+  return { handlePress, inactive, busy: loading || busy };
+}
 
 const CIRCLE = {
   cream: { backgroundColor: colors.cream, fg: colors.ink, borderWidth: 0, borderColor: undefined },
@@ -79,22 +112,26 @@ export function PrimaryButton({
   );
 }
 
-/** Transparent outlined pill. `surface` is what it sits on: ink border on cream/colour, `line` on charcoal. */
+/**
+ * Transparent outlined pill. `surface` is what it sits on: ink border on cream/colour, `line` on charcoal.
+ * `danger` is for a destructive action (Delete, Archive): red text and border (the cream sheet's error red, tomato on charcoal).
+ */
 export function SecondaryButton({
   label,
   onPress,
   surface = "light",
+  danger,
   ...guard
-}: GuardedProps & { label: string; surface?: "light" | "dark" }) {
+}: GuardedProps & { label: string; surface?: "light" | "dark"; danger?: boolean }) {
   const { handlePress, inactive, busy } = useGuardedPress(onPress, guard);
-  const fg = surface === "light" ? colors.ink : colors.text;
+  const fg = danger ? (surface === "light" ? extra.errorOnCream : colors.tomato) : surface === "light" ? colors.ink : colors.text;
   return (
     <PressableScale
       onPress={handlePress}
       disabled={inactive}
       accessibilityLabel={label}
       accessibilityState={{ disabled: inactive, busy }}
-      style={[styles.secondary, { borderColor: surface === "light" ? colors.ink : colors.line }, inactive && styles.inactive]}
+      style={[styles.secondary, { borderColor: danger ? fg : surface === "light" ? colors.ink : colors.line }, inactive && styles.inactive]}
     >
       {busy ? <ActivityIndicator color={fg} /> : <RNText style={[styles.secondaryLabel, { color: fg }]}>{label}</RNText>}
     </PressableScale>

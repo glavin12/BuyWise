@@ -48,7 +48,7 @@ export default function NewPayeeSheet() {
       autoFocusName
       errors={attempted ? errors : {}}
       formError={create.isError ? userMessage(create.error, "create this payee") : null}
-      primary={{ label: "Create payee", onPress: save, disabled: create.isPending }}
+      primary={{ onPress: save, disabled: create.isPending }}
     />
   );
 }
