@@ -4,6 +4,7 @@ import { StyleSheet, Text as RNText, View } from "react-native";
 import type { BudgetRowState } from "@/lib/budget";
 
 import type { Hue } from "./Chips";
+import { DrawnFill, useCountUp, type Counted } from "./motion";
 import { PressableScale } from "./PressableScale";
 import { Skeleton } from "./Skeleton";
 import { colors, extra, fonts, radius, type } from "./tokens";
@@ -18,19 +19,17 @@ const ROW = {
   over: { pill: colors.tomato, pillText: colors.ink, bar: colors.tomato, line: colors.tomato },
 } as const;
 
-/** The marigold "READY TO ASSIGN" card: the amount (a placeholder while it loads), a line under it, actions on the right. */
-export function ReadyCard({ amount, line, action, secondary }: { amount: string | null; line: string; action: ReactNode; secondary?: ReactNode }) {
+/**
+ * The marigold "READY TO ASSIGN" card: the amount (a placeholder while it loads), a line under it, actions on the
+ * right. The amount is text as it is, or a number to count up to (DESIGN.md §6.4) with the helper that writes it.
+ */
+export function ReadyCard({ amount, line, action, secondary }: { amount: string | Counted | null; line: string; action: ReactNode; secondary?: ReactNode }) {
+  const said = typeof amount === "object" && amount ? amount.format(amount.to) : amount; // screen readers hear the real figure, not the count
   return (
     <View style={styles.ready}>
-      <View style={styles.readyText} accessible accessibilityLabel={`Ready to assign: ${amount ?? "loading"}. ${line}`}>
+      <View style={styles.readyText} accessible accessibilityLabel={`Ready to assign: ${said ?? "loading"}. ${line}`}>
         <RNText style={styles.readyLabel}>Ready to assign</RNText>
-        {amount === null ? (
-          <Skeleton tone="light" width="60%" height={34} />
-        ) : (
-          <RNText style={styles.readyAmount} numberOfLines={1} adjustsFontSizeToFit>
-            {amount}
-          </RNText>
-        )}
+        {amount === null ? <Skeleton tone="light" width="60%" height={34} /> : <Figure amount={amount} />}
         <RNText style={styles.readyLine}>{line}</RNText>
       </View>
       <View style={styles.readyActions}>
@@ -38,6 +37,15 @@ export function ReadyCard({ amount, line, action, secondary }: { amount: string 
         {secondary}
       </View>
     </View>
+  );
+}
+
+function Figure({ amount }: { amount: string | Counted }) {
+  const shown = useCountUp(typeof amount === "string" ? 0 : amount.to);
+  return (
+    <RNText style={styles.readyAmount} numberOfLines={1} adjustsFontSizeToFit>
+      {typeof amount === "string" ? amount : amount.format(shown)}
+    </RNText>
   );
 }
 
@@ -104,7 +112,7 @@ export function BudgetRow({
           </RNText>
         </View>
         <View style={styles.track}>
-          <View style={[styles.fill, { width: `${state.barPercent}%`, backgroundColor: look.bar }]} />
+          <DrawnFill percent={state.barPercent} style={[styles.fill, { backgroundColor: look.bar }]} />
         </View>
         <RNText style={[styles.line, { color: look.line }]} numberOfLines={1}>
           {line}

@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { StyleSheet, Text as RNText, View, type StyleProp, type ViewStyle } from "react-native";
 
 import { Chip, InlineChip, type Hue } from "./Chips";
+import { DrawnFill, useCountUp } from "./motion";
 import { PressableScale } from "./PressableScale";
 import { colors, extra, fonts, radius, type } from "./tokens";
 
@@ -72,10 +73,21 @@ export function IconTile({ icon: Icon, color, size = 44 }: { icon: LucideIcon | 
   );
 }
 
-/** The 40px balance figure with its fraction smaller and muted: ₹1,24,860.00. Pass the formatted parts. */
-export function HeroAmount({ whole, fraction }: { whole: string; fraction: string }) {
+type HeroParts = { whole: string; fraction: string };
+
+/**
+ * The 40px balance figure with its fraction smaller and muted: ₹1,24,860.00. Pass the formatted parts, or `to`
+ * and a `format` that writes them to have it count up to them (DESIGN.md §6.4).
+ */
+export function HeroAmount({
+  tone = "text",
+  ...amount
+}: { /** `mint` for money in. */ tone?: "text" | "mint" } & (HeroParts | { to: number; format: (n: number) => HeroParts })) {
+  const shown = useCountUp("to" in amount ? amount.to : 0);
+  const { whole, fraction } = "to" in amount ? amount.format(shown) : amount;
+  const said = "to" in amount ? amount.format(amount.to) : amount; // screen readers hear the real figure, not the count
   return (
-    <RNText style={styles.hero} numberOfLines={1} adjustsFontSizeToFit accessibilityLabel={whole + fraction}>
+    <RNText style={[styles.hero, { color: colors[tone] }]} numberOfLines={1} adjustsFontSizeToFit accessibilityLabel={said.whole + said.fraction}>
       {whole}
       <RNText style={styles.heroFraction}>{fraction}</RNText>
     </RNText>
@@ -140,7 +152,7 @@ export function Note({ children, tone = "muted" }: { children: string; tone?: ke
   );
 }
 
-/** Ink progress bar on a colour card, with an optional ink tooltip ("79%") above the fill's end. */
+/** Ink progress bar on a colour card (it draws from 0 on mount), with an optional ink tooltip ("79%") above the fill's end. */
 export function Meter({ percent, height = 8, tooltip, label }: { percent: number; height?: 8 | 12; tooltip?: string; label: string }) {
   const p = Math.max(0, Math.min(100, percent));
   return (
@@ -150,13 +162,14 @@ export function Meter({ percent, height = 8, tooltip, label }: { percent: number
       accessibilityValue={{ min: 0, max: 100, now: Math.round(p) }}
       style={[styles.meter, { height }, tooltip && styles.meterTipRoom]}
     >
-      <View style={[styles.meterFill, { width: `${p}%` }]} />
-      {tooltip ? (
-        // A 60-wide anchor centred on the fill's end centres the tip over it.
-        <View style={[styles.tipAnchor, { left: `${p}%` }]}>
-          <RNText style={styles.tip}>{tooltip}</RNText>
-        </View>
-      ) : null}
+      <DrawnFill percent={p} style={styles.meterFill}>
+        {tooltip ? (
+          // A 60-wide anchor centred on the fill's end (100% of the fill) centres the tip over it.
+          <View style={styles.tipAnchor}>
+            <RNText style={styles.tip}>{tooltip}</RNText>
+          </View>
+        ) : null}
+      </DrawnFill>
     </View>
   );
 }
@@ -288,7 +301,7 @@ const styles = StyleSheet.create({
   meter: { borderRadius: radius.pill, backgroundColor: extra.trackOnColour },
   meterTipRoom: { marginTop: 22 },
   meterFill: { height: "100%", borderRadius: radius.pill, backgroundColor: colors.ink },
-  tipAnchor: { position: "absolute", top: -26, width: 60, marginLeft: -30, alignItems: "center" },
+  tipAnchor: { position: "absolute", top: -26, left: "100%", width: 60, marginLeft: -30, alignItems: "center" },
   tip: {
     fontFamily: fonts.mono,
     fontSize: 10,

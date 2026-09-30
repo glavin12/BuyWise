@@ -99,7 +99,7 @@ export default function HomeScreen() {
   const shownMonth = period === "this_month" ? now : monthShift(now.month, now.year, -1);
 
   return (
-    <Screen surface="screen" tabBar onRefresh={refresh} refreshing={refreshing}>
+    <Screen surface="screen" tabBar enter onRefresh={refresh} refreshing={refreshing}>
       <Row justify="between">
         <PressableScale onPress={() => router.navigate("/profile")} accessibilityLabel={`Hi, ${name}! Open your profile`}>
           <Row gap="md">
@@ -134,7 +134,7 @@ export default function HomeScreen() {
               </Row>
               <CircleButton icon={ArrowUpRight} size={38} label="Open reports" onPress={() => router.push("/reports")} />
             </Row>
-            <HeroAmount {...toParts(formatCurrency(data.display_current_balance, currency))} />
+            <HeroAmount to={data.display_current_balance} format={(n) => toParts(formatCurrency(n, currency))} />
             <RichText
               tone="card"
               links={{

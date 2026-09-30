@@ -7,26 +7,24 @@ import { useArchiveCategory, useUpdateCategory } from "@/lib/mutations";
 import { useCategory } from "@/lib/queries";
 import { categoryDraftFromCategory, categoryDraftKey, categoryEditPatch, validateCategoryDraft } from "@/lib/settings";
 import type { Category } from "@/lib/types";
-import { CategoryEditor, confirm, ErrorState, hapticSuccess, NotFoundScreen, Screen, showToast, Skeleton, useDiscardGuard } from "@/ui";
+import { CategoryEditor, confirm, hapticSuccess, SheetLoading, SheetNotFound, showToast, useDiscardGuard } from "@/ui";
 
 export default function EditCategoryRoute() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  if (!isUuid(id)) return <NotFoundScreen title="Edit category" what="Category" />;
+  if (!isUuid(id)) return <SheetNotFound title="Edit category" what="Category" />;
   return <EditLoader id={id} />;
 }
 
 function EditLoader({ id }: { id: string }) {
   const category = useCategory(id);
   if (category.data) return <EditForm category={category.data} />;
-  if (isNotFound(category.error)) return <NotFoundScreen title="Edit category" what="Category" />;
+  if (isNotFound(category.error)) return <SheetNotFound title="Edit category" what="Category" />;
   return (
-    <Screen title="Edit category" back>
-      {category.isError ? (
-        <ErrorState message={userMessage(category.error, "load this category")} onRetry={() => category.refetch()} />
-      ) : (
-        <Skeleton height={220} />
-      )}
-    </Screen>
+    <SheetLoading
+      title="Edit category"
+      error={category.isError ? userMessage(category.error, "load this category") : null}
+      onRetry={() => category.refetch()}
+    />
   );
 }
 
@@ -98,7 +96,7 @@ function EditForm({ category }: { category: Category }) {
       // The form starts valid, so any error shown here comes from something the user just changed.
       errors={errors}
       formError={failure}
-      primary={{ label: "Save changes", onPress: save, disabled: !changed || update.isPending }}
+      primary={{ onPress: save, disabled: !changed || update.isPending }}
       danger={{ label: "Archive category", onPress: onArchive, disabled: archive.isPending }}
     />
   );

@@ -1,23 +1,24 @@
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 
-import { Button, ChatThread } from "@/ui";
+import { ChatThread, goBack } from "@/ui";
 
-/** Always opens a new chat; History holds the earlier ones. */
+/**
+ * Always opens a new chat; History holds the earlier ones. Another screen asks for a new chat by
+ * navigating here with a fresh `fresh` value (a timestamp): the thread is keyed on it.
+ */
 export default function ChatTab() {
   const router = useRouter();
+  const { fresh } = useLocalSearchParams<{ fresh?: string }>();
   const [thread, setThread] = useState(0); // a new key starts a fresh chat
 
   return (
     <ChatThread
-      key={thread}
-      title="Chat"
-      actions={
-        <>
-          <Button title="History" variant="link" onPress={() => router.push("/conversations")} />
-          <Button title="New chat" variant="link" onPress={() => setThread((n) => n + 1)} />
-        </>
-      }
+      key={`${fresh ?? ""}:${thread}`}
+      tab
+      onBack={goBack}
+      onHistory={() => router.push("/conversations")}
+      onNew={() => setThread((n) => n + 1)}
     />
   );
 }

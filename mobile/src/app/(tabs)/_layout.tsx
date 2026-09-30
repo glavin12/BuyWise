@@ -4,10 +4,11 @@ import { TabBar } from "@/ui";
 
 // Design v3 (DESIGN.md §5): Home · Activity · [AI chat] · Budget · Profile, no labels. The
 // centre opens Chat on tap and the QuickAdd sheet on a 350 ms hold (both in TabBar). Activity
-// shows the first-run coach mark for it (design/screens/03-activity.png).
+// shows the first-run coach mark for it (design/screens/03-activity.png). `backBehavior="history"`:
+// back (the Chat tab's button, Android back) returns to the tab you came from, not always Home.
 export default function TabsLayout() {
   return (
-    <Tabs screenOptions={{ headerShown: false }} tabBar={(props) => <TabBar {...props} coachOn="transactions" />}>
+    <Tabs backBehavior="history" screenOptions={{ headerShown: false }} tabBar={(props) => <TabBar {...props} coachOn="transactions" />}>
       <Tabs.Screen name="index" options={{ title: "Home" }} />
       <Tabs.Screen name="transactions" options={{ title: "Activity" }} />
       <Tabs.Screen name="chat" options={{ title: "Chat" }} />

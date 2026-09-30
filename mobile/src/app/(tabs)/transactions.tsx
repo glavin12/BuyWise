@@ -201,7 +201,6 @@ export default function ActivityTab() {
   return (
     <Screen surface="screen" tabBar scroll={false}>
       <SectionedList
-        v3
         sections={sections}
         keyExtractor={(tx) => tx.id}
         renderItem={(tx) => <ActivityRow tx={tx} currency={currency} onPress={() => router.push(`/transaction/${tx.id}`)} />}

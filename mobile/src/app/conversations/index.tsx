@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
+import { ArrowLeft, MessagesSquare } from "lucide-react-native";
 import { useState } from "react";
 
 import { isNotFound, userMessage } from "@/lib/api";
@@ -11,18 +12,25 @@ import type { Conversation } from "@/lib/types";
 import { useRefetchStaleOnFocus } from "@/lib/useRefetchStaleOnFocus";
 import {
   Banner,
+  CircleButton,
   confirm,
+  ConversationHeader,
   ConversationRow,
+  ConversationSkeletons,
   EmptyState,
   ErrorState,
+  goBack,
   hapticSuccess,
+  Row,
   Screen,
   SectionedList,
-  SectionHeader,
   showToast,
-  Skeleton,
   Stack,
+  Title,
 } from "@/ui";
+
+// History, in Activity's style: back and "HISTORY", then the chats grouped Today / This week / Older
+// with relative times. Tap opens one, long-press deletes it (after a confirm).
 
 export default function ConversationsScreen() {
   const router = useRouter();
@@ -64,20 +72,32 @@ export default function ConversationsScreen() {
     });
   };
 
-  const empty = list.isPending ? (
-    <Stack>
-      {[0, 1, 2, 3].map((i) => (
-        <Skeleton key={i} height={52} />
-      ))}
+  const header = (
+    <Stack gap="md">
+      <Row>
+        <CircleButton icon={ArrowLeft} label="Go back" onPress={goBack} />
+        <Title>History</Title>
+      </Row>
+      {list.isError && list.data ? <Banner tone="warning" message="Couldn't refresh. Showing what we have." /> : null}
     </Stack>
+  );
+
+  const empty = list.isPending ? (
+    <ConversationSkeletons />
   ) : list.isError && !list.data ? (
-    <ErrorState message={userMessage(list.error, "load your chats")} onRetry={() => list.refetch()} />
+    <ErrorState title="Can't load chats" message={userMessage(list.error, "load your chats")} onRetry={() => list.refetch()} />
   ) : (
-    <EmptyState icon="chatbubbles-outline" title="No chats yet" message="Your conversations with BuyWise show up here." />
+    <EmptyState
+      icon={MessagesSquare}
+      title="No chats yet"
+      message="Your conversations with BuyWise show up here."
+      actionLabel="Start a chat"
+      onAction={() => router.dismissTo({ pathname: "/chat", params: { fresh: String(Date.now()) } })} // back to the tab shell, on a new chat
+    />
   );
 
   return (
-    <Screen title="History" back scroll={false}>
+    <Screen surface="screen" scroll={false}>
       <SectionedList
         sections={sections}
         keyExtractor={(c) => c.id}
@@ -89,8 +109,8 @@ export default function ConversationsScreen() {
             locked={!online || pending.includes(c.id)} // AI7: never delete a chat whose reply is on its way
           />
         )}
-        renderSectionHeader={(section: ConversationSection) => <SectionHeader title={section.title} />}
-        header={list.isError && list.data ? <Banner tone="warning" message="Couldn't refresh. Showing what we have." /> : undefined}
+        renderSectionHeader={(section: ConversationSection) => <ConversationHeader title={section.title} />}
+        header={header}
         empty={empty}
         refreshing={refreshing}
         onRefresh={refresh}

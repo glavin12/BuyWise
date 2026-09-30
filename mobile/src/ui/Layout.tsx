@@ -1,8 +1,9 @@
 import { View, type ViewProps } from "react-native";
 
-import { theme } from "./theme";
+// The gap scale of Row and Stack (`gap="md"`). Not tokens.space, whose keys stand for other values.
+const GAP = { xs: 4, sm: 8, md: 12, lg: 16 } as const;
 
-type Gap = keyof typeof theme.space;
+type Gap = keyof typeof GAP;
 type LayoutProps = Omit<ViewProps, "style"> & {
   gap?: Gap;
   /** Fill the remaining space in a Row/Stack (flex: 1, allowed to shrink so text can truncate). */
@@ -10,7 +11,7 @@ type LayoutProps = Omit<ViewProps, "style"> & {
 };
 
 export function Stack({ gap = "md", grow, ...rest }: LayoutProps) {
-  return <View style={[{ gap: theme.space[gap] }, grow && { flex: 1, minWidth: 0 }]} {...rest} />;
+  return <View style={[{ gap: GAP[gap] }, grow && { flex: 1, minWidth: 0 }]} {...rest} />;
 }
 
 const JUSTIFY = {
@@ -35,7 +36,7 @@ export function Row({
       style={[
         {
           flexDirection: "row",
-          gap: theme.space[gap],
+          gap: GAP[gap],
           justifyContent: JUSTIFY[justify],
           alignItems: ALIGN[align],
         },

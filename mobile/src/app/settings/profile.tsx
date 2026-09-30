@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
+import { Check, Globe, User } from "lucide-react-native";
 import { useState } from "react";
 
 import { userMessage } from "@/lib/api";
@@ -7,7 +8,8 @@ import { formatDate } from "@/lib/format";
 import { useUpdateProfile } from "@/lib/mutations";
 import { profileQuery } from "@/lib/queries";
 import {
-  CURRENCY_OPTIONS,
+  currencyOptions,
+  currencyTag,
   profileDraftFromProfile,
   profileDraftKey,
   profileEditPatch,
@@ -18,34 +20,35 @@ import {
 import type { UserProfile } from "@/lib/types";
 import {
   Banner,
-  Button,
-  ErrorState,
+  Chip,
+  FieldButton,
+  FieldInput,
   hapticSuccess,
-  Input,
-  PickerList,
-  Screen,
-  SelectField,
+  Note,
+  OptionSheet,
+  PrimaryButton,
+  Row,
+  SectionLabel,
+  SheetLoading,
+  SheetScreen,
   showToast,
-  Skeleton,
   Stack,
-  Text,
   useDiscardGuard,
 } from "@/ui";
 
-type PickerKind = "currency" | "timezone" | null;
+// Edit profile, on the same cream sheet as QuickAdd: name, currency (chips), time zone (a field that opens
+// the list), and the join date. Opened by the Profile card's pencil and by the Region ticket.
 
 export default function ProfileSettingsScreen() {
   const profile = useQuery(profileQuery);
 
   if (profile.data) return <ProfileForm profile={profile.data} />;
   return (
-    <Screen title="Profile" back>
-      {profile.isError ? (
-        <ErrorState message={userMessage(profile.error, "load your profile")} onRetry={() => profile.refetch()} />
-      ) : (
-        <Skeleton height={220} />
-      )}
-    </Screen>
+    <SheetLoading
+      title="Edit profile"
+      error={profile.isError ? userMessage(profile.error, "load your profile") : null}
+      onRetry={() => profile.refetch()}
+    />
   );
 }
 
@@ -54,9 +57,7 @@ function ProfileForm({ profile }: { profile: UserProfile }) {
   const [baseline] = useState(() => profileDraftFromProfile(profile));
   const [draft, setDraft] = useState<ProfileDraft>(baseline);
   const [failure, setFailure] = useState<string | null>(null);
-  // Choosing currency or timezone swaps the form for a full-screen PickerList; the
-  // component itself stays mounted, so `draft` survives the round trip.
-  const [picker, setPicker] = useState<PickerKind>(null);
+  const [zoneOpen, setZoneOpen] = useState(false);
   const update = useUpdateProfile();
   const { allowLeave } = useDiscardGuard(profileDraftKey(draft) !== profileDraftKey(baseline));
 
@@ -64,9 +65,10 @@ function ProfileForm({ profile }: { profile: UserProfile }) {
   const patch = profileEditPatch(profile, draft, name);
   const changed = Object.keys(patch).length > 0;
 
-  const currencyLabel = CURRENCY_OPTIONS.find((c) => c.value === draft.currency)?.label ?? draft.currency;
-  const timezones = timezoneOptions(draft.timezone);
-  const timezoneLabel = timezones.find((z) => z.value === draft.timezone)?.label ?? draft.timezone;
+  // The saved values stay on offer, so a change can be undone before saving.
+  const currencies = currencyOptions(profile.currency);
+  const zones = timezoneOptions(profile.timezone);
+  const zoneLabel = zones.find((z) => z.value === draft.timezone)?.label ?? draft.timezone;
 
   const save = async () => {
     if (errors.name || !changed) return;
@@ -83,44 +85,62 @@ function ProfileForm({ profile }: { profile: UserProfile }) {
     router.back();
   };
 
-  if (picker) {
-    const options = picker === "currency" ? CURRENCY_OPTIONS : timezones;
-    return (
-      <PickerList
-        title={picker === "currency" ? "Currency" : "Time zone"}
-        searchLabel="Search"
-        noun={picker === "currency" ? "currency" : "time zone"}
-        emptyMessage="No options."
-        items={options.map((o) => ({ id: o.value, label: o.label }))}
-        loading={false}
-        error={null}
-        onRetry={() => {}}
-        onSelect={(item) => {
-          setDraft((d) => (picker === "currency" ? { ...d, currency: item.id } : { ...d, timezone: item.id }));
-          setPicker(null);
-        }}
-        onClose={() => setPicker(null)}
-      />
-    );
-  }
-
   return (
-    <Screen title="Profile" back keyboard>
-      {failure ? <Banner tone="error" message={failure} /> : null}
+    <SheetScreen title="Edit profile">
+      {failure ? <Banner tone="error" surface="cream" message={failure} /> : null}
 
-      <Input label="Name" value={draft.name} onChangeText={(text) => setDraft({ ...draft, name: text })} error={errors.name} returnKeyType="done" />
-
-      <SelectField label="Currency" value={currencyLabel} placeholder="Choose a currency" onPress={() => setPicker("currency")} />
-      <SelectField label="Time zone" value={timezoneLabel} placeholder="Choose a time zone" onPress={() => setPicker("timezone")} />
-
-      <Stack gap="xs">
-        <Text variant="caption" tone="muted">
-          Joined
-        </Text>
-        <Text>{formatDate(profile.created_at, "medium")}</Text>
+      <Stack gap="sm">
+        <SectionLabel label="Name" light />
+        <FieldInput
+          icon={User}
+          accessibilityLabel="Name"
+          placeholder="Your name"
+          value={draft.name}
+          onChangeText={(text) => setDraft({ ...draft, name: text })}
+          returnKeyType="done"
+        />
+        {errors.name ? <Note tone="error">{errors.name}</Note> : null}
       </Stack>
 
-      <Button title="Save" onPress={save} disabled={!changed || !!errors.name || update.isPending} requiresNetwork />
-    </Screen>
+      <Stack gap="sm">
+        <SectionLabel label="Currency" light />
+        <Row gap="xs" wrap>
+          {currencies.map((c) => {
+            const on = c.value === draft.currency;
+            return (
+              <Chip
+                key={c.value}
+                label={currencyTag(c.value)}
+                accessibilityLabel={c.label}
+                variant={on ? "ink" : "outlined"}
+                selected={on}
+                onPress={() => setDraft({ ...draft, currency: c.value })}
+              />
+            );
+          })}
+        </Row>
+      </Stack>
+
+      <Stack gap="sm">
+        <SectionLabel label="Time zone" light />
+        <FieldButton icon={Globe} label="Time zone" value={zoneLabel} placeholder="Choose a time zone" onPress={() => setZoneOpen(true)} />
+      </Stack>
+
+      <Note tone="cream">{`Joined ${formatDate(profile.created_at, "medium")}`}</Note>
+
+      <PrimaryButton label="Save" icon={Check} onPress={save} disabled={!changed || !!errors.name || update.isPending} requiresNetwork />
+
+      <OptionSheet
+        visible={zoneOpen}
+        title="Time zone"
+        groups={[{ options: zones.map((z) => ({ value: z.value, label: z.label })) }]}
+        value={draft.timezone}
+        onSelect={(timezone) => {
+          setDraft({ ...draft, timezone });
+          setZoneOpen(false);
+        }}
+        onClose={() => setZoneOpen(false)}
+      />
+    </SheetScreen>
   );
 }

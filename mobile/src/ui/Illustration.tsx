@@ -15,7 +15,7 @@ const ART = {
   goal_badge: { Art: GoalBadge, ratio: 1 },
 } as const;
 
-export type IllustrationName = keyof typeof ART;
+type IllustrationName = keyof typeof ART;
 
 export function Illustration({ name, width }: { name: IllustrationName; width: number }) {
   const { Art, ratio } = ART[name];

@@ -99,4 +99,10 @@ export const extra = {
   mutedOnSage: '#5A564D',   // Goals dial "of ₹80,000 · 67%"
   errorOnCream: '#B3261E',  // ours: form errors on a cream sheet (the design draws none; tomato is too light for text)
   trackOnColour: 'rgba(22,22,22,0.14)', // progress track on a colour card
+  lineOnTomato: 'rgba(22,22,22,0.22)',  // the stat cards' border inside the tomato panel (Reports.html)
+  trackOnCard: '#2A2A2C',               // the payment bars' track inside a charcoal card (Reports.html)
+  ticketShadow: 'rgba(0,0,0,0.35)',     // the Profile tickets' drop shadow (Settings.html)
+  ticketChip: 'rgba(22,22,22,0.12)',    // the translucent chip on the sky ticket (Settings.html)
+  proseOnBubble: '#E4E2DA',             // the AI chat bubbles' mono prose (Chat.html)
+  tableHead: '#2A2A2C',                 // a chat table's header row (Chat.html)
 } as const;

@@ -1,9 +1,11 @@
 // Settings forms as pure functions: profile, category and payee drafts,
-// validation and patches. Mirrors the goal/transaction form pattern (draft
-// holds text, a validate function parses it once). Import-free or explicit
-// .ts siblings so `npm test` can run it.
+// validation and patches, plus the strings on the Profile tab's card and
+// tickets. Mirrors the goal/transaction form pattern (draft holds text, a
+// validate function parses it once). Import-free or explicit .ts siblings so
+// `npm test` can run it.
 
 import { categoryHue, HUES, type Hue } from "./categoryStyle.ts";
+import { currencySymbol } from "./home.ts";
 import { diffFields } from "./ledger.ts";
 import type {
   Category,
@@ -45,6 +47,32 @@ export function timezoneOptions(current: string): readonly { value: string; labe
   return TIMEZONE_OPTIONS.some((z) => z.value === current) ? TIMEZONE_OPTIONS : [...TIMEZONE_OPTIONS, { value: current, label: current }];
 }
 
+/** The four currencies, plus the profile's own if it is another one (an API client can save any ISO code). */
+export function currencyOptions(current: string): readonly { value: string; label: string }[] {
+  return CURRENCY_OPTIONS.some((c) => c.value === current) ? CURRENCY_OPTIONS : [...CURRENCY_OPTIONS, { value: current, label: current }];
+}
+
+/** "INR ₹": the code and its symbol (just the code when it has none). */
+export function currencyTag(currency: string): string {
+  const symbol = currencySymbol(currency);
+  return symbol === currency ? currency : `${currency} ${symbol}`;
+}
+
+/** The Region ticket's chip: "INR ₹ · Asia/Kolkata". */
+export const regionLabel = (currency: string, timezone: string): string => `${currencyTag(currency)} · ${timezone}`;
+
+/** The Profile card's name: the saved full name, else the part of the email before the "@". */
+export function displayName(fullName: string | null | undefined, email: string | null | undefined): string {
+  return fullName?.trim() || email?.split("@")[0] || "";
+}
+
+/** "since Aug 2026" from the profile's created_at ("" when that is not a date). */
+export function sinceLabel(createdAt: string): string {
+  const joined = new Date(createdAt);
+  if (Number.isNaN(joined.getTime())) return "";
+  return `since ${joined.toLocaleDateString("en-US", { month: "short", year: "numeric" })}`;
+}
+
 export type ProfileDraft = { name: string; currency: string; timezone: string };
 
 export function profileDraftFromProfile(profile: UserProfile): ProfileDraft {
@@ -77,8 +105,10 @@ export function profileDraftKey(draft: ProfileDraft): string {
 // ── Categories ──────────────────────────────────────────────────
 
 export const CATEGORY_NAME_MAX = 100; // backend CategoryCreate.name
-export const CATEGORY_ICON_MAX = 32; // backend CategoryCreate.icon
 
+// `icon` is the key of a glyph in the editor's picker (CATEGORY_GLYPHS in ui/CategoryTile; the backend keeps up to 32
+// characters). "" is none, which draws the tag glyph. An older category may hold an emoji: the picker shows nothing
+// chosen for it, and it is only replaced when a glyph is picked.
 export type CategoryDraft = { name: string; icon: string; hue: Hue; type: CategoryType };
 
 export function emptyCategoryDraft(type: CategoryType): CategoryDraft {
@@ -124,6 +154,9 @@ export function categoryEditPatch(category: Category, draft: CategoryDraft, name
   return patch;
 }
 
+/** The icon picker's tap: choosing the glyph that is already chosen clears it. */
+export const pickIcon = (current: string, key: string): string => (current === key ? "" : key);
+
 export function categoryDraftKey(draft: CategoryDraft): string {
   return JSON.stringify([draft.name.trim(), draft.icon.trim(), draft.hue, draft.type]);
 }
@@ -155,6 +188,9 @@ export function validatePayeeDraft(draft: PayeeDraft): { name: string; errors: P
 export function payeeDraftKey(draft: PayeeDraft): string {
   return JSON.stringify([draft.name.trim(), draft.type]);
 }
+
+/** The letter on a payee's tile: its first character, upper case (a whole emoji counts as one). */
+export const payeeInitial = (name: string): string => Array.from(name.trim())[0]?.toUpperCase() ?? "?";
 
 // ── Shared: create-returns-existing detection ──────────────────
 // POST /categories and POST /payees return the existing active row when the

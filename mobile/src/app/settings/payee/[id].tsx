@@ -7,26 +7,24 @@ import { useDeletePayee, useUpdatePayee } from "@/lib/mutations";
 import { usePayee } from "@/lib/queries";
 import { payeeDraftFromPayee, payeeDraftKey, validatePayeeDraft } from "@/lib/settings";
 import type { Payee } from "@/lib/types";
-import { confirm, ErrorState, hapticSuccess, NotFoundScreen, PayeeEditor, Screen, showToast, Skeleton, useDiscardGuard } from "@/ui";
+import { confirm, hapticSuccess, PayeeEditor, SheetLoading, SheetNotFound, showToast, useDiscardGuard } from "@/ui";
 
 export default function EditPayeeRoute() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  if (!isUuid(id)) return <NotFoundScreen title="Edit payee" what="Payee" />;
+  if (!isUuid(id)) return <SheetNotFound title="Edit payee" what="Payee" />;
   return <EditLoader id={id} />;
 }
 
 function EditLoader({ id }: { id: string }) {
   const payee = usePayee(id);
   if (payee.data) return <EditForm payee={payee.data} />;
-  if (isNotFound(payee.error)) return <NotFoundScreen title="Edit payee" what="Payee" />;
+  if (isNotFound(payee.error)) return <SheetNotFound title="Edit payee" what="Payee" />;
   return (
-    <Screen title="Edit payee" back>
-      {payee.isError ? (
-        <ErrorState message={userMessage(payee.error, "load this payee")} onRetry={() => payee.refetch()} />
-      ) : (
-        <Skeleton height={160} />
-      )}
-    </Screen>
+    <SheetLoading
+      title="Edit payee"
+      error={payee.isError ? userMessage(payee.error, "load this payee") : null}
+      onRetry={() => payee.refetch()}
+    />
   );
 }
 
@@ -96,7 +94,7 @@ function EditForm({ payee }: { payee: Payee }) {
       editing
       errors={errors}
       formError={failure}
-      primary={{ label: "Save changes", onPress: save, disabled: !changed || update.isPending }}
+      primary={{ onPress: save, disabled: !changed || update.isPending }}
       danger={{ label: "Delete payee", onPress: onDelete, disabled: remove.isPending }}
     />
   );

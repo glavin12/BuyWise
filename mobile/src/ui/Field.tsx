@@ -45,11 +45,27 @@ export function FieldButton({
   );
 }
 
-export function FieldInput({ icon: Icon, ...input }: TextInputProps & { icon: LucideIcon; accessibilityLabel: string }) {
+export function FieldInput({
+  icon: Icon,
+  grow,
+  ...input
+}: TextInputProps & {
+  icon: LucideIcon;
+  accessibilityLabel: string;
+  /** A multi-line note: grows with its text (up to a limit) instead of staying 50 tall. */
+  grow?: boolean;
+}) {
   return (
-    <View style={[styles.field, styles.inputField]}>
+    <View style={[styles.field, styles.inputField, grow && styles.growField]}>
       <Icon size={18} color={colors.ink} strokeWidth={2.1} />
-      <TextInput {...input} style={styles.input} placeholderTextColor={extra.mutedOnCream} selectionColor={colors.tomato} cursorColor={colors.tomato} />
+      <TextInput
+        multiline={grow}
+        {...input}
+        style={[styles.input, grow && styles.growInput]}
+        placeholderTextColor={extra.mutedOnCream}
+        selectionColor={colors.tomato}
+        cursorColor={colors.tomato}
+      />
     </View>
   );
 }
@@ -63,4 +79,6 @@ const styles = StyleSheet.create({
   hint: { fontFamily: fonts.mono, fontSize: 10.5, color: extra.mutedOnCream },
   clear: { paddingRight: 14 },
   input: { flex: 1, height: "100%", fontFamily: fonts.mono, fontSize: 13, color: colors.ink, padding: 0 },
+  growField: { height: undefined, minHeight: 50, alignItems: "flex-start", paddingVertical: 14 },
+  growInput: { height: undefined, minHeight: 22, maxHeight: 110, textAlignVertical: "top" },
 });

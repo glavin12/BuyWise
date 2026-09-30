@@ -1,12 +1,12 @@
+import { WifiOff } from "lucide-react-native";
 import type { ReactNode } from "react";
-import { StyleSheet, View } from "react-native";
+import { StyleSheet, Text as RNText, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useOnline } from "@/lib/network";
 
-import { Text } from "./Text";
-import { theme } from "./theme";
 import { ToastHost } from "./toast";
+import { colors, fonts } from "./tokens";
 
 /** C1: persistent banner while the device has no connection. Clears itself on reconnect (C2). */
 function OfflineBanner() {
@@ -14,11 +14,11 @@ function OfflineBanner() {
   const insets = useSafeAreaInsets();
   if (online) return null;
 
+  // Tomato is the design's alert colour, and ink text on it is readable under light or dark status icons.
   return (
-    <View accessibilityRole="alert" style={[styles.offline, { paddingTop: insets.top + theme.space.sm }]}>
-      <Text variant="caption" tone="onAccent">
-        No internet connection
-      </Text>
+    <View accessibilityRole="alert" style={[styles.offline, { paddingTop: insets.top + 8 }]}>
+      <WifiOff size={14} color={colors.ink} strokeWidth={2.4} />
+      <RNText style={styles.offlineText}>No internet connection</RNText>
     </View>
   );
 }
@@ -35,11 +35,15 @@ export function AppShell({ children }: { children: ReactNode }) {
 }
 
 const styles = StyleSheet.create({
-  shell: { flex: 1, backgroundColor: theme.color.background },
+  shell: { flex: 1, backgroundColor: colors.screen },
   content: { flex: 1 },
   offline: {
+    flexDirection: "row",
     alignItems: "center",
-    paddingBottom: theme.space.sm,
-    backgroundColor: theme.color.text,
+    justifyContent: "center",
+    gap: 7,
+    paddingBottom: 8,
+    backgroundColor: colors.tomato,
   },
+  offlineText: { fontFamily: fonts.monoMedium, fontSize: 11, color: colors.ink },
 });

@@ -22,7 +22,7 @@ const CHIP = {
   mint: { bg: colors.mint, fg: colors.ink, border: undefined }, // QuickAdd suggestion
   creamLine: { bg: colors.cream, fg: colors.ink, border: colors.ink }, // Goals corner chips
 } as const;
-export type ChipVariant = keyof typeof CHIP;
+type ChipVariant = keyof typeof CHIP;
 
 type ChipProps = {
   label: string;
