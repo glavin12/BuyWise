@@ -196,7 +196,7 @@ export const monthBudgetsQuery = ({ month, year }: MonthYear) =>
     queryFn: () => api.getMonthBudgets(year, month),
   });
 
-/** The month's income and spending in minor units: "ready to assign" is worked out from the income. */
+/** The month's income and spending in minor units (the Budget screen's chips; the API works out "ready to assign"). */
 export const monthIncomeQuery = ({ month, year }: MonthYear) =>
   queryOptions({
     queryKey: ["analytics", "monthly", monthKey(month, year)],

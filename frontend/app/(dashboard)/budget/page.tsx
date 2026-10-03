@@ -1,10 +1,13 @@
 /**
  * Budget — colorful-cream (see _Budget.dc.html).
  *
- * "Ready to assign" hero + income/assigned/spent summary, then a single
- * envelopes list (the backend has no category groups, so the mockup's named
- * groups collapse to one list). Budgeted amount is inline-editable; progress
- * bars use each category's colour.
+ * "Ready to assign" hero + opening / income / spent / closing summary (the month's
+ * slice of the one running balance), then a single envelopes list (the backend
+ * has no category groups, so the mockup's named groups collapse to one list).
+ * Budgets roll over: "Available" is what earlier months left (or overspent) plus
+ * this month's budget minus this month's spending; the progress bar is this
+ * month's alone. Budgeted amount is inline-editable; progress bars use each
+ * category's colour.
  */
 "use client";
 
@@ -24,13 +27,18 @@ import { formatCurrency, displayToMinor } from "@/lib/format";
 import { categoryStyle, categoryEmoji } from "@/lib/categories";
 import { TRANSACTION_UPDATED_EVENT } from "@/lib/events";
 import { cn } from "@/lib/utils";
-import type { Budget, Category, DashboardData } from "@/lib/types";
+import type { Budget, BudgetMonthResponse, Category, DashboardData } from "@/lib/types";
 
 export default function BudgetPage() {
   const now = new Date();
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [year, setYear] = useState(now.getFullYear());
-  const [budgets, setBudgets] = useState<Budget[]>([]);
+  const [monthView, setMonthView] = useState<BudgetMonthResponse | null>(null);
+  const budgets = monthView?.budgets ?? [];
+  const carried = monthView?.carried ?? [];
+  // Optimistic edits change the month's rows in place until the refetch lands.
+  const setBudgets = (update: (prev: Budget[]) => Budget[]) =>
+    setMonthView((view) => (view ? { ...view, budgets: update(view.budgets) } : view));
   const [categories, setCategories] = useState<Category[]>([]);
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -67,7 +75,7 @@ export default function BudgetPage() {
           api.listCategories(),
           api.getDashboard(period),
         ]);
-        if (budgetRes.status === "fulfilled") setBudgets(budgetRes.value.budgets);
+        if (budgetRes.status === "fulfilled") setMonthView(budgetRes.value);
         if (catRes.status === "fulfilled") setCategories(catRes.value.categories);
         if (dashRes.status === "fulfilled") setDashboard(dashRes.value);
       } catch (err) {
@@ -96,10 +104,11 @@ export default function BudgetPage() {
     (c) => c.is_active && c.type === "expense" && !budgetedCategoryIds.has(c.id)
   );
 
-  const totalBudgeted = budgets.reduce((s, b) => s + b.display_budgeted_amount, 0);
-  const totalSpent = budgets.reduce((s, b) => s + (b.display_spent ?? 0), 0);
+  const totalSpent = dashboard?.display_total_spent ?? 0;
   const income = dashboard?.display_total_income ?? 0;
-  const leftToBudget = income - totalBudgeted;
+  const leftToBudget = monthView?.display_unassigned ?? 0;
+  const carriedLabel = (display: number | null | undefined) =>
+    !display ? "—" : `${display > 0 ? "+" : "−"}${formatCurrency(Math.abs(display), currency)}`;
 
   const handleBudgetEdit = async (budgetId: string, newAmountStr: string) => {
     const num = parseFloat(newAmountStr);
@@ -113,8 +122,10 @@ export default function BudgetPage() {
               ...b,
               budgeted_amount: newMinor,
               display_budgeted_amount: num,
-              remaining_amount: newMinor - (b.spent ?? 0),
+              remaining: newMinor - (b.spent ?? 0),
               display_remaining: num - (b.display_spent ?? 0),
+              available: (b.available ?? b.remaining ?? 0) + (newMinor - b.budgeted_amount),
+              display_available: (b.display_available ?? b.display_remaining ?? 0) + (num - b.display_budgeted_amount),
               percent_used: num > 0 ? ((b.display_spent ?? 0) / num) * 100 : null,
             }
           : b
@@ -218,8 +229,8 @@ export default function BudgetPage() {
         </div>
       </div>
 
-      {/* Ready-to-assign hero + summary */}
-      <div className="grid gap-4 md:grid-cols-[1.2fr_1fr_1fr_1fr] mb-6">
+      {/* Ready-to-assign hero + the month's balance: opening + income - spent = closing */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1fr_1fr] mb-6">
         <div className="relative overflow-hidden rounded-[18px] bg-primary text-background p-6">
           <div className="absolute -right-8 -top-8 w-36 h-36 rounded-full bg-[#F2C14E] opacity-20 pointer-events-none" />
           <p className="relative text-[11px] uppercase tracking-[0.1em] text-background/70">
@@ -236,26 +247,32 @@ export default function BudgetPage() {
           <p className="relative text-xs text-background/70 mt-2">
             {leftToBudget >= 0
               ? `${formatCurrency(leftToBudget, currency)} still needs a job.`
-              : "You've assigned more than your income."}
+              : "You've assigned more than you have."}
           </p>
         </div>
 
+        <Card className="bg-[#FBF1D8] border-[#EAD9A6]">
+          <p className="text-[11px] uppercase tracking-[0.1em] text-warning">Opening balance</p>
+          <div className="mt-1">
+            <AmountText amount={monthView?.display_opening_balance ?? 0} currency={currency} size="lg" />
+          </div>
+        </Card>
         <Card className="bg-[#E9F5EE] border-[#C7E4D2]">
           <p className="text-[11px] uppercase tracking-[0.1em] text-positive">Income</p>
           <div className="mt-1">
             <AmountText amount={income} currency={currency} size="lg" />
           </div>
         </Card>
-        <Card className="bg-[#FBF1D8] border-[#EAD9A6]">
-          <p className="text-[11px] uppercase tracking-[0.1em] text-warning">Assigned</p>
-          <div className="mt-1">
-            <AmountText amount={totalBudgeted} currency={currency} size="lg" />
-          </div>
-        </Card>
         <Card className="bg-[#FCE9E5] border-[#F4C7BF]">
           <p className="text-[11px] uppercase tracking-[0.1em] text-negative">Spent so far</p>
           <div className="mt-1">
             <AmountText amount={totalSpent} currency={currency} size="lg" />
+          </div>
+        </Card>
+        <Card>
+          <p className="text-[11px] uppercase tracking-[0.1em] text-secondary">Closing balance</p>
+          <div className="mt-1">
+            <AmountText amount={monthView?.display_closing_balance ?? 0} currency={currency} size="lg" />
           </div>
         </Card>
       </div>
@@ -267,7 +284,7 @@ export default function BudgetPage() {
             ◧
           </div>
           <div className="font-semibold text-[15px]">Envelopes</div>
-          <div className="ml-2 text-xs text-secondary">{budgets.length} categories</div>
+          <div className="ml-2 text-xs text-secondary">{budgets.length + carried.length} categories</div>
         </div>
 
         {loading ? (
@@ -282,7 +299,7 @@ export default function BudgetPage() {
               </div>
             ))}
           </div>
-        ) : budgets.length === 0 ? (
+        ) : budgets.length + carried.length === 0 ? (
           <EmptyState
             icon={<PiggyBank className="w-7 h-7" />}
             title="No budgets set for this month"
@@ -292,13 +309,14 @@ export default function BudgetPage() {
         ) : (
           <>
             {/* column header */}
-            <div className="hidden sm:grid grid-cols-[28px_1fr_110px_110px_110px_1.4fr] gap-4 px-5 py-2.5 text-[11px] uppercase tracking-[0.08em] text-secondary border-b border-divider">
+            <div className="hidden sm:grid grid-cols-[28px_1fr_100px_110px_100px_110px_1.3fr] gap-4 px-5 py-2.5 text-[11px] uppercase tracking-[0.08em] text-secondary border-b border-divider">
               <div />
               <div>Category</div>
+              <div className="text-right">Carried in</div>
               <div className="text-right">Assigned</div>
               <div className="text-right">Spent</div>
-              <div className="text-right">Left</div>
-              <div>Progress</div>
+              <div className="text-right">Available</div>
+              <div>This month</div>
             </div>
 
             {budgets.map((b) => {
@@ -306,7 +324,7 @@ export default function BudgetPage() {
               return (
                 <div
                   key={b.id}
-                  className="grid grid-cols-[28px_1fr_auto] sm:grid-cols-[28px_1fr_110px_110px_110px_1.4fr] gap-x-3 sm:gap-4 gap-y-2 px-5 py-3.5 items-center border-b border-divider last:border-0"
+                  className="grid grid-cols-[28px_1fr_auto] sm:grid-cols-[28px_1fr_100px_110px_100px_110px_1.3fr] gap-x-3 sm:gap-4 gap-y-2 px-5 py-3.5 items-center border-b border-divider last:border-0"
                 >
                   <div
                     className="w-7 h-7 rounded-[9px] flex items-center justify-center text-sm"
@@ -318,6 +336,12 @@ export default function BudgetPage() {
                     <div className="text-sm font-medium truncate">
                       {b.category || "Uncategorized"}
                     </div>
+                  </div>
+
+                  {/* Carried in from earlier months (negative = overspent) */}
+                  <div className="text-right text-sm text-tertiary tabular-nums col-start-2 sm:col-auto">
+                    <span className="sm:hidden text-[11px] text-secondary mr-1">Carried in</span>
+                    {carriedLabel(b.display_carried_in)}
                   </div>
 
                   {/* Assigned (inline editable) */}
@@ -339,15 +363,25 @@ export default function BudgetPage() {
                     {formatCurrency(b.display_spent ?? 0, currency)}
                   </div>
 
-                  {/* Left */}
+                  {/* Available = carried in + assigned - spent; an overspend can be covered in one click */}
                   <div
                     className={cn(
                       "text-right text-sm font-semibold tabular-nums col-start-2 sm:col-auto",
-                      remainingColor(b.display_remaining ?? null, b.percent_used)
+                      remainingColor(b.display_available ?? b.display_remaining ?? null, b.percent_used)
                     )}
                   >
-                    <span className="sm:hidden text-[11px] text-secondary mr-1 font-normal">Left</span>
-                    {formatCurrency(b.display_remaining ?? 0, currency)}
+                    <span className="sm:hidden text-[11px] text-secondary mr-1 font-normal">Available</span>
+                    {formatCurrency(b.display_available ?? b.display_remaining ?? 0, currency)}
+                    {(b.available ?? 0) < 0 && (
+                      <button
+                        onClick={() =>
+                          handleBudgetEdit(b.id, String((b.budgeted_amount - (b.available ?? 0)) / 100))
+                        }
+                        className="block ml-auto text-[11px] font-normal underline text-secondary hover:text-primary cursor-pointer"
+                      >
+                        Cover the overspend
+                      </button>
+                    )}
                   </div>
 
                   {/* Progress + delete */}
@@ -368,6 +402,57 @@ export default function BudgetPage() {
                       <span className="text-sm">×</span>
                     </button>
                   </div>
+                </div>
+              );
+            })}
+
+            {/* Categories that carry money in but have no budget this month */}
+            {carried.map((c) => {
+              const style = categoryStyle(c.category);
+              return (
+                <div
+                  key={`carried-${c.category_id}`}
+                  className="grid grid-cols-[28px_1fr_auto] sm:grid-cols-[28px_1fr_100px_110px_100px_110px_1.3fr] gap-x-3 sm:gap-4 gap-y-2 px-5 py-3.5 items-center border-b border-divider last:border-0"
+                >
+                  <div
+                    className="w-7 h-7 rounded-[9px] flex items-center justify-center text-sm"
+                    style={{ backgroundColor: style.bg }}
+                  >
+                    {categoryEmoji(c.category)}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium truncate">{c.category || "Uncategorized"}</div>
+                    <div className="text-[11px] text-secondary">No budget this month</div>
+                  </div>
+                  <div className="text-right text-sm text-tertiary tabular-nums col-start-2 sm:col-auto">
+                    <span className="sm:hidden text-[11px] text-secondary mr-1">Carried in</span>
+                    {carriedLabel(c.display_carried_in)}
+                  </div>
+                  <div className="text-right col-start-2 sm:col-auto">
+                    <button
+                      onClick={() => {
+                        setAddCategoryId(c.category_id);
+                        setShowAddModal(true);
+                      }}
+                      className="text-sm underline text-secondary hover:text-primary cursor-pointer"
+                    >
+                      Assign
+                    </button>
+                  </div>
+                  <div className="text-right text-sm text-tertiary tabular-nums col-start-2 sm:col-auto">
+                    <span className="sm:hidden text-[11px] text-secondary mr-1">Spent</span>
+                    {formatCurrency(c.display_spent, currency)}
+                  </div>
+                  <div
+                    className={cn(
+                      "text-right text-sm font-semibold tabular-nums col-start-2 sm:col-auto",
+                      c.available < 0 ? "text-negative" : "text-positive"
+                    )}
+                  >
+                    <span className="sm:hidden text-[11px] text-secondary mr-1 font-normal">Available</span>
+                    {formatCurrency(c.display_available, currency)}
+                  </div>
+                  <div className="col-span-3 sm:col-auto" />
                 </div>
               );
             })}

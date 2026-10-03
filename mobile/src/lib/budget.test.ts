@@ -6,8 +6,10 @@ import {
   budgetRow,
   byAssigned,
   copyBudgets,
+  carriedRow,
   copySummary,
-  readyToAssign,
+  coverAmount,
+  readyLine,
   unbudgetedCategories,
 } from "./budget.ts";
 import type { BudgetCopyItem } from "./ledger.ts";
@@ -19,14 +21,17 @@ function category(id: string, name: string, extra: Partial<Category> = {}): Cate
 
 const item = (id: string): BudgetCopyItem => ({ category_id: id, category: id, budgeted_amount: 1000 });
 
-test("readyToAssign is income minus assigned, negative when over-assigned", () => {
-  assert.deepEqual(readyToAssign(8500000, [{ budgeted_amount: 1000000 }, { budgeted_amount: 300000 }]), {
-    income: 8500000,
-    assigned: 1300000,
-    ready: 7200000,
-  });
-  assert.equal(readyToAssign(100, [{ budgeted_amount: 250 }]).ready, -150);
-  assert.deepEqual(readyToAssign(0, []), { income: 0, assigned: 0, ready: 0 });
+test("readyLine words the unassigned money, over-assigned included", () => {
+  assert.equal(readyLine(486000), "give every rupee a job");
+  assert.equal(readyLine(0), "every rupee has a job");
+  assert.equal(readyLine(-100), "you assigned more than you have");
+});
+
+test("coverAmount is the assigned amount that brings an overspent category back to zero", () => {
+  assert.equal(coverAmount(300000, -50000), 350000);
+  assert.equal(coverAmount(0, -300), 300);
+  assert.equal(coverAmount(300000, 0), null);
+  assert.equal(coverAmount(300000, 120000), null);
 });
 
 test("budgetProgress: the bar is capped at 100 but the text percent is true", () => {
@@ -89,6 +94,39 @@ test("budgetRow says the state in words, with what is available", () => {
   assert.deepEqual(row(0, 0), { kind: "done", available: "₹0", line: "nothing assigned", barPercent: 0 });
   assert.deepEqual(row(0, 300), { kind: "over", available: "−₹3", line: "overspent by ₹3", barPercent: 100 });
   assert.equal(row(800000, 0).line, "₹0 of ₹8,000 spent");
+});
+
+test("budgetRow with rollover: the pill is available money, the bar and 'spent' stay this month's", () => {
+  const money = (minor: number) => `₹${(minor / 100).toLocaleString("en-IN")}`;
+  const row = (budgeted: number, spent: number, carried: number) =>
+    budgetRow({ budgeted_amount: budgeted, spent, carried_in: carried, available: carried + budgeted - spent }, money);
+  // September's Food: ₹1,000 carried in, ₹8,000 assigned, ₹7,500 spent -> ₹1,500 available
+  assert.deepEqual(row(800000, 750000, 100000), { kind: "left", available: "₹1,500", line: "₹7,500 of ₹8,000 spent · +₹1,000 carried", barPercent: 94 });
+  // Entertainment: a ₹500 overspend carried in is paid off by this month's ₹3,000
+  assert.deepEqual(row(300000, 200000, -50000), { kind: "left", available: "₹500", line: "₹2,000 of ₹3,000 spent · −₹500 carried", barPercent: 67 });
+  // still in debt: red, and the bar shows only this month's 40%
+  assert.deepEqual(row(100000, 40000, -90000), { kind: "over", available: "−₹300", line: "overspent by ₹300 · −₹900 carried", barPercent: 40 });
+  // carried money used up exactly
+  assert.deepEqual(row(0, 50000, 50000), { kind: "done", available: "₹0", line: "fully spent · +₹500 carried", barPercent: 100 });
+  // a budget with nothing carried reads exactly as before
+  assert.equal(row(150000, 124000, 0).line, "₹1,240 of ₹1,500 spent");
+});
+
+test("carriedRow: a category with money carried in but no budget this month", () => {
+  const money = (minor: number) => `₹${(minor / 100).toLocaleString("en-IN")}`;
+  assert.deepEqual(carriedRow({ carried_in: 60000, spent: 10000, available: 50000 }, money), {
+    kind: "left",
+    available: "₹500",
+    line: "₹100 spent · +₹600 carried",
+    barPercent: 17, // ₹100 of the ₹600 carried in
+  });
+  assert.equal(carriedRow({ carried_in: 150000, spent: 0, available: 150000 }, money).line, "nothing assigned · +₹1,500 carried");
+  assert.deepEqual(carriedRow({ carried_in: -50000, spent: 0, available: -50000 }, money), {
+    kind: "over",
+    available: "−₹500",
+    line: "overspent by ₹500 · −₹500 carried",
+    barPercent: 100,
+  });
 });
 
 test("copyBudgets writes in order and carries on past an individual failure", async () => {

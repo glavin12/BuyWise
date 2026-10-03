@@ -8,7 +8,12 @@ from ai_service.utils.financial import amount_to_minor, current_month_range
 
 @tool
 async def get_budget_status(period: str = "this_month") -> dict:
-    """Compare per-category budgets with actual expense totals."""
+    """Compare per-category budgets with actual expense totals.
+
+    Budgets roll over: each category row has this month's budgeted_amount, spent and remaining,
+    plus carried_in (what earlier months left over, negative if overspent) and available
+    (carried_in + remaining). `carried` lists categories that carry money but have no budget this
+    month. unassigned is the closing balance minus all envelope money, not yet given a job."""
     return await BudgetService(get_db_session()).budget_status(
         get_current_user_id(), period=period
     )
@@ -21,7 +26,8 @@ async def set_category_budget(
     month: int | None = None,
     year: int | None = None,
 ) -> dict:
-    """Set a monthly budget for one expense category."""
+    """Set the amount assigned to one expense category for a month. Unspent money and
+    overspending carry into later months."""
     user_id = get_current_user_id()
     session = get_db_session()
     window = current_month_range()

@@ -1,15 +1,21 @@
-// Budget maths as pure functions: what is left to assign, how far a category is
-// through its budget (and its row in words), which categories still have none, and the sequential
-// "copy from last month" runner. Type-only imports plus explicit .ts siblings
-// so `npm test` can run it. Every figure is an integer in minor units.
+// Budget maths as pure functions: the line under "ready to assign", how far a category is
+// through its budget (and its row in words, rolled-over money included), which categories still
+// have none, and the sequential "copy from last month" runner. Type-only imports plus explicit .ts
+// siblings so `npm test` can run it. Every figure is an integer in minor units. What is left to
+// assign (`unassigned`) and each category's available money are worked out by the API.
 
 import type { BudgetCopyItem } from "./ledger.ts";
-import type { Budget, Category } from "./types";
+import type { Budget, BudgetCarried, Category } from "./types";
 
-/** Income minus everything assigned to category budgets. Negative means over-assigned. */
-export function readyToAssign(income: number, budgets: readonly Pick<Budget, "budgeted_amount">[]) {
-  const assigned = budgets.reduce((total, budget) => total + budget.budgeted_amount, 0);
-  return { income, assigned, ready: income - assigned };
+/** The line under READY TO ASSIGN, from the API's `unassigned` (closing balance minus the envelopes). */
+export function readyLine(unassigned: number): string {
+  if (unassigned > 0) return "give every rupee a job";
+  return unassigned === 0 ? "every rupee has a job" : "you assigned more than you have";
+}
+
+/** The assigned amount that brings an overspent category back to ₹0 available; null when it isn't overspent. */
+export function coverAmount(assigned: number, available: number): number | null {
+  return available < 0 ? assigned - available : null;
 }
 
 export type BudgetProgress = {
@@ -52,18 +58,42 @@ export type BudgetRowState = {
   barPercent: number;
 };
 
-/** One Budget row in words. Available is this month's budget minus this month's spending (no carry-over). */
-export function budgetRow(budget: Pick<Budget, "budgeted_amount" | "spent">, money: (minor: number) => string): BudgetRowState {
-  const progress = budgetProgress(budget);
-  if (progress.over) {
-    return { kind: "over", available: `−${money(progress.overBy)}`, line: `overspent by ${money(progress.overBy)}`, barPercent: 100 };
+function signedMoney(minor: number, money: (minor: number) => string): string {
+  return `${minor < 0 ? "−" : "+"}${money(Math.abs(minor))}`;
+}
+
+/**
+ * A row in words. The pill is the money available (carried in plus this month's budget minus this
+ * month's spending); the bar and "X of Y spent" are this month's alone, so a big carry-over cannot
+ * make heavy spending look small. The carry-over is named at the end of the line.
+ */
+function rowState(assigned: number, spent: number, carried: number, available: number, money: (minor: number) => string): BudgetRowState {
+  // The bar measures this month's spending against this month's budget; with none, against the money carried in.
+  const base = assigned > 0 ? assigned : Math.max(carried, 0);
+  const barPercent = base > 0 ? budgetProgress({ budgeted_amount: base, spent }).barPercent : available < 0 ? 100 : 0;
+  const tail = carried !== 0 ? ` · ${signedMoney(carried, money)} carried` : "";
+  if (available < 0) return { kind: "over", available: `−${money(-available)}`, line: `overspent by ${money(-available)}${tail}`, barPercent };
+  if (available === 0) {
+    const used = assigned > 0 || spent > 0 || carried !== 0;
+    return { kind: "done", available: money(0), line: `${used ? "fully spent" : "nothing assigned"}${tail}`, barPercent };
   }
-  if (progress.left === 0) {
-    const assigned = budget.budgeted_amount > 0;
-    return { kind: "done", available: money(0), line: assigned ? "fully spent" : "nothing assigned", barPercent: assigned ? 100 : 0 };
-  }
-  const spent = money(budget.spent ?? 0);
-  return { kind: "left", available: money(progress.left), line: `${spent} of ${money(budget.budgeted_amount)} spent`, barPercent: progress.barPercent };
+  const used = assigned > 0 ? `${money(spent)} of ${money(assigned)} spent` : spent > 0 ? `${money(spent)} spent` : "nothing assigned";
+  return { kind: "left", available: money(available), line: `${used}${tail}`, barPercent };
+}
+
+/** One Budget row. An API without rollover fields falls back to this month's budget minus this month's spending. */
+export function budgetRow(
+  budget: Pick<Budget, "budgeted_amount" | "spent"> & Partial<Pick<Budget, "carried_in" | "available">>,
+  money: (minor: number) => string
+): BudgetRowState {
+  const spent = budget.spent ?? 0;
+  const available = budget.available ?? budget.budgeted_amount - spent;
+  return rowState(budget.budgeted_amount, spent, budget.carried_in ?? 0, available, money);
+}
+
+/** The row of a category that carries money but has no budget this month. */
+export function carriedRow(row: Pick<BudgetCarried, "carried_in" | "spent" | "available">, money: (minor: number) => string): BudgetRowState {
+  return rowState(0, row.spent, row.carried_in, row.available, money);
 }
 
 /** Active expense categories that have no budget yet this month. */

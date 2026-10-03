@@ -4,7 +4,7 @@ import { Copy, Plus, RotateCw, Sparkles } from "lucide-react-native";
 import { useState } from "react";
 
 import { userMessage } from "@/lib/api";
-import { budgetRow, byAssigned, copySummary, readyToAssign, unbudgetedCategories } from "@/lib/budget";
+import { budgetRow, byAssigned, carriedRow, copySummary, readyLine, unbudgetedCategories } from "@/lib/budget";
 import { currentMonth, monthKey, monthShift, type MonthYear } from "@/lib/dates";
 import { formatMinor, formatMonth, formatMonthShort } from "@/lib/format";
 import { wholeIfRound } from "@/lib/home";
@@ -37,10 +37,12 @@ import {
 } from "@/ui";
 
 // Budget (the owner's list mockup, 2026-09-29): title and month pill, the marigold "ready to assign"
-// card with "Copy <last month>" (Auto-assign is a "coming soon" chip), income / assigned / spent
-// chips, then only the categories with a budget, most assigned first. Available is this month's
-// budget minus this month's spending: the API has no carry-over. At the end, how many categories
-// still have no budget, with a way to set one.
+// card with "Copy <last month>" (Auto-assign is a "coming soon" chip), opening / income / spent /
+// closing chips (the month's slice of the one running balance), then the categories with a budget,
+// most assigned first, then those that only carry money in. Budgets roll over: Available is what
+// earlier months left (or overspent) plus this month's budget minus this month's spending, and
+// "ready to assign" is the closing balance minus the money in every envelope; both come from the API.
+// At the end, how many categories still have no budget, with a way to set one.
 
 const MONTHS_AHEAD = 3;
 const MONTHS_BACK = 11;
@@ -66,10 +68,11 @@ export default function BudgetTab() {
   const signedMoney = (minor: number) => `${minor < 0 ? "−" : ""}${money(Math.abs(minor))}`;
   const monthLabel = formatMonth(period.month, period.year);
   const rows = budgets.data?.budgets;
+  const carried = budgets.data?.carried ?? [];
   const expenseCategories = categories.data?.categories;
   const activeIds = expenseCategories ? new Set(expenseCategories.filter((c) => c.is_active).map((c) => c.id)) : null;
   const colorOf = new Map(expenseCategories?.map((c) => [c.id, c.color]));
-  const ready = rows && summary.data ? readyToAssign(summary.data.income, rows) : null;
+  const ready = budgets.data?.unassigned ?? null;
   const sorted = rows ? byAssigned(rows) : [];
   const rest = rows && expenseCategories ? unbudgetedCategories(expenseCategories, rows) : [];
   const previous = monthShift(period.month, period.year, -1);
@@ -139,15 +142,7 @@ export default function BudgetTab() {
     });
   };
 
-  const readyLine = ready
-    ? ready.ready > 0
-      ? "give every rupee a job"
-      : ready.ready === 0
-        ? "every rupee has a job"
-        : "you assigned more than came in"
-    : summary.isError
-      ? userMessage(summary.error, "load this month's income")
-      : "";
+  const line = ready !== null ? readyLine(ready) : budgets.isError ? userMessage(budgets.error, "load this month's budget") : "";
   const left = `${rest.length} ${rest.length === 1 ? "category" : "categories"}`;
 
   const screen = (
@@ -158,11 +153,11 @@ export default function BudgetTab() {
       </Row>
 
       <ReadyCard
-        amount={ready ? { to: ready.ready, format: (n) => signedMoney(Math.round(n)) } : summary.isError ? "—" : null}
-        line={readyLine}
+        amount={ready !== null ? { to: ready, format: (n) => signedMoney(Math.round(n)) } : budgets.isError ? "—" : null}
+        line={line}
         action={
-          summary.isError && !summary.data ? (
-            <PillButton label="Try again" icon={RotateCw} onPress={() => summary.refetch()} />
+          budgets.isError && !budgets.data ? (
+            <PillButton label="Try again" icon={RotateCw} onPress={() => budgets.refetch()} />
           ) : (
             <PillButton
               label={`Copy ${formatMonthShort(previous.month, previous.year, previous.year)}`}
@@ -184,11 +179,12 @@ export default function BudgetTab() {
         }
       />
 
-      {ready && summary.data ? (
+      {budgets.data && summary.data ? (
         <Row gap="xs" wrap>
-          <Chip variant="card" label={`income ${money(ready.income)}`} />
-          <Chip variant="card" label={`assigned ${money(ready.assigned)}`} />
+          <Chip variant="card" label={`opening ${signedMoney(budgets.data.opening_balance)}`} />
+          <Chip variant="card" label={`income ${money(summary.data.income)}`} />
           <Chip variant="card" label={`spent ${money(summary.data.expenses)}`} />
+          <Chip variant="card" label={`closing ${signedMoney(budgets.data.closing_balance)}`} />
         </Row>
       ) : null}
 
@@ -207,7 +203,7 @@ export default function BudgetTab() {
         ) : (
           <BudgetTable loading />
         )
-      ) : sorted.length > 0 ? (
+      ) : sorted.length + carried.length > 0 ? (
         <BudgetTable>
           {sorted.map((b, i) => (
             <BudgetRow
@@ -221,6 +217,18 @@ export default function BudgetTab() {
               onPress={() => openSet(b.category_id)}
             />
           ))}
+          {carried.map((c, i) => (
+            <BudgetRow
+              key={`carried-${c.category_id}`}
+              first={sorted.length === 0 && i === 0}
+              name={c.category ?? "Unknown category"}
+              dot={categoryTone(c.category, colorOf.get(c.category_id))}
+              assigned={money(0)}
+              state={carriedRow(c, money)}
+              archived={activeIds ? !activeIds.has(c.category_id) : false}
+              onPress={() => openSet(c.category_id)}
+            />
+          ))}
         </BudgetTable>
       ) : (
         <Panel>
@@ -232,7 +240,7 @@ export default function BudgetTab() {
         </Panel>
       )}
 
-      {sorted.length > 0 && rest.length > 0 ? (
+      {sorted.length + carried.length > 0 && rest.length > 0 ? (
         <Panel>
           <Stack>
             <RichText tone="card">{`{hi:${left}} still left to assign.`}</RichText>

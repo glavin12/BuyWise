@@ -174,6 +174,24 @@ export interface Budget {
   remaining: number | null;
   display_remaining: number | null;
   percent_used: number | null;
+  // Rollover, set only on a month's list (null on a single budget): `remaining` and `percent_used`
+  // are this month's alone, `available` adds what earlier months left over (negative when overspent).
+  carried_in?: number | null;
+  display_carried_in?: number | null;
+  available?: number | null;
+  display_available?: number | null;
+}
+
+/** A category with money carried in from earlier months but no budget entry this month. */
+export interface BudgetCarried {
+  category_id: string;
+  category: string | null;
+  carried_in: number;
+  display_carried_in: number;
+  spent: number;
+  display_spent: number;
+  available: number;
+  display_available: number;
 }
 
 export interface BudgetCreate {
@@ -191,6 +209,15 @@ export interface BudgetMonthResponse {
   month: number;
   year: number;
   budgets: Budget[];
+  carried: BudgetCarried[];
+  /** The one running balance at the start and end of the month. */
+  opening_balance: number;
+  display_opening_balance: number;
+  closing_balance: number;
+  display_closing_balance: number;
+  /** Closing balance minus the money in every envelope: what has no job yet. Negative = over-assigned. */
+  unassigned: number;
+  display_unassigned: number;
 }
 
 // ── Goals ────────────────────────────────────────────────────────
@@ -298,8 +325,14 @@ export interface DashboardData {
   month: string;
   year: number;
   currency: string;
+  /** The one running balance across all transactions: it never resets at month end. */
   current_balance: number;
   display_current_balance: number;
+  /** The same balance at the start and the end of `period`'s month. */
+  opening_balance: number;
+  display_opening_balance: number;
+  closing_balance: number;
+  display_closing_balance: number;
   active_goals_count: number;
   total_income: number;
   display_total_income: number;
@@ -311,6 +344,9 @@ export interface DashboardData {
   display_total_budgeted: number;
   remaining_budget: number;
   display_remaining_budget: number;
+  /** Closing balance minus the money in every envelope ("Ready to assign"). */
+  unassigned: number;
+  display_unassigned: number;
   has_budget: boolean;
   days_remaining_in_month: number;
 }

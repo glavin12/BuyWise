@@ -26,7 +26,6 @@ class DashboardService:
         summary = await self.analytics.monthly_summary(user_id, window.month, window.year)
         budget = await self.budgets.budget_status(user_id, period=period, today=today)
         current_balance = await self.transactions.get_balance(user_id)
-        unassigned = summary["income"] - budget["total_budgeted"]
         return {
             "period": period,
             "month": window.month_name,
@@ -34,6 +33,10 @@ class DashboardService:
             "currency": profile.currency if profile else "INR",
             "current_balance": current_balance,
             "display_current_balance": minor_to_amount(current_balance),
+            "opening_balance": budget["opening_balance"],
+            "display_opening_balance": budget["display_opening_balance"],
+            "closing_balance": budget["closing_balance"],
+            "display_closing_balance": budget["display_closing_balance"],
             "active_goals_count": await self.goals.count_active(user_id),
             "total_income": summary["income"],
             "display_total_income": minor_to_amount(summary["income"]),
@@ -45,8 +48,8 @@ class DashboardService:
             "display_total_budgeted": budget["display_total_budgeted"],
             "remaining_budget": budget["remaining"],
             "display_remaining_budget": budget["display_remaining"],
-            "unassigned": unassigned,
-            "display_unassigned": minor_to_amount(unassigned),
+            "unassigned": budget["unassigned"],
+            "display_unassigned": budget["display_unassigned"],
             "has_budget": budget["has_budget"],
             "days_remaining_in_month": days_remaining_in_month(today),
         }

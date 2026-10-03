@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -56,6 +56,16 @@ class BudgetRepository:
             .order_by(BudgetEntry.category_id)
         )
         return list(result)
+
+    async def assigned_before(self, user_id: uuid.UUID, month: int, year: int) -> dict[uuid.UUID, int]:
+        """Everything assigned to each category in the months before ``month``/``year``."""
+        month_index = BudgetEntry.year * 12 + BudgetEntry.month
+        rows = await self.session.execute(
+            select(BudgetEntry.category_id, func.sum(BudgetEntry.budgeted_amount))
+            .where(BudgetEntry.user_id == user_id, month_index < year * 12 + month)
+            .group_by(BudgetEntry.category_id)
+        )
+        return {category_id: int(amount or 0) for category_id, amount in rows.all()}
 
     async def get(self, user_id: uuid.UUID, budget_id: uuid.UUID) -> BudgetEntry | None:
         return await self.session.scalar(

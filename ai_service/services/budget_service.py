@@ -42,18 +42,72 @@ class BudgetService:
         await self.session.commit()
         return self._entry_to_dict(entry)
 
-    async def get_month_budgets(self, user_id: uuid.UUID, month: int, year: int) -> list[dict]:
+    async def month_view(self, user_id: uuid.UUID, month: int, year: int) -> dict:
+        """One month of envelope budgeting.
+
+        Nothing is stored: a category's carry-over is everything assigned in earlier months minus
+        what was spent since it was first budgeted, so editing an old transaction or budget fixes
+        every later month. Overspending carries over as a negative.
+
+            available = carried_in + assigned (this month) - spent (this month)
+            unassigned = closing balance - sum of every envelope's available
+
+        so ``closing balance = money in envelopes + unassigned`` always holds. Only categories with
+        a budget entry in this month or before count as envelopes; spending elsewhere simply lowers
+        the closing balance, and so the unassigned money.
+        """
         window = month_range(month, year)
         entries = await self.budgets.get_month(user_id, month, year)
-        spent = await self.transactions.sum_by_category(
+        spent_rows = await self.transactions.sum_by_category(
             user_id, transaction_type="expense", start=window.start, end=window.end
         )
-        spent_by_category = {row.category.id: row.amount for row in spent}
-        return [self._budget_status(entry, spent_by_category.get(entry.category_id, 0)) for entry in entries]
+        spent = {row.category.id: row.amount for row in spent_rows}
+        assigned_before = await self.budgets.assigned_before(user_id, month, year)
+        spent_before = await self.transactions.spent_since_first_budget(
+            user_id, month=month, year=year, before=window.start
+        )
+        carried_in = {
+            category_id: assigned - spent_before.get(category_id, 0)
+            for category_id, assigned in assigned_before.items()
+        }
+
+        rows = [
+            self._budget_status(entry, spent.get(entry.category_id, 0), carried_in.get(entry.category_id, 0))
+            for entry in entries
+        ]
+        budgeted_now = {entry.category_id for entry in entries}
+        carried = []
+        for category_id, carry in carried_in.items():
+            if category_id in budgeted_now:
+                continue
+            spent_now = spent.get(category_id, 0)
+            if carry == 0 and spent_now == 0:
+                continue
+            category = await self.categories.get(user_id, category_id)
+            carried.append(self._carried_row(category_id, category.name if category else None, carry, spent_now))
+        carried.sort(key=lambda row: (row["category"] or "", row["category_id"]))
+
+        envelopes = sum(row["available"] for row in rows) + sum(row["available"] for row in carried)
+        opening = await self.transactions.get_balance(user_id, before=window.start)
+        closing = await self.transactions.get_balance(user_id, before=window.end)
+        unassigned = closing - envelopes
+        return {
+            "month": month,
+            "year": year,
+            "budgets": rows,
+            "carried": carried,
+            "opening_balance": opening,
+            "display_opening_balance": minor_to_amount(opening),
+            "closing_balance": closing,
+            "display_closing_balance": minor_to_amount(closing),
+            "unassigned": unassigned,
+            "display_unassigned": minor_to_amount(unassigned),
+        }
 
     async def budget_status(self, user_id: uuid.UUID, *, period: str = "this_month", today: date | None = None) -> dict:
         window = resolve_period(period, today)
-        rows = await self.get_month_budgets(user_id, window.month, window.year)
+        view = await self.month_view(user_id, window.month, window.year)
+        rows = view["budgets"]
         total_budgeted = sum(row["budgeted_amount"] for row in rows)
         total_spent = await self.transactions.sum_total(
             user_id,
@@ -73,6 +127,13 @@ class BudgetService:
             "remaining": total_budgeted - total_spent,
             "display_remaining": minor_to_amount(total_budgeted - total_spent),
             "categories": rows,
+            "carried": view["carried"],
+            "opening_balance": view["opening_balance"],
+            "display_opening_balance": view["display_opening_balance"],
+            "closing_balance": view["closing_balance"],
+            "display_closing_balance": view["display_closing_balance"],
+            "unassigned": view["unassigned"],
+            "display_unassigned": view["display_unassigned"],
         }
 
     async def get_budget(self, user_id: uuid.UUID, budget_id: uuid.UUID) -> dict:
@@ -110,8 +171,10 @@ class BudgetService:
         }
 
     @staticmethod
-    def _budget_status(entry, spent: int) -> dict:
+    def _budget_status(entry, spent: int, carried_in: int = 0) -> dict:
+        """``remaining`` and ``percent_used`` are this month's alone; ``available`` includes the carry-over."""
         remaining = entry.budgeted_amount - spent
+        available = carried_in + remaining
         return {
             **BudgetService._entry_to_dict(entry),
             "spent": spent,
@@ -121,4 +184,23 @@ class BudgetService:
             "percent_used": round(spent * 100 / entry.budgeted_amount, 1)
             if entry.budgeted_amount
             else 0,
+            "carried_in": carried_in,
+            "display_carried_in": minor_to_amount(carried_in),
+            "available": available,
+            "display_available": minor_to_amount(available),
+        }
+
+    @staticmethod
+    def _carried_row(category_id: uuid.UUID, name: str | None, carried_in: int, spent: int) -> dict:
+        """A category with money carried in but no budget entry this month."""
+        available = carried_in - spent
+        return {
+            "category_id": str(category_id),
+            "category": name,
+            "carried_in": carried_in,
+            "display_carried_in": minor_to_amount(carried_in),
+            "spent": spent,
+            "display_spent": minor_to_amount(spent),
+            "available": available,
+            "display_available": minor_to_amount(available),
         }

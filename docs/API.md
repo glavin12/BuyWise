@@ -50,7 +50,7 @@ API write requests use integer minor units. For INR, `1050` means `INR 10.50`. R
 
 ## Balance And Payment Methods
 
-There are no accounts or transfers. Each user has one running balance, `income + starting balances - expenses`, returned as `current_balance` by `GET /api/v1/dashboard`. A transaction can carry an optional `payment_method`: `cash`, `upi`, `bank_transfer`, `card`, or `other`. Spending by payment method is available from `GET /api/v1/analytics/payment-methods`.
+There are no accounts or transfers. Each user has one running balance, `income + starting balances - expenses`, returned as `current_balance` by `GET /api/v1/dashboard`. A transaction can carry an optional `payment_method`: `cash`, `upi`, `bank_transfer`, `card`, or `other`. Spending by payment method is available from `GET /api/v1/analytics/payment-methods`. The balance never resets at month end; a month is a slice of it: `opening_balance` (the balance at the start of the month) and `closing_balance` (at its end) come with `GET /api/v1/budgets/{YYYY-MM}` and `GET /api/v1/dashboard`, and one month's closing balance is the next month's opening balance.
 
 ## Categories And Payees
 
@@ -98,12 +98,19 @@ Example create request:
 | method | path | behavior |
 |---|---|---|
 | POST | `/api/v1/budgets` | upsert one expense-category budget for month/year |
-| GET | `/api/v1/budgets/{YYYY-MM}` | list budgets with spent, remaining, and percent used |
+| GET | `/api/v1/budgets/{YYYY-MM}` | the month's budgets with spent, remaining, percent used and the rollover figures, plus carried-only categories, opening and closing balance, and unassigned |
 | GET | `/api/v1/budgets/id/{budget_id}` | get one budget |
 | PATCH | `/api/v1/budgets/{budget_id}` | update budget amount |
 | DELETE | `/api/v1/budgets/{budget_id}` | delete budget |
 
-`GET /api/v1/dashboard` includes overall budget totals for `this_month` or `last_month`.
+`GET /api/v1/dashboard` includes overall budget totals for `this_month` or `last_month`, with the same `opening_balance`, `closing_balance` and `unassigned` as the month's budget response.
+
+Budgets roll over, and nothing is stored for it: every request works it out from the budget entries and the ledger.
+
+- Each row of `budgets` has `carried_in` (everything assigned in earlier months minus what was spent in the category since it was first budgeted; negative when overspent) and `available = carried_in + budgeted_amount - spent`. `remaining` (`budgeted_amount - spent`) and `percent_used` stay this month's alone, so a large carry-over does not make heavy spending look small. Spending from before a category's first budget is not counted against it. On single-budget responses (`POST`, `GET /id/{id}`, `PATCH`) these fields are null.
+- `carried` lists categories that have money carried in (or spending this month) but no entry this month, each with `category_id`, `category`, `carried_in`, `spent` and `available`. A category with nothing carried and nothing spent has no row.
+- `unassigned = closing_balance - (sum of available over `budgets` and `carried`)`, so `closing_balance = money in envelopes + unassigned`. It is negative when the envelopes hold more than the balance. Spending in a category with no budget history lowers the closing balance, and so `unassigned`.
+- `closing_balance` counts every transaction dated before the first day of the next month, including ones dated later in the same month.
 
 ## Analytics
 

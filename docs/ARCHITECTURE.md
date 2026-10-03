@@ -35,7 +35,7 @@ Repositories never trust an owner ID from an LLM or request body. Services valid
 - `CategoryService`: user-owned category CRUD and default seeding.
 - `PayeeService`: normalized payee CRUD.
 - `TransactionService`: ledger CRUD, ownership validation, filters, and serialization.
-- `BudgetService`: per-category monthly budget upsert, status, and CRUD.
+- `BudgetService`: per-category monthly budget upsert and CRUD, and `month_view`, which works out a month's rollover (carried-in and available per category), the opening and closing balance and the unassigned money from the budget entries and the ledger, storing nothing.
 - `AnalyticsService`: monthly summary, category spending, comparison, and AI-facing breakdowns.
 - `GoalService`: category-linked goals and manual progress completion.
 - `DashboardService`: composition of profile, the running balance, analytics, budgets, and goals. Takes the caller's `today` so "this month" follows the user's calendar, not the server's UTC clock.
@@ -46,6 +46,8 @@ Repositories never trust an owner ID from an LLM or request body. Services valid
 - Expenses and income require an owned category of the matching type; starting balances do not.
 - There are no accounts and no transfers. Each user has one balance: `starting_balance + income - expense`.
 - Starting balances are ledger rows but are never counted as income or expenses.
+- The balance is never stored and never resets: a month's opening and closing balance are the same sum taken up to the month's start and end (`TransactionRepository.get_balance(before=...)`).
+- Budgets roll over: `available = carried_in + assigned - spent` per category and `unassigned = closing balance - sum(available)`, so the closing balance always equals the money in envelopes plus the unassigned money.
 - Each transaction has an optional `payment_method` (`cash`, `upi`, `bank_transfer`, `card`, `other`).
 - Split child rows are excluded from the balance and from aggregate queries; parent/child persistence is extensible but split creation is not exposed yet.
 - Every financial query includes `user_id` and, where applicable, owned category/payee references.

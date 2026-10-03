@@ -185,12 +185,38 @@ class BudgetResponse(BaseModel):
     remaining: int | None = None
     display_remaining: float | None = None
     percent_used: float | None = None
+    # Rollover (only on a month's list): `remaining` and `percent_used` are this month's alone,
+    # `available` adds what earlier months left over, or overspent (negative).
+    carried_in: int | None = None
+    display_carried_in: float | None = None
+    available: int | None = None
+    display_available: float | None = None
+
+
+class BudgetCarriedResponse(BaseModel):
+    """A category with money carried in from earlier months but no budget entry this month."""
+
+    category_id: UUID
+    category: str | None = None
+    carried_in: int
+    display_carried_in: float
+    spent: int
+    display_spent: float
+    available: int
+    display_available: float
 
 
 class BudgetMonthResponse(BaseModel):
     month: int
     year: int
     budgets: list[BudgetResponse]
+    carried: list[BudgetCarriedResponse]
+    opening_balance: int
+    display_opening_balance: float
+    closing_balance: int
+    display_closing_balance: float
+    unassigned: int
+    display_unassigned: float
 
 
 class GoalCreate(BaseModel):
@@ -284,6 +310,10 @@ class DashboardResponse(BaseModel):
     currency: str
     current_balance: int
     display_current_balance: float
+    opening_balance: int
+    display_opening_balance: float
+    closing_balance: int
+    display_closing_balance: float
     active_goals_count: int
     total_income: int
     display_total_income: float
