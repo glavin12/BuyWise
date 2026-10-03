@@ -36,7 +36,6 @@ export type ScreenProps = {
 
 const SURFACE = { screen: colors.screen, sage: colors.sage, peri: colors.peri, cream: colors.cream } as const;
 const FAB_SPACE = 96;
-const MAX_WIDTH = 600; // P2: keep content readable on tablets / wide browsers
 
 export function goBack() {
   if (router.canGoBack()) router.back();
@@ -62,7 +61,8 @@ export function Screen({
 
   // While offline the OfflineBanner sits above the app and already covers the
   // status-bar area, so the screen must not add the top inset a second time.
-  const frame = { paddingTop: online ? insets.top : 0, paddingBottom: bottom };
+  // Left and right matter in landscape, when a foldable or tablet rotates (Android 16 ignores `orientation` there).
+  const frame = { paddingTop: online ? insets.top : 0, paddingBottom: bottom, paddingLeft: insets.left, paddingRight: insets.right };
 
   const body = scroll ? (
     <ScrollBody onRefresh={onRefresh} refreshing={refreshing} bottom={(tabBar ? barSpace : 0) + (fab ? FAB_SPACE : 0)} enter={enter}>
@@ -170,6 +170,6 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   // 16 below: the space the last block leaves when nothing (tab bar, Fab) asks for more.
   content: { flexGrow: 1, alignItems: "center", paddingHorizontal: space.screenX, paddingTop: space.screenTop, paddingBottom: 16 },
-  column: { flexGrow: 1, width: "100%", maxWidth: MAX_WIDTH, gap: space.lg },
+  column: { flexGrow: 1, width: "100%", maxWidth: space.contentMax, gap: space.lg }, // P2: readable on tablets / wide browsers
   block: { gap: space.lg },
 });

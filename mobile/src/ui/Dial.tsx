@@ -1,9 +1,9 @@
-import { StyleSheet, Text as RNText, View } from "react-native";
+import { StyleSheet, Text as RNText, useWindowDimensions, View } from "react-native";
 import Animated, { useAnimatedProps } from "react-native-reanimated";
 import Svg, { Circle, Line } from "react-native-svg";
 
 import { useDraw } from "./motion";
-import { colors, extra, fonts, type } from "./tokens";
+import { colors, extra, fonts, space, type } from "./tokens";
 
 // The Goals dial (DESIGN.md §3 `Dial`; geometry from design/reference-html/Goals.html, a 310 box):
 // cream face, 120 ticks (every 10th longer and darker), a 30-wide tomato arc over its track,
@@ -28,7 +28,9 @@ const TICKS = Array.from({ length: 120 }, (_, i) => {
 
 /** In the middle: the goal's name, the saved amount and a line under it ("of ₹80,000 · 67%"). */
 export function Dial({ percent, title, amount, sub, label }: { percent: number; title: string; amount: string; sub: string; label: string }) {
-  const size = 310;
+  // The drawing is a 310 box; on a narrower screen (a 320 dp phone, or "Largest" display size) the SVG scales down with its viewBox.
+  const { width } = useWindowDimensions();
+  const size = Math.min(310, width - 2 * space.screenX);
   const drawn = useDraw(Math.max(0, Math.min(100, percent)) / 100); // how far round the arc is now: 0 to the goal's share
   const arc = useAnimatedProps(() => ({ strokeDashoffset: CIRCUMFERENCE * (1 - drawn.get()) }));
   const knob = useAnimatedProps(() => {
@@ -69,7 +71,7 @@ export function Dial({ percent, title, amount, sub, label }: { percent: number; 
         <AnimatedCircle r={11} fill={colors.ink} animatedProps={knob} />
         <AnimatedCircle r={4} fill={colors.marigold} animatedProps={knob} />
       </Svg>
-      <View style={styles.centre}>
+      <View style={[styles.centre, { paddingHorizontal: (72 * size) / 310 }]}>
         <RNText style={styles.title} numberOfLines={1}>
           {title}
         </RNText>
@@ -85,7 +87,7 @@ export function Dial({ percent, title, amount, sub, label }: { percent: number; 
 }
 
 const styles = StyleSheet.create({
-  centre: { ...StyleSheet.absoluteFill, alignItems: "center", justifyContent: "center", paddingHorizontal: 72 },
+  centre: { ...StyleSheet.absoluteFill, alignItems: "center", justifyContent: "center" }, // paddingHorizontal: 72 in the 310 box, scaled in the component
   title: { ...type.label, color: colors.ink },
   amount: { fontFamily: fonts.numberBold, fontSize: 40, lineHeight: 41, color: colors.ink },
   sub: { ...type.meta, color: extra.mutedOnSage },

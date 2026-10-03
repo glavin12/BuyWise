@@ -265,7 +265,7 @@ function Bubble({ message, live, currency }: { message: Message; live?: ChatResp
   if (message.role === "user") return <UserPill text={message.content} />;
   return (
     <View style={styles.reply}>
-      {live?.tool_calls.map((call, i) => <ToolPill key={`${call.tool_name}-${i}`} call={call} />)}
+      {live?.tool_calls.map((call, i) => <ToolPill key={`${call.tool_name}-${i}`} call={call} currency={currency} />)}
       <AiBubble time={clockTime(message.created_at)} failed={message.status === "failed"}>
         <Markdown currency={currency}>{message.content}</Markdown>
         {live?.reasoning ? <Reasoning text={live.reasoning} /> : null}
@@ -284,9 +284,9 @@ function Spark({ size, color }: { size: number; color: string }) {
 }
 
 /** The tool pill: a mint spark, the summary ("Checked Food · 14 orders") and a chevron. It opens to the tool's raw input and output. */
-function ToolPill({ call }: { call: ToolCall }) {
+function ToolPill({ call, currency }: { call: ToolCall; currency: string }) {
   const [open, setOpen] = useState(false);
-  const summary = toolSummary(call);
+  const summary = toolSummary(call, currency);
   const Chevron = open ? ChevronUp : ChevronDown;
   return (
     <View style={styles.tool}>

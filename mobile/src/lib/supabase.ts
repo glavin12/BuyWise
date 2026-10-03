@@ -4,6 +4,10 @@ import { createClient } from "@supabase/supabase-js";
 import * as SecureStore from "expo-secure-store";
 import { AppState, Platform } from "react-native";
 
+import { fetchWithTimeout } from "./fetchWithTimeout";
+
+const AUTH_TIMEOUT_MS = 15_000; // same as the API's CRUD calls
+
 const url = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -56,6 +60,8 @@ export const supabase = createClient(url, anonKey, {
     persistSession: true,
     detectSessionInUrl: false,
   },
+  // F1: React Native's Android HTTP client has no timeout, so a stalled auth request would never settle.
+  global: { fetch: (input, init) => fetchWithTimeout(fetch, input, init, AUTH_TIMEOUT_MS) },
 });
 
 // Supabase's React Native pattern (edge case L3): only refresh tokens while the

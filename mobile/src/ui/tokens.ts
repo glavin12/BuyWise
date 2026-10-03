@@ -63,7 +63,7 @@ export const type = {
   chip:       { fontFamily: fonts.monoMedium, fontSize: 11 },
 } as const;
 
-export const space = { xxs: 4, xs: 6, sm: 8, md: 10, lg: 12, xl: 14, xxl: 18, screenX: 18, screenTop: 8 } as const;
+export const space = { xxs: 4, xs: 6, sm: 8, md: 10, lg: 12, xl: 14, xxl: 18, screenX: 18, screenTop: 8, contentMax: 600 } as const; // contentMax: the readable column on tablets / wide browsers
 
 export const radius = {
   inlineChip: 6, tile: 14, tileLg: 19, field: 17, row: 20, card: 24, cardLg: 26, panel: 28, sheet: 34, pill: 999,

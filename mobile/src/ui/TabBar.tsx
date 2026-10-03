@@ -1,7 +1,6 @@
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import * as SecureStore from "expo-secure-store";
 import type { BottomTabBarProps } from "expo-router/js-tabs";
 import { useEffect, useState } from "react";
 import { Keyboard, Platform, StyleSheet, Text as RNText, View } from "react-native";
@@ -9,9 +8,11 @@ import Animated, { Easing, useAnimatedProps, useReducedMotion, useSharedValue, w
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle, Path, Rect } from "react-native-svg";
 
+import { FLAGS, readFlag, writeFlag } from "@/lib/flags";
+
 import { Illustration } from "./Illustration";
 import { PressableScale } from "./PressableScale";
-import { colors, extra, fonts, motion, radius, tabSurface } from "./tokens";
+import { colors, extra, fonts, motion, radius, space, tabSurface } from "./tokens";
 
 // The v3 tab bar (DESIGN.md §5): no container, border or rule. Icons float over a fade of
 // the screen colour. Centre = AI chat: tap opens Chat, hold (350 ms) opens the QuickAdd sheet.
@@ -53,25 +54,8 @@ export function useTabBarSpace() {
 }
 
 // The first-run coach mark ("tap to chat · hold to add ₹") stays until the centre button is
-// first used or the hint is tapped. SecureStore is the only on-device store installed (web: localStorage).
-const COACH_KEY = "coach.centre-tab";
-
-function readCoachSeen() {
-  try {
-    return (Platform.OS === "web" ? globalThis.localStorage?.getItem(COACH_KEY) : SecureStore.getItem(COACH_KEY)) === "1";
-  } catch {
-    return false;
-  }
-}
-
-function rememberCoachSeen() {
-  try {
-    if (Platform.OS === "web") globalThis.localStorage?.setItem(COACH_KEY, "1");
-    else SecureStore.setItem(COACH_KEY, "1");
-  } catch {
-    // Not saved: the hint shows again next launch, which is harmless.
-  }
-}
+// first used or the hint is tapped (the flag is kept by `lib/flags`).
+const readCoachSeen = () => readFlag(FLAGS.coach);
 
 const fadeAt = (rgb: string, alpha: number) => rgb.replace("rgb(", "rgba(").replace(")", `,${alpha})`);
 
@@ -87,7 +71,7 @@ export function TabBar({ state, descriptors, navigation, coachOn }: BottomTabBar
   const dismissCoach = () => {
     if (coachSeen) return;
     setCoachSeen(true);
-    rememberCoachSeen();
+    writeFlag(FLAGS.coach);
   };
 
   if (keyboard) return null; // it would ride up over the chat input
@@ -99,30 +83,32 @@ export function TabBar({ state, descriptors, navigation, coachOn }: BottomTabBar
         locations={[0, 0.42, 0.7]}
         style={[styles.fade, { height: FADE + bottom - 20 }]}
       />
-      <View style={[styles.row, styles.passThrough, { bottom }]} accessibilityRole="tablist">
-        {state.routes.map((route, i) => {
-          const isFocused = i === state.index;
-          const open = () => {
-            const event = navigation.emit({ type: "tabPress", target: route.key, canPreventDefault: true });
-            if (!isFocused && !event.defaultPrevented) navigation.navigate(route.name, route.params);
-          };
-          if (route.name === "chat") {
-            return <CentreButton key={route.key} onPress={open} onUse={dismissCoach} chatOpen={isFocused} surface={surface} />;
-          }
-          return (
-            <PressableScale
-              key={route.key}
-              onPress={open}
-              accessibilityRole="tab"
-              accessibilityLabel={descriptors[route.key].options.title ?? route.name}
-              accessibilityState={{ selected: isFocused }}
-              style={styles.tab}
-            >
-              <TabIcon name={route.name} color={isFocused ? surface.active : surface.idle} active={isFocused} ring={surface.active} />
-              <View style={[styles.dot, { backgroundColor: isFocused ? surface.dot : "transparent" }]} />
-            </PressableScale>
-          );
-        })}
+      <View style={[styles.rowWrap, styles.passThrough, { bottom }]}>
+        <View style={[styles.row, styles.passThrough]} accessibilityRole="tablist">
+          {state.routes.map((route, i) => {
+            const isFocused = i === state.index;
+            const open = () => {
+              const event = navigation.emit({ type: "tabPress", target: route.key, canPreventDefault: true });
+              if (!isFocused && !event.defaultPrevented) navigation.navigate(route.name, route.params);
+            };
+            if (route.name === "chat") {
+              return <CentreButton key={route.key} onPress={open} onUse={dismissCoach} chatOpen={isFocused} surface={surface} />;
+            }
+            return (
+              <PressableScale
+                key={route.key}
+                onPress={open}
+                accessibilityRole="tab"
+                accessibilityLabel={descriptors[route.key].options.title ?? route.name}
+                accessibilityState={{ selected: isFocused }}
+                style={styles.tab}
+              >
+                <TabIcon name={route.name} color={isFocused ? surface.active : surface.idle} active={isFocused} ring={surface.active} />
+                <View style={[styles.dot, { backgroundColor: isFocused ? surface.dot : "transparent" }]} />
+              </PressableScale>
+            );
+          })}
+        </View>
       </View>
       {coachOn === focused.name && !coachSeen && <CoachMark bottom={bottom + ROW + 18} onPress={dismissCoach} />}
     </View>
@@ -271,15 +257,18 @@ function CentreButton({
 const styles = StyleSheet.create({
   passThrough: { pointerEvents: "box-none" },
   fade: { position: "absolute", left: 0, right: 0, bottom: 0, pointerEvents: "none" },
+  // The row is capped at the readable column and centred, so on a tablet the tabs stay together.
+  rowWrap: { position: "absolute", left: 0, right: 0, alignItems: "center" },
   row: {
-    position: "absolute",
-    left: 14,
-    right: 14,
+    width: "100%",
+    maxWidth: space.contentMax,
+    paddingHorizontal: 14,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
-  tab: { width: 56, height: 58, alignItems: "center", justifyContent: "center", gap: 6 },
+  // Each tab takes an equal share, so four tabs and the centre button fit a 320 dp phone at any display size.
+  tab: { flex: 1, height: 58, alignItems: "center", justifyContent: "center", gap: 6 },
   dot: { width: 5, height: 5, borderRadius: radius.pill },
   avatarRing: { borderRadius: radius.pill, borderWidth: 2, padding: 2.5, margin: -4.5 },
   centre: {
