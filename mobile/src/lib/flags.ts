@@ -2,12 +2,14 @@ import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 
 // Small yes/no "has seen it" flags kept on the device. SecureStore is the only on-device store installed (web:
-// localStorage). Any failure reads as "not set", which only means a hint shows again.
+// localStorage). Any failure reads as "not set", which only means a hint (or the AI consent sheet) shows again.
 
 /** Every flag key, so a fresh install can clear them all (`freshInstall.ts`). */
 export const FLAGS = {
   /** The first-run coach mark above the centre tab. */
   coach: "coach.centre-tab",
+  /** The user agreed to BuyWise AI sending their messages and figures to the AI provider (per device, not per account). */
+  aiConsent: "consent.ai.v1",
 } as const;
 
 export function readFlag(key: string): boolean {

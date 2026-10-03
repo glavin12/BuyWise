@@ -152,6 +152,7 @@ async function fetchAPI<T>(
   }
 
   if (res.status < 200 || res.status >= 300) throw errorFor(res);
+  if (res.status === 204) return undefined as T; // no body (DELETE /profile)
 
   try {
     return JSON.parse(res.body) as T;
@@ -193,9 +194,13 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
+  /** Permanently deletes the account: all the user's data, then their login. The caller signs out afterwards. */
+  deleteAccount: () => fetchAPI<void>("/api/v1/profile", { method: "DELETE" }),
+
   // ── Dashboard ──────────────────────────────────────────────────
-  getDashboard: (period = "this_month") =>
-    fetchAPI<DashboardData>(`/api/v1/dashboard?period=${period}`),
+  /** `today` is the phone's local date: the server's UTC date can be a day off near a month boundary. */
+  getDashboard: (period = "this_month", today?: string) =>
+    fetchAPI<DashboardData>(`/api/v1/dashboard?period=${period}${today ? `&today=${today}` : ""}`),
 
   // ── Categories ─────────────────────────────────────────────────
   listCategories: (type?: "expense" | "income") => {

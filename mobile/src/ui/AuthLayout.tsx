@@ -19,6 +19,7 @@ import { useOnline } from "@/lib/network";
 
 import { RichText } from "./Chips";
 import { Illustration } from "./Illustration";
+import { LegalLinks } from "./LegalLinks";
 import { PressableScale } from "./PressableScale";
 import { colors, fonts, radius, type } from "./tokens";
 
@@ -117,6 +118,7 @@ export function AuthLayout({
                 </PressableScale>
               </View>
             ) : null}
+            <LegalLinks />
           </View>
         </View>
       </ScrollView>

@@ -1,6 +1,7 @@
 // Screens import UI from here. The tokens are deliberately not exported:
 // only the primitives in this folder may read visual tokens.
 export { EntryAmount } from "./AmountInput";
+export { AiConsent } from "./AiConsent";
 export { AppShell } from "./AppShell";
 export { AuthField, AuthLayout } from "./AuthLayout";
 export { Banner } from "./Banner";
@@ -41,6 +42,7 @@ export { BudgetRow, BudgetTable, ReadyCard } from "./BudgetList";
 export { CategoryRow, ChartBlock, ChartNote, MethodBar, ReportCard, SavingsCard, SegmentBar, StatCard, StatTile, TomatoPanel } from "./ReportBlocks";
 export { FieldButton, FieldInput } from "./Field";
 export { Illustration } from "./Illustration";
+export { LegalLinks } from "./LegalLinks";
 export { OptionSheet, Sheet, SheetHandle, type OptionGroup } from "./OptionSheet";
 export { PressableScale } from "./PressableScale";
 export { SearchField } from "./SearchField";
