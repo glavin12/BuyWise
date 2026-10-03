@@ -63,7 +63,7 @@ export const type = {
   chip:       { fontFamily: fonts.monoMedium, fontSize: 11 },
 } as const;
 
-export const space = { xxs: 4, xs: 6, sm: 8, md: 10, lg: 12, xl: 14, xxl: 18, screenX: 18, screenTop: 8 } as const;
+export const space = { xxs: 4, xs: 6, sm: 8, md: 10, lg: 12, xl: 14, xxl: 18, screenX: 18, screenTop: 8, contentMax: 600 } as const; // contentMax: the readable column on tablets / wide browsers
 
 export const radius = {
   inlineChip: 6, tile: 14, tileLg: 19, field: 17, row: 20, card: 24, cardLg: 26, panel: 28, sheet: 34, pill: 999,
@@ -88,7 +88,8 @@ export const extra = {
   outline: '#8A8880',      // outline CircleButton border on charcoal
   inlineDark: '#1C1C1E',   // `dark` InlineChip fill
   proseOnCard: '#D4D2CA',  // mono prose inside a card
-  mutedOnCream: '#6E685C', // secondary text on a cream sheet
+  mutedOnCream: '#645E52', // secondary text on a cream sheet (darkened from the design's #6E685C: 4.8:1 on creamField, 5.6:1 on cream)
+  placeholderOnCream: '#857E6E', // the QuickAdd amount's "0" placeholder (large text: 3.5:1 on cream)
   dashedOnCream: '#9C9483',// dashed "New" tile border
   handle: '#C9C1AF',       // sheet handle
   track: '#E4DCCB',        // dial / progress track on cream
@@ -105,4 +106,6 @@ export const extra = {
   ticketChip: 'rgba(22,22,22,0.12)',    // the translucent chip on the sky ticket (Settings.html)
   proseOnBubble: '#E4E2DA',             // the AI chat bubbles' mono prose (Chat.html)
   tableHead: '#2A2A2C',                 // a chat table's header row (Chat.html)
+  whiteOnPeri: '#FFFFFF',               // today's weekday and the % labels on the peri Spend Pulse card
+  labelOnPeri: '#DAD7FC',               // the other weekday labels on the peri card
 } as const;

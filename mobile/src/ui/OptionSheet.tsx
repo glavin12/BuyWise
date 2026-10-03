@@ -4,7 +4,7 @@ import { Modal, Pressable, ScrollView, StyleSheet, Text as RNText, View } from "
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Title } from "./Blocks";
-import { colors, extra, fonts, radius, type } from "./tokens";
+import { colors, extra, fonts, radius, space, type } from "./tokens";
 
 // `Sheet` is a cream bottom sheet (DESIGN.md §3: radius 34, 46×5 handle). `OptionSheet` is what a
 // dropdown Pill opens: the choices, the current one ticked. The design draws only the pills, so
@@ -85,6 +85,9 @@ export function OptionSheet({
 const styles = StyleSheet.create({
   scrim: { flex: 1, justifyContent: "flex-end", backgroundColor: extra.scrim },
   sheet: {
+    alignSelf: "center",
+    width: "100%",
+    maxWidth: space.contentMax, // centred in the readable column on a tablet instead of spanning it
     maxHeight: "75%",
     gap: 10,
     paddingTop: 10,

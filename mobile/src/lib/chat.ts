@@ -87,7 +87,7 @@ function asNumber(v: unknown): number | null {
 function asString(v: unknown): string | null {
   return typeof v === "string" ? v : null;
 }
-function money(display: unknown, currency: unknown = "INR"): string | null {
+function formatMoney(display: unknown, currency: unknown): string | null {
   const amount = asNumber(display);
   if (amount === null) return null;
   const cur = asString(currency) ?? "INR";
@@ -106,8 +106,13 @@ function plural(n: number, word: string): string {
   return `${n} ${word}${n === 1 ? "" : "s"}`;
 }
 
-/** A short human summary of a tool call's output, for the card's collapsed header. Falls back to `prettyToolName` on an error shape, an unknown tool, or JSON that doesn't parse. */
-export function toolSummary(call: Pick<ToolCall, "tool_name" | "tool_output">): string {
+/**
+ * A short human summary of a tool call's output, for the card's collapsed header. Falls back to `prettyToolName` on an
+ * error shape, an unknown tool, or JSON that doesn't parse. `currency` (the profile's) formats the amounts whose
+ * output carries no currency of its own; only `add_transaction` reports one.
+ */
+export function toolSummary(call: Pick<ToolCall, "tool_name" | "tool_output">, currency = "INR"): string {
+  const money = (display: unknown, cur: unknown = currency) => formatMoney(display, cur);
   const fallback = prettyToolName(call.tool_name);
   let parsed: unknown;
   try {

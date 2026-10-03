@@ -134,6 +134,8 @@ export interface TransactionCreate {
   description?: string | null;
   notes?: string | null;
   cleared_status?: ClearedStatus;
+  /** A repeat of a key the server already saw returns the first transaction instead of creating another. */
+  idempotency_key?: string;
 }
 
 export interface TransactionUpdate {

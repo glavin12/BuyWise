@@ -31,13 +31,14 @@ Repositories never trust an owner ID from an LLM or request body. Services valid
 ## Financial Services
 
 - `ProfileService`: profile CRUD and first-profile initialization (seeds default categories and payees).
+- `AccountService`: account deletion. Deletes the user's data (`AccountRepository`) and then their Supabase Auth login through the Admin API with `SUPABASE_SERVICE_ROLE_KEY`; refuses, deleting nothing, when that key is not set.
 - `CategoryService`: user-owned category CRUD and default seeding.
 - `PayeeService`: normalized payee CRUD.
 - `TransactionService`: ledger CRUD, ownership validation, filters, and serialization.
 - `BudgetService`: per-category monthly budget upsert, status, and CRUD.
 - `AnalyticsService`: monthly summary, category spending, comparison, and AI-facing breakdowns.
 - `GoalService`: category-linked goals and manual progress completion.
-- `DashboardService`: composition of profile, the running balance, analytics, budgets, and goals.
+- `DashboardService`: composition of profile, the running balance, analytics, budgets, and goals. Takes the caller's `today` so "this month" follows the user's calendar, not the server's UTC clock.
 
 ## Ledger Invariants
 

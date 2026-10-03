@@ -10,7 +10,7 @@ import {
 import { useState } from "react";
 
 import { api } from "./api";
-import { monthKey, monthShift, type DateRange, type MonthYear } from "./dates";
+import { monthKey, monthShift, todayLocal, type DateRange, type MonthYear } from "./dates";
 import { findInPages, planBudgetCopy } from "./ledger";
 import { suggestedCategory, type PickedCategory } from "./transactionForm";
 import type { CategoryType, Goal, Transaction, TransactionType, TransactionsResponse } from "./types";
@@ -34,10 +34,11 @@ export const profileQuery = queryOptions({
 
 export type DashboardPeriod = "this_month" | "last_month";
 
-export const dashboardQuery = (period: DashboardPeriod) =>
+// The phone's date is part of the key, so the numbers refetch when the day (and maybe the month) turns.
+export const dashboardQuery = (period: DashboardPeriod, today: string = todayLocal()) =>
   queryOptions({
-    queryKey: ["dashboard", period],
-    queryFn: () => api.getDashboard(period),
+    queryKey: ["dashboard", period, today],
+    queryFn: () => api.getDashboard(period, today),
   });
 
 // ── Transactions ────────────────────────────────────────────────

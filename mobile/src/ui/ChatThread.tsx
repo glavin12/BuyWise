@@ -31,12 +31,14 @@ import Svg, { Path } from "react-native-svg";
 
 import { isNotFound, userMessage } from "@/lib/api";
 import { clockTime, firstSuggestionOverride, greeting, newIdempotencyKey, toolSummary, visibleMessages } from "@/lib/chat";
+import { FLAGS, readFlag, writeFlag } from "@/lib/flags";
 import { usePendingChatIds, useSendMessage, type SendVars } from "@/lib/mutations";
 import { useOnline } from "@/lib/network";
 import { dashboardQuery, messagesQuery, profileQuery, recentTransactionsQuery } from "@/lib/queries";
 import { escapeRich } from "@/lib/richText";
 import type { ChatResponse, Message, ToolCall } from "@/lib/types";
 
+import { AiConsent } from "./AiConsent";
 import { Banner } from "./Banner";
 import { Note, Panel, Title } from "./Blocks";
 import { CircleButton } from "./Buttons";
@@ -100,6 +102,8 @@ export function ChatThread({
   const pendingElsewhere = usePendingChatIds().includes(id ?? ""); // sent from this thread before the user left and came back
   const online = useOnline();
   const [draft, setDraft] = useState("");
+  // A message waiting on the first-use AI consent sheet; it is sent when the user agrees.
+  const [consentFor, setConsentFor] = useState<string | null>(null);
   const list = useRef<FlatList<Message>>(null);
   const input = useRef<TextInput>(null);
 
@@ -133,8 +137,19 @@ export function ChatThread({
   const submit = (text: string) => {
     const message = text.trim();
     if (!message || busy || !online) return false;
+    if (!readFlag(FLAGS.aiConsent)) {
+      setConsentFor(message); // false keeps typed text in the box until the user has agreed
+      return false;
+    }
     run({ message, conversationId: id, idempotencyKey: newIdempotencyKey() });
     return true;
+  };
+
+  const agree = () => {
+    writeFlag(FLAGS.aiConsent);
+    const message = consentFor;
+    setConsentFor(null);
+    if (message && submit(message)) setDraft((current) => (current.trim() === message ? "" : current));
   };
 
   const empty = loading ? (
@@ -176,62 +191,66 @@ export function ChatThread({
   );
 
   return (
-    <Screen surface="screen" keyboard scroll={false} tabBar={tab}>
-      <Row align="start">
-        <CircleButton icon={ArrowLeft} label="Go back" onPress={onBack} />
-        <Stack grow>
-          <Title>{"Money\nBuddy"}</Title>
-        </Stack>
-        {onHistory ? <CircleButton icon={History} label="Past conversations" onPress={onHistory} /> : null}
-      </Row>
-      <FlatList
-        ref={list}
-        style={styles.list}
-        contentContainerStyle={styles.content}
-        data={rows}
-        keyExtractor={(m) => m.id}
-        renderItem={({ item }) => <Bubble message={item} live={item.id === liveId ? send.data : undefined} currency={currency} />}
-        ListHeaderComponent={
-          history.isError && history.data ? <Banner tone="warning" message="Couldn't refresh. Showing what we have." /> : null
-        }
-        ListEmptyComponent={empty}
-        ListFooterComponent={footer}
-        onContentSizeChange={() => list.current?.scrollToEnd({ animated: true })}
-        keyboardShouldPersistTaps="handled"
-      />
-      {fresh ? (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.chipsScroll}
-          contentContainerStyle={styles.chips}
+    <>
+      <Screen surface="screen" keyboard scroll={false} tabBar={tab}>
+        <Row align="start">
+          <CircleButton icon={ArrowLeft} label="Go back" onPress={onBack} />
+          <Stack grow>
+            <Title>{"Money\nBuddy"}</Title>
+          </Stack>
+          {onHistory ? <CircleButton icon={History} label="Past conversations" onPress={onHistory} /> : null}
+        </Row>
+        <FlatList
+          ref={list}
+          style={styles.list}
+          contentContainerStyle={styles.content}
+          data={rows}
+          keyExtractor={(m) => m.id}
+          renderItem={({ item }) => <Bubble message={item} live={item.id === liveId ? send.data : undefined} currency={currency} />}
+          ListHeaderComponent={
+            history.isError && history.data ? <Banner tone="warning" message="Couldn't refresh. Showing what we have." /> : null
+          }
+          ListEmptyComponent={empty}
+          ListFooterComponent={footer}
+          onContentSizeChange={() => list.current?.scrollToEnd({ animated: true })}
           keyboardShouldPersistTaps="handled"
-        >
-          {PREFILL_CHIPS.map((chip) => (
-            <Chip
-              key={chip.label}
-              label={chip.label}
-              icon={chip.icon}
-              variant="outlinedDark"
-              onPress={() => {
-                setDraft(chip.text);
-                input.current?.focus();
-              }}
-            />
-          ))}
-        </ScrollView>
-      ) : null}
-      <ChatInput
-        inputRef={input}
-        value={draft}
-        onChangeText={setDraft}
-        onSend={() => {
-          if (submit(draft)) setDraft("");
-        }}
-        onNew={onNew}
-        busy={busy}
-      />
-    </Screen>
+        />
+        {fresh ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.chipsScroll}
+            contentContainerStyle={styles.chips}
+            keyboardShouldPersistTaps="handled"
+          >
+            {PREFILL_CHIPS.map((chip) => (
+              <Chip
+                key={chip.label}
+                label={chip.label}
+                icon={chip.icon}
+                variant="outlinedDark"
+                onPress={() => {
+                  setDraft(chip.text);
+                  input.current?.focus();
+                }}
+              />
+            ))}
+          </ScrollView>
+        ) : null}
+        <ChatInput
+          inputRef={input}
+          value={draft}
+          onChangeText={setDraft}
+          onSend={() => {
+            if (submit(draft)) setDraft("");
+          }}
+          onNew={onNew}
+          busy={busy}
+        />
+      </Screen>
+      {/* The modal sits outside the Screen, like the other sheets. */}
+      <AiConsent visible={consentFor !== null} onAgree={agree} onDecline={() => setConsentFor(null)} />
+    </>
   );
 }
 
@@ -265,7 +284,7 @@ function Bubble({ message, live, currency }: { message: Message; live?: ChatResp
   if (message.role === "user") return <UserPill text={message.content} />;
   return (
     <View style={styles.reply}>
-      {live?.tool_calls.map((call, i) => <ToolPill key={`${call.tool_name}-${i}`} call={call} />)}
+      {live?.tool_calls.map((call, i) => <ToolPill key={`${call.tool_name}-${i}`} call={call} currency={currency} />)}
       <AiBubble time={clockTime(message.created_at)} failed={message.status === "failed"}>
         <Markdown currency={currency}>{message.content}</Markdown>
         {live?.reasoning ? <Reasoning text={live.reasoning} /> : null}
@@ -284,9 +303,9 @@ function Spark({ size, color }: { size: number; color: string }) {
 }
 
 /** The tool pill: a mint spark, the summary ("Checked Food · 14 orders") and a chevron. It opens to the tool's raw input and output. */
-function ToolPill({ call }: { call: ToolCall }) {
+function ToolPill({ call, currency }: { call: ToolCall; currency: string }) {
   const [open, setOpen] = useState(false);
-  const summary = toolSummary(call);
+  const summary = toolSummary(call, currency);
   const Chevron = open ? ChevronUp : ChevronDown;
   return (
     <View style={styles.tool}>

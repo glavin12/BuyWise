@@ -174,6 +174,11 @@ export function useUpdateProfile() {
   });
 }
 
+/** Permanently deletes the account (data and login). Nothing to invalidate: the caller signs out, and SIGNED_OUT clears the whole cache. */
+export function useDeleteAccount() {
+  return useMutation({ mutationFn: () => api.deleteAccount() });
+}
+
 /** Name, icon and colour; a category's type never changes. */
 export function useUpdateCategory() {
   const queryClient = useQueryClient();

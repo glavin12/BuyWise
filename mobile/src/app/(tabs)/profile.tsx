@@ -4,7 +4,7 @@ import { Globe, LayoutGrid, Pencil, User } from "lucide-react-native";
 import { useState } from "react";
 
 import { userMessage } from "@/lib/api";
-import { useUpdateProfile } from "@/lib/mutations";
+import { useDeleteAccount, useUpdateProfile } from "@/lib/mutations";
 import { useOnline } from "@/lib/network";
 import { categoriesQuery, payeesQuery, profileQuery } from "@/lib/queries";
 import { displayName, regionLabel, sinceLabel } from "@/lib/settings";
@@ -16,11 +16,13 @@ import {
   confirm,
   ErrorState,
   Illustration,
+  LegalLinks,
   Note,
   Panel,
   Row,
   Screen,
   SectionLabel,
+  SecondaryButton,
   showToast,
   SignOutButton,
   Skeleton,
@@ -45,6 +47,7 @@ export default function ProfileScreen() {
   const expensePayees = useQuery(payeesQuery("expense"));
   const incomePayees = useQuery(payeesQuery("income"));
   const updateProfile = useUpdateProfile();
+  const deleteAccount = useDeleteAccount();
   const online = useOnline();
   const [refreshing, setRefreshing] = useState(false);
   useRefetchStaleOnFocus();
@@ -71,6 +74,29 @@ export default function ProfileScreen() {
   const onSignOut = async () => {
     const yes = await confirm("Sign out?", "You'll need to log in again to see your data.", "Sign out", true);
     if (yes) await signOut(); // the route guard then returns to the login screen
+  };
+
+  /**
+   * Two confirms, then the server deletes the data and the login; signing out afterwards returns to the login
+   * screen (SIGNED_OUT clears the cache). Needs the network, and a failure leaves the user signed in to retry.
+   */
+  const onDeleteAccount = async () => {
+    const sure = await confirm(
+      "Delete your account?",
+      "This permanently deletes your transactions, budgets, goals and chats. It can't be undone.",
+      "Delete",
+      true,
+    );
+    if (!sure) return;
+    const certain = await confirm("Are you sure?", "Your account and everything in it will be gone for good.", "Delete my account", true);
+    if (!certain) return;
+    try {
+      await deleteAccount.mutateAsync();
+    } catch (err) {
+      showToast(userMessage(err, "delete your account"));
+      return;
+    }
+    await signOut();
   };
 
   /** R3: the switch flips at once (useUpdateProfile is optimistic) and settles on the server's answer either way. */
@@ -161,6 +187,8 @@ export default function ProfileScreen() {
       )}
 
       <SignOutButton onPress={onSignOut} />
+      <SecondaryButton label="Delete account" surface="dark" danger requiresNetwork onPress={onDeleteAccount} />
+      <LegalLinks />
 
       {__DEV__ ? <SectionLabel label="Dev only" link="Design kit" onLink={() => router.push("/kit")} /> : null}
     </Screen>

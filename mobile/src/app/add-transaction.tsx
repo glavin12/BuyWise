@@ -5,6 +5,7 @@ import type { TextInput } from "react-native";
 
 import { userMessage } from "@/lib/api";
 import { todayLocal } from "@/lib/dates";
+import { newIdempotencyKey } from "@/lib/chat";
 import { formatMinor } from "@/lib/format";
 import { wholeIfRound } from "@/lib/home";
 import { useCreateTransaction } from "@/lib/mutations";
@@ -33,6 +34,9 @@ export default function AddTransactionModal() {
   );
   const [draft, setDraft] = useState<TransactionDraft>(baseline);
   const [attempted, setAttempted] = useState(false);
+  // Sent with the save, so a Save that timed out and is pressed again cannot log the expense twice. The same key
+  // retries the same intent; it changes when the user edits the form or finishes a "Save & add another".
+  const saveKey = useRef(newIdempotencyKey());
 
   const profile = useQuery(profileQuery);
   const create = useCreateTransaction();
@@ -45,7 +49,7 @@ export default function AddTransactionModal() {
     setAttempted(true);
     if (amount === null || errors.category) return;
     try {
-      await create.mutateAsync(toCreatePayload(draft, amount, profile.data?.currency));
+      await create.mutateAsync({ ...toCreatePayload(draft, amount, profile.data?.currency), idempotency_key: saveKey.current });
     } catch {
       return; // the failure is shown by the error banner
     }
@@ -55,6 +59,7 @@ export default function AddTransactionModal() {
     showToast(draft.type === "income" ? `${amountText} income added to ${categoryName}` : `${amountText} added to ${categoryName}`);
     if (another) {
       const next = afterSaveAndAddAnother(draft);
+      saveKey.current = newIdempotencyKey();
       setDraft(next);
       setBaseline(next); // what is left (type, category, method, date) is not "unsaved work"
       setAttempted(false);
@@ -68,7 +73,10 @@ export default function AddTransactionModal() {
   return (
     <TransactionEditor
       draft={draft}
-      onChange={setDraft}
+      onChange={(next) => {
+        saveKey.current = newIdempotencyKey(); // an edited form is a new intent
+        setDraft(next);
+      }}
       currency={currency}
       amountRef={amountRef}
       errors={attempted ? errors : {}}

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import date
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -50,8 +51,8 @@ class BudgetService:
         spent_by_category = {row.category.id: row.amount for row in spent}
         return [self._budget_status(entry, spent_by_category.get(entry.category_id, 0)) for entry in entries]
 
-    async def budget_status(self, user_id: uuid.UUID, *, period: str = "this_month") -> dict:
-        window = resolve_period(period)
+    async def budget_status(self, user_id: uuid.UUID, *, period: str = "this_month", today: date | None = None) -> dict:
+        window = resolve_period(period, today)
         rows = await self.get_month_budgets(user_id, window.month, window.year)
         total_budgeted = sum(row["budgeted_amount"] for row in rows)
         total_spent = await self.transactions.sum_total(

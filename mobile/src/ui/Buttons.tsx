@@ -1,12 +1,12 @@
 import { ArrowUpRight, Plus, type LucideIcon } from "lucide-react-native";
 import { useRef, useState } from "react";
-import { ActivityIndicator, StyleSheet, Text as RNText, View } from "react-native";
+import { ActivityIndicator, StyleSheet, Text as RNText, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useOnline } from "@/lib/network";
 
 import { PressableScale } from "./PressableScale";
-import { colors, extra, fonts, radius } from "./tokens";
+import { colors, extra, fonts, radius, space } from "./tokens";
 
 // Design v3 buttons (DESIGN.md §3). Sizes come from design/reference-html.
 
@@ -158,8 +158,11 @@ export function PillButton({ label, icon: Icon, onPress, ...guard }: GuardedProp
 /** The floating marigold + at the bottom right of a stack screen (Goals: new goal). Pass it as `<Screen fab>`. */
 export function Fab({ label, onPress }: { label: string; onPress: () => void }) {
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  // Beside the content column (`Screen` caps it at space.contentMax), not at the far edge of a tablet.
+  const right = Math.max(space.screenX, (width - space.contentMax) / 2 + space.screenX);
   return (
-    <PressableScale onPress={onPress} accessibilityLabel={label} style={[styles.fab, { bottom: insets.bottom + 22 }]}>
+    <PressableScale onPress={onPress} accessibilityLabel={label} style={[styles.fab, { bottom: insets.bottom + 22, right }]}>
       <Plus size={28} color={colors.ink} strokeWidth={2.6} />
     </PressableScale>
   );
@@ -178,7 +181,6 @@ const styles = StyleSheet.create({
   pillLabel: { fontFamily: fonts.monoBold, fontSize: 11, color: colors.cream },
   fab: {
     position: "absolute",
-    right: 18,
     width: 60,
     height: 60,
     borderRadius: radius.pill,

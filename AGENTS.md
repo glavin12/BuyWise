@@ -16,12 +16,12 @@ Both clients call this API with a Supabase access token and use Supabase for aut
 
 ## Status
 
-Verified against the code on 2026-09-24. Update this section in the same change as any feature in any part.
+Verified against the code on 2026-09-24; the backend and mobile rows were rechecked on 2026-10-03. Update this section in the same change as any feature in any part.
 
 | Part | State | Checks (2026-09-24) |
 |---|---|---|
-| Backend | Everything under [HTTP API](#http-api) is implemented, with 13 AI tools and migrations 001 to 003 | `pytest tests`: 71 passing (2026-09-25) |
-| Mobile | Every phase done: auth, Dashboard, Transactions, Budget, Goals, AI chat (1 to 4), Reports and full Settings (5). Design v3 (charcoal) done: tokens, fonts, illustrations, component kit, the new tab bar (centre = AI chat, hold = add; Settings is now the Profile tab), every screen rebuilt (the ones with no PNG reuse the rebuilt look; forms are cream sheets like Quick Add) and the DESIGN.md §6 motion. The old cream look (1.5) is removed. Details: `mobile/AGENTS.md` | 157 unit tests passing; `tsc` and lint clean; the Android bundle exports (2026-09-30) |
+| Backend | Everything under [HTTP API](#http-api) is implemented, with 13 AI tools and migrations 001 to 004 | `pytest tests`: 85 passing (2026-10-03) |
+| Mobile | Every phase done: auth, Dashboard, Transactions, Budget, Goals, AI chat (1 to 4), Reports and full Settings (5). Design v3 (charcoal) done: tokens, fonts, illustrations, component kit, the new tab bar (centre = AI chat, hold = add; Settings is now the Profile tab), every screen rebuilt (the ones with no PNG reuse the rebuilt look; forms are cream sheets like Quick Add) and the DESIGN.md §6 motion. The old cream look (1.5) is removed. Details: `mobile/AGENTS.md` | 172 unit tests passing; `tsc` and lint clean; the Android bundle exports (2026-10-03). The app-review fixes of 2026-10-03 (timeouts, reinstall sign-out, layout, accessibility, idempotent Save, account deletion, AI consent) are in the code but not yet checked on a device |
 | Web | Every sidebar screen exists (see below) | `tsc` clean; `npm run lint` reports 24 errors; no tests |
 
 ### Web app (`frontend/`)
@@ -29,7 +29,7 @@ Verified against the code on 2026-09-24. Update this section in the same change 
 - Next.js 16 (App Router), React 19, Tailwind 4, TypeScript. Auth is Supabase SSR through `middleware.ts`, and screens call the API through `frontend/lib/api.ts`. Before writing web code, read the Next.js guide in `frontend/node_modules/next/dist/docs/` (see `frontend/AGENTS.md`).
 - Routes: `/login`, `/signup`, `/dashboard`, `/transactions`, `/budget`, `/goals`, `/reports`, `/chat` and `/chat/[id]`, `/settings`, and `/accounts`, which is shown as "Balance": it was the multi-account screen and now shows the single balance, spending by payment method, and recent activity. `/` redirects to `/chat`.
 - Also built: a quick-add transaction modal opened from the sidebar, and AI chat wired to `chat`, `getMessages`, `listConversations` and `deleteConversation` (a new `idempotency_key` per send). Settings edits the profile, categories, payees and the budget-alerts toggle.
-- The web app uses 30 of the 34 `api.ts` calls; unused: `getCategory`, `getPayee`, `getTransaction`, `getBudget`.
+- The web app uses 30 of the 35 `api.ts` calls; unused: `getCategory`, `getPayee`, `getTransaction`, `getBudget`, `deleteAccount` (the Settings "Delete account" control is still a "coming soon" toast). `getDashboard` takes an optional `today` and `TransactionCreate` an optional `idempotency_key`, but no web screen sends either yet.
 - 22 controls show a "coming soon" toast through `frontend/lib/coming-soon.ts` because the backend does not expose the feature: Search, Sort, Export CSV, Export ledger CSV, Notifications, Net-worth history, Trends, Smart insights, Envelope suggestions, Move from balance, Auto-save monthly, Auto-categorize, Chat-added transactions, Chat envelope transfers, Week start day, Weekly recap, Unusual transaction alerts, Goal milestone alerts, Two-factor authentication, Active sessions, Billing, Delete account.
 - `npm run lint` reports 24 errors in 10 files, all React hooks rules (13 `react-hooks/preserve-manual-memoization`, 11 `react-hooks/set-state-in-effect`).
 - Commands, from `frontend/`: `npm run dev` (http://localhost:3000), `npm run build`, `npm run lint`. Copy `.env.example` to `.env.local` and set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` and `NEXT_PUBLIC_API_URL`; for a local Uvicorn use `http://127.0.0.1:8000`, not `localhost`.
@@ -130,7 +130,8 @@ Protected routes:
 - `DELETE /api/v1/conversations/{conversation_id}`
 - `GET /api/v1/profile`
 - `POST /api/v1/profile`
-- `GET /api/v1/dashboard` (`period` is `this_month` or `last_month`)
+- `DELETE /api/v1/profile` (deletes the account: all the user's data, then their Supabase login)
+- `GET /api/v1/dashboard` (`period` is `this_month` or `last_month`; optional `today` is the caller's local date)
 - `GET /api/v1/goals` (`status` is `active`, `completed`, or `archived`; default `active`)
 - `POST /api/v1/goals`
 - `PATCH /api/v1/goals/{goal_id}`
@@ -153,6 +154,9 @@ Behavior clients rely on:
 
 - `GET /conversations/{id}/messages` returns the newest `limit` messages in chronological order; `cursor` (a timestamp) returns the page older than it.
 - `GET /transactions` filters are `category_id`, `payee_id`, `transaction_type`, `cleared_status`, `date_from`, `date_to`, `period`, `limit` (1 to 100, default 20), and `offset`. Results are newest first.
+- `GET /dashboard` works out "this month" from `today` (`YYYY-MM-DD`, the caller's local date) when it is sent, else from the server's UTC date. Clients send it: near a month boundary the two differ.
+- `POST /transactions` takes an optional `idempotency_key` (at most 128 characters, unique per user, blank = none). A repeat of a used key returns the first transaction instead of creating another, so a client can retry after a timeout. Goals and the other `POST`s have no such key.
+- `DELETE /profile` answers 204. It deletes every row the user owns in one transaction (`AccountRepository`), then their Supabase Auth login through the Admin API using `SUPABASE_SERVICE_ROLE_KEY` (a backend-only secret: never in `mobile/` or `frontend/`, never committed). Without the key it answers 503 and deletes nothing; if only the login deletion fails it answers 502 and repeating is safe.
 - `POST /budgets` is an upsert per category, month, and year, and only an active expense category can be budgeted.
 - `POST /categories` returns the existing row when an active category with that name and type exists. `DELETE /categories/{id}` archives (`is_active=false`) and category lists hide archived rows. Payee deletion is a hard delete and `transactions.payee_id` becomes null.
 - Goals have no GET-by-id and no DELETE; archiving is a `PATCH` with `status=archived`. On update the server sets `status` to `completed` when `current_amount >= target_amount`, and back to `active` if it drops below, unless a `status` is sent or the goal is archived.
@@ -192,11 +196,12 @@ The repository now contains a clean rebuild:
 - `001_baseline.py` drops no existing data itself but creates the complete application schema on a fresh database.
 - `002_payee_types_and_predefined_data.py` adds `payees.type` and backfills default categories and payees.
 - `003_security_hardening.py` revokes the `anon` and `authenticated` roles' table privileges (the Supabase Data API is not a supported access path; the backend connects as the table owner) and makes the messages idempotency index per user.
+- `004_transaction_idempotency.py` adds the nullable `transactions.idempotency_key` and a per-user partial unique index (additive; run `uv run alembic upgrade head` before starting a backend that has this code, because the model reads the column).
 - The old seven migrations are deleted from the repository history.
 
 The baseline creates `profiles`, `conversations`, `messages`, `categories`, `payees`, `transactions`, `budget_entries`, and `goals`, plus indexes, constraints, enums, and RLS policies. There is no `accounts` table, and `transactions.payment_method` is defined in the baseline. It is intentionally destructive when used as a reset strategy. Do not apply it to a database containing data that must be preserved.
 
-The current Alembic head is `003`.
+The current Alembic head is `004`.
 
 ## Development Commands
 

@@ -77,6 +77,7 @@ async function fetchAPI<T>(
     throw new Error(detail);
   }
 
+  if (res.status === 204) return undefined as T; // no body (DELETE /profile)
   return res.json();
 }
 
@@ -112,9 +113,13 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
+  /** Permanently deletes the account: all the user's data, then their login. Not wired to a screen yet. */
+  deleteAccount: () => fetchAPI<void>("/api/v1/profile", { method: "DELETE" }),
+
   // ── Dashboard ──────────────────────────────────────────────────
-  getDashboard: (period = "this_month") =>
-    fetchAPI<DashboardData>(`/api/v1/dashboard?period=${period}`),
+  /** `today` (YYYY-MM-DD) is the caller's local date; without it the server uses its UTC date. */
+  getDashboard: (period = "this_month", today?: string) =>
+    fetchAPI<DashboardData>(`/api/v1/dashboard?period=${period}${today ? `&today=${today}` : ""}`),
 
   // ── Categories ─────────────────────────────────────────────────
   listCategories: (type?: "expense" | "income") => {

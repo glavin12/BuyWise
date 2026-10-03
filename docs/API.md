@@ -34,6 +34,7 @@ Errors use FastAPI's `{"detail": "..."}` shape. Authentication errors are HTTP 4
 | category `color` | `#RRGGBB` |
 | category `icon` | at most 32 characters (a keyword such as `public-transit`, or an emoji) |
 | chat `message` / `idempotency_key` | at most 4000 / 128 characters |
+| transaction `idempotency_key` | at most 128 characters (a blank one counts as none) |
 
 A category's `type` is fixed at creation: `PATCH /api/v1/categories/{id}` ignores it.
 
@@ -44,6 +45,8 @@ API write requests use integer minor units. For INR, `1050` means `INR 10.50`. R
 ## Profile Initialization
 
 `GET /api/v1/profile` returns the authenticated profile and creates a default one on first read. `POST /api/v1/profile` creates or partially updates it (422 when the body has no fields). Profile creation seeds 36 user-owned categories (29 expense, 7 income) and 36 payees (20 expense, 16 income). There are no accounts.
+
+`DELETE /api/v1/profile` permanently deletes the authenticated user's account and answers 204 with no body. It removes every row the user owns (messages, conversations, transactions, budgets, goals, payees, categories) and then the profile, in one database transaction, and after the commit deletes the user's Supabase Auth login through the Admin API (`DELETE {SUPABASE_URL}/auth/v1/admin/users/{id}`) with `SUPABASE_SERVICE_ROLE_KEY`. The user is always the authenticated one; the path and body choose nothing. With no key configured it answers 503 `Account deletion is not configured` and deletes nothing. If the data is gone but Supabase Auth fails or does not answer it answers 502, and repeating the request is safe: the data deletes are no-ops and only the login is retried (a login Supabase no longer has counts as deleted). Until the login is removed the old access token still works, and the next `GET /profile` would provision a fresh default profile.
 
 ## Balance And Payment Methods
 
@@ -71,6 +74,8 @@ Category deletion is a soft deactivation, and category lists hide deactivated ro
 | DELETE | `/api/v1/transactions/{transaction_id}` | hard delete owned transaction |
 
 `currency` defaults to the profile currency. Expenses and income require a category of the matching type (a `starting_balance` does not), `payment_method` is optional, and `payee_name` finds or creates a payee. Changing `transaction_type`, `category_id`, or `payee_id` on `PATCH` must leave the category (and payee) type equal to the transaction type, otherwise the API returns 400. Lists are ordered by date, then creation time, then id, so offset pages never duplicate or skip rows.
+
+`POST` takes an optional `idempotency_key` (at most 128 characters) so a client that timed out can retry safely: a repeat of a key this user already used returns the first transaction (HTTP 200, same `id`) instead of creating another. Keys are unique per user, so two users may use the same one, and a request without a key (or with a blank one) is always a new transaction. Clients send a fresh key for each new intent and reuse it only to retry the same one. Goals and the other `POST`s have no such key.
 
 GET filters are `category_id`, `payee_id`, `transaction_type`, `cleared_status`, `date_from`, `date_to`, `period`, `limit` (1 to 100, default 20), and `offset`. `transaction_type` accepts `expense`, `income`, and `starting_balance`; `period` accepts `this_month` and `last_month`.
 
@@ -116,7 +121,9 @@ Analytics returns integer minor units. Expense and income totals exclude startin
 - `GET /api/v1/goals?status=active|completed|archived`
 - `POST /api/v1/goals`
 - `PATCH /api/v1/goals/{goal_id}`
-- `GET /api/v1/dashboard?period=this_month|last_month`
+- `GET /api/v1/dashboard?period=this_month|last_month&today=YYYY-MM-DD`
+
+`today` is the caller's local calendar date. "This month" and "last month", the month name and `days_remaining_in_month` are worked out from it, because near a month boundary the server's UTC date can be a day ahead of or behind the phone. Without it the server's UTC date is used (older clients keep working). A date whose year is outside 2020 to 2100 returns 400 and a malformed one 422.
 
 Goals support optional category linkage and manual progress. Reaching `target_amount` marks the goal completed, and dropping below it reactivates it. An explicit `status` is respected (so a completed goal can be archived), and an archived goal is never changed by progress updates.
 

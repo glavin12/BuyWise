@@ -2,6 +2,7 @@ import { isAuthRetryableFetchError } from "@supabase/supabase-js";
 
 import { ApiError, isNotFound, MSG, stopsBatch, userMessage } from "./errors";
 import { supabase } from "./supabase";
+import { TIMED_OUT, withTimeout } from "./timeout";
 import type {
   Budget,
   BudgetCreate,
@@ -48,9 +49,15 @@ export { ApiError, isNotFound, stopsBatch, userMessage };
 const CRUD_TIMEOUT_MS = 15_000; // C4
 const CHAT_TIMEOUT_MS = 60_000; // AI1: Groq tool chains can legitimately take 30s+
 
+const TOKEN_TIMEOUT_MS = 10_000; // a stalled refresh must not hang every request behind it
+
 async function currentToken(): Promise<string | null> {
   // getSession() refreshes an expired access token on its own (L3).
-  const { data } = await supabase.auth.getSession();
+  const result = await withTimeout(supabase.auth.getSession(), TOKEN_TIMEOUT_MS);
+  if (result === TIMED_OUT) throw new ApiError(0, MSG.timeout);
+  const { data, error } = result;
+  // A refresh that failed on the network is not "signed out": status 0 is retried once, a 401 never is.
+  if (!data.session && error && isAuthRetryableFetchError(error)) throw new ApiError(0, MSG.network);
   return data.session?.access_token ?? null;
 }
 
@@ -145,6 +152,7 @@ async function fetchAPI<T>(
   }
 
   if (res.status < 200 || res.status >= 300) throw errorFor(res);
+  if (res.status === 204) return undefined as T; // no body (DELETE /profile)
 
   try {
     return JSON.parse(res.body) as T;
@@ -186,9 +194,13 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
+  /** Permanently deletes the account: all the user's data, then their login. The caller signs out afterwards. */
+  deleteAccount: () => fetchAPI<void>("/api/v1/profile", { method: "DELETE" }),
+
   // ── Dashboard ──────────────────────────────────────────────────
-  getDashboard: (period = "this_month") =>
-    fetchAPI<DashboardData>(`/api/v1/dashboard?period=${period}`),
+  /** `today` is the phone's local date: the server's UTC date can be a day off near a month boundary. */
+  getDashboard: (period = "this_month", today?: string) =>
+    fetchAPI<DashboardData>(`/api/v1/dashboard?period=${period}${today ? `&today=${today}` : ""}`),
 
   // ── Categories ─────────────────────────────────────────────────
   listCategories: (type?: "expense" | "income") => {

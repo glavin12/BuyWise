@@ -120,6 +120,15 @@ test("toolSummary: add_transaction", () => {
   );
 });
 
+test("toolSummary formats the amounts that carry no currency in the profile's currency", () => {
+  const budget = call("set_category_budget", { category: "Food", month: 9, year: 2026, budgeted_amount: 500000, display_budgeted_amount: 5000 });
+  assert.equal(toolSummary(budget), "Budget for Food set to ₹5,000"); // INR unless told otherwise
+  assert.equal(toolSummary(budget, "USD"), "Budget for Food set to $5,000");
+  // add_transaction reports its own currency, which wins over the profile's.
+  const added = call("add_transaction", { transaction_type: "expense", category: "Food", display_amount: 12, currency: "EUR" });
+  assert.equal(toolSummary(added, "USD"), "Added 12 € to Food"); // de-DE puts a no-break space before the €
+});
+
 test("toolSummary: set_category_budget, add_goal, update_goal_progress", () => {
   assert.equal(
     toolSummary(call("set_category_budget", { category: "Food", month: 9, year: 2026, budgeted_amount: 500000, display_budgeted_amount: 5000 })),
