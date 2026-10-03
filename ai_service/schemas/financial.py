@@ -4,7 +4,7 @@ from datetime import date, datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import AliasPath, BaseModel, ConfigDict, Field, computed_field
+from pydantic import AliasPath, BaseModel, ConfigDict, Field, computed_field, field_validator
 
 from ai_service.utils.financial import minor_to_amount
 
@@ -96,6 +96,18 @@ class TransactionCreate(BaseModel):
     description: str | None = Field(default=None, max_length=500)
     notes: str | None = Field(default=None, max_length=2000)
     cleared_status: ClearedStatus = "pending"
+    idempotency_key: str | None = Field(
+        default=None,
+        max_length=128,
+        description="Client-generated key for exactly-once creates. A request that repeats a key this user "
+        "already used returns that first transaction instead of creating another.",
+    )
+
+    @field_validator("idempotency_key", mode="before")
+    @classmethod
+    def _blank_key_is_missing(cls, value: object) -> object:
+        """Treat a blank key from a form/UI client as no key."""
+        return None if isinstance(value, str) and not value.strip() else value
 
 
 class TransactionUpdate(BaseModel):

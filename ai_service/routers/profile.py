@@ -6,6 +6,11 @@ from ai_service.core.config import get_settings
 from ai_service.core.rate_limit import limiter
 from ai_service.db.session import get_async_session
 from ai_service.schemas.profile import ProfileRead, ProfileUpdate
+from ai_service.services.account_service import (
+    AccountDeletionNotConfiguredError,
+    AccountService,
+    AuthUserDeletionError,
+)
 from ai_service.services.profile_service import ProfileService
 
 router = APIRouter(prefix="/api/v1", tags=["profile"])
@@ -63,3 +68,26 @@ async def upsert_profile(
     else:
         profile = await service.update_profile(current_user.id, **data)
     return profile
+
+
+@router.delete("/profile", status_code=204)
+@limiter.limit(settings.PROFILE_RATE_LIMIT)
+async def delete_account(
+    request: Request,
+    response: Response,
+    session: AsyncSession = Depends(get_async_session),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    """Permanently delete the authenticated user's account: all their data, then their Supabase login.
+
+    The user is always ``current_user``; nothing in the path or body picks who is deleted. Repeating the
+    request after a 502 is safe and finishes the job.
+    """
+    try:
+        await AccountService(session).delete_account(current_user.id)
+    except AccountDeletionNotConfiguredError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except AuthUserDeletionError as exc:
+        raise HTTPException(
+            status_code=502, detail="Your data was deleted but your login could not be removed. Please try again."
+        ) from exc

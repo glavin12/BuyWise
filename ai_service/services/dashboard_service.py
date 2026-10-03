@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import date
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,11 +20,11 @@ class DashboardService:
         self.budgets = BudgetService(session)
         self.transactions = TransactionRepository(session)
 
-    async def get_dashboard(self, user_id: uuid.UUID, *, period: str = "this_month") -> dict:
-        window = resolve_period(period)
+    async def get_dashboard(self, user_id: uuid.UUID, *, period: str = "this_month", today: date | None = None) -> dict:
+        window = resolve_period(period, today)
         profile = await self.profiles.get(user_id)
         summary = await self.analytics.monthly_summary(user_id, window.month, window.year)
-        budget = await self.budgets.budget_status(user_id, period=period)
+        budget = await self.budgets.budget_status(user_id, period=period, today=today)
         current_balance = await self.transactions.get_balance(user_id)
         unassigned = summary["income"] - budget["total_budgeted"]
         return {
@@ -47,5 +48,5 @@ class DashboardService:
             "unassigned": unassigned,
             "display_unassigned": minor_to_amount(unassigned),
             "has_budget": budget["has_budget"],
-            "days_remaining_in_month": days_remaining_in_month(),
+            "days_remaining_in_month": days_remaining_in_month(today),
         }

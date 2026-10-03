@@ -51,9 +51,12 @@ The ledger source of truth:
 | `description`, `notes` | text | nullable |
 | `cleared_status` | text | `pending` or `cleared` |
 | `parent_transaction_id` | uuid | nullable self-FK `CASCADE` for future splits |
+| `idempotency_key` | text | nullable; client key for exactly-once creates |
 | timestamps | timestamptz | required |
 
 Every row except a `starting_balance` requires a category (`transactions_category_required_check`), and `payment_method` is limited to the five values above (`transactions_payment_method_check`). Split child rows (`parent_transaction_id` set) are excluded from the balance and from analytical aggregates; split creation is not exposed yet.
+
+A partial unique index `ix_transactions_user_idempotency_key` on `(user_id, idempotency_key)`, limited to rows where the key is non-null, makes `POST /transactions` exactly-once per user: a conflicting insert is caught in a savepoint and the first row is returned (migration `004`).
 
 Indexes cover `user_id`, `category_id`, `payee_id`, `transaction_date`, `(user_id, transaction_date)`, `(user_id, transaction_type)`, and `parent_transaction_id`.
 
@@ -83,6 +86,10 @@ The Supabase Data API (`/rest/v1/...`) is not a supported access path: the Supab
 select has_table_privilege('authenticated', 'public.transactions', 'INSERT');  -- must be false, for every app table
 ```
 
+## Account Deletion
+
+`DELETE /api/v1/profile` (`AccountRepository.delete_user_data`) clears the user's rows child to parent, in one transaction: `messages`, `conversations` (it has no foreign key to `profiles`), `transactions`, `budget_entries`, `goals`, `payees`, `categories`, then `profiles`. The foreign keys would cascade from `profiles`, but `transactions.category_id` is `RESTRICT` and the SQLite test database enforces no foreign keys, so the order is explicit. Soft-deleted messages and conversations are removed too.
+
 ## Migrations
 
 | revision | description |
@@ -90,6 +97,7 @@ select has_table_privilege('authenticated', 'public.transactions', 'INSERT');  -
 | `001` | complete fresh schema, indexes, checks, enums, and RLS |
 | `002` | `payees.type`, plus backfill of default categories and payees |
 | `003` | revoke `anon`/`authenticated` table privileges; per-user messages idempotency index |
+| `004` | `transactions.idempotency_key` and its per-user partial unique index (additive: one nullable column) |
 
 ```bash
 uv run alembic heads

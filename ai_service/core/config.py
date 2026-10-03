@@ -38,6 +38,10 @@ class Settings(BaseSettings):
     SUPABASE_JWT_AUDIENCE: str = "authenticated"
     SUPABASE_JWT_ALGORITHMS: str = "ES256,RS256"  # asymmetric algs only; PyJWKClient selects key by kid
     JWKS_CACHE_TTL_SECONDS: int = 300  # keep <= Supabase's 10-min edge cache
+    # SECRET. Only for DELETE /api/v1/profile, which deletes the user's Supabase Auth login through the Admin
+    # API. The legacy service_role key or a new sb_secret_... key. Set it on the backend host only: never in
+    # mobile/ or frontend/, never committed, never logged. Blank => account deletion answers 503 and deletes nothing.
+    SUPABASE_SERVICE_ROLE_KEY: str = ""
 
     # Rate Limiting (in-memory, per-user via JWT hash / per-IP fallback)
     # Set RATE_LIMIT_ENABLED=false to disable all rate limiting (e.g. testing).

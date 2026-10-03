@@ -1,3 +1,4 @@
+from datetime import date
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
@@ -27,10 +28,18 @@ async def get_dashboard(
     request: Request,
     response: Response,
     period: str = Query("this_month", pattern="^(this_month|last_month)$"),
+    today: date | None = Query(
+        None,
+        description="The caller's local calendar date (YYYY-MM-DD); defaults to the server's UTC date. "
+        "Near a month boundary the two differ, so clients send it.",
+    ),
     session: AsyncSession = Depends(get_async_session),
     current_user: CurrentUser = Depends(get_current_user),
 ):
-    return await DashboardService(session).get_dashboard(current_user.id, period=period)
+    try:
+        return await DashboardService(session).get_dashboard(current_user.id, period=period, today=today)
+    except ValueError as exc:  # a date outside the supported 2020-2100 years
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.get("/goals", response_model=GoalsListResponse)

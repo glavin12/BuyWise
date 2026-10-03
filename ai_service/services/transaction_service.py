@@ -71,6 +71,7 @@ class TransactionService:
         description: str | None = None,
         notes: str | None = None,
         cleared_status: str = "pending",
+        idempotency_key: str | None = None,
     ) -> dict:
         self._validate_amount(amount)
         if transaction_type not in {"expense", "income", "starting_balance"}:
@@ -97,6 +98,7 @@ class TransactionService:
             description=description,
             notes=notes,
             cleared_status=cleared_status,
+            idempotency_key=idempotency_key,
         )
         await self.session.commit()
         result = await self.transactions.get(user_id, transaction.id)

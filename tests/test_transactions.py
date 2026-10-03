@@ -100,3 +100,74 @@ async def test_add_transaction_rejects_payee_type_mismatch(session):
             amount=100,
             transaction_type="income",
         )
+
+
+async def _add(service, user_id, category, **extra):
+    return await service.add_transaction(user_id, category_id=category.id, amount=1250, transaction_type="expense", **extra)
+
+
+@pytest.mark.asyncio
+async def test_repeating_an_idempotency_key_returns_the_first_transaction(session):
+    user_id = uuid.uuid4()
+    await ProfileService(session).create_profile(user_id)
+    category = await CategoryRepository(session).find_by_name(user_id, "Food", "expense")
+    service = TransactionService(session)
+
+    first = await _add(service, user_id, category, idempotency_key="retry-1")
+    again = await _add(service, user_id, category, idempotency_key="retry-1")
+
+    assert again["id"] == first["id"]
+    assert (await service.list_transactions(user_id))["total"] == 1
+    # The session survives the conflict: the next write works.
+    await _add(service, user_id, category, idempotency_key="retry-2")
+    assert (await service.list_transactions(user_id))["total"] == 2
+
+
+@pytest.mark.asyncio
+async def test_the_same_idempotency_key_is_separate_for_each_user(session):
+    service = TransactionService(session)
+    ids = []
+    for _ in range(2):
+        user_id = uuid.uuid4()
+        await ProfileService(session).create_profile(user_id)
+        category = await CategoryRepository(session).find_by_name(user_id, "Food", "expense")
+        created = await _add(service, user_id, category, idempotency_key="shared-key")
+        assert (await service.list_transactions(user_id))["total"] == 1
+        ids.append(created["id"])
+    assert ids[0] != ids[1]
+
+
+@pytest.mark.asyncio
+async def test_transactions_without_a_key_are_never_merged(session):
+    user_id = uuid.uuid4()
+    await ProfileService(session).create_profile(user_id)
+    category = await CategoryRepository(session).find_by_name(user_id, "Food", "expense")
+    service = TransactionService(session)
+
+    first = await _add(service, user_id, category)
+    second = await _add(service, user_id, category)
+
+    assert first["id"] != second["id"]
+    assert (await service.list_transactions(user_id))["total"] == 2
+
+
+@pytest.mark.asyncio
+async def test_post_transactions_is_idempotent_and_ignores_a_blank_key(api_client, session):
+    client, user_id = api_client
+    await ProfileService(session).create_profile(user_id)
+    category = await CategoryRepository(session).find_by_name(user_id, "Food", "expense")
+    body = {"category_id": str(category.id), "amount": 1250, "transaction_type": "expense"}
+
+    first = await client.post("/api/v1/transactions", json={**body, "idempotency_key": "tap-1"})
+    again = await client.post("/api/v1/transactions", json={**body, "idempotency_key": "tap-1"})
+    assert first.status_code == again.status_code == 200
+    assert again.json()["id"] == first.json()["id"]
+
+    # A blank key means "no key": two of those are two transactions.
+    blank_a = await client.post("/api/v1/transactions", json={**body, "idempotency_key": "  "})
+    blank_b = await client.post("/api/v1/transactions", json={**body, "idempotency_key": ""})
+    assert blank_a.json()["id"] != blank_b.json()["id"]
+
+    listed = (await client.get("/api/v1/transactions")).json()
+    assert listed["total"] == 3
+    assert (await client.post("/api/v1/transactions", json={**body, "idempotency_key": "x" * 129})).status_code == 422

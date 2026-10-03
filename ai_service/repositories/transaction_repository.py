@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from datetime import date
 
 from sqlalchemy import case, func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -32,11 +33,34 @@ class TransactionRepository:
         self.session = session
 
     async def create(self, user_id: uuid.UUID, **fields) -> Transaction:
+        """Insert a transaction.
+
+        With an ``idempotency_key``, a repeat of a key this user already used (a client retry after a
+        timeout, even one racing the first request) is caught by the unique index and the first row
+        is returned instead. The insert runs in a savepoint so that conflict does not fail the whole
+        transaction, as in ``MessageRepository.create``.
+        """
+        key = fields.get("idempotency_key")
         transaction = Transaction(user_id=user_id, **fields)
-        self.session.add(transaction)
-        await self.session.flush()
+        try:
+            async with self.session.begin_nested():
+                self.session.add(transaction)
+                await self.session.flush()
+        except IntegrityError:
+            # Only a repeated key is recoverable; any other integrity error must surface.
+            existing = await self.get_by_idempotency_key(user_id, key) if key else None
+            if existing is None:
+                raise
+            return existing
         await self.session.refresh(transaction)
         return transaction
+
+    async def get_by_idempotency_key(self, user_id: uuid.UUID, idempotency_key: str) -> Transaction | None:
+        return await self.session.scalar(
+            select(Transaction)
+            .options(selectinload(Transaction.category), selectinload(Transaction.payee))
+            .where(Transaction.user_id == user_id, Transaction.idempotency_key == idempotency_key)
+        )
 
     async def get(self, user_id: uuid.UUID, transaction_id: uuid.UUID) -> Transaction | None:
         return await self.session.scalar(
