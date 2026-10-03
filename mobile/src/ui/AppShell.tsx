@@ -1,10 +1,11 @@
 import { WifiOff } from "lucide-react-native";
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { StyleSheet, Text as RNText, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useOnline } from "@/lib/network";
 
+import { announce } from "./a11y";
 import { ToastHost } from "./toast";
 import { colors, fonts } from "./tokens";
 
@@ -12,6 +13,9 @@ import { colors, fonts } from "./tokens";
 function OfflineBanner() {
   const online = useOnline();
   const insets = useSafeAreaInsets();
+  useEffect(() => {
+    if (!online) announce("No internet connection");
+  }, [online]);
   if (online) return null;
 
   // Tomato is the design's alert colour, and ink text on it is readable under light or dark status icons.

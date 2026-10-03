@@ -1,7 +1,8 @@
 import type { LucideIcon } from "lucide-react-native";
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { StyleSheet, Text as RNText, View, type StyleProp, type ViewStyle } from "react-native";
 
+import { announce } from "./a11y";
 import { Chip, InlineChip, type Hue } from "./Chips";
 import { DrawnFill, useCountUp } from "./motion";
 import { PressableScale } from "./PressableScale";
@@ -145,11 +146,10 @@ const NOTE = { muted: colors.muted, cream: extra.mutedOnCream, error: extra.erro
 
 /** A line of small mono text ("47 transactions found"). `cream` / `error` are for a cream sheet. */
 export function Note({ children, tone = "muted" }: { children: string; tone?: keyof typeof NOTE }) {
-  return (
-    <RNText style={[styles.note, { color: NOTE[tone] }]} accessibilityLiveRegion={tone === "error" ? "polite" : undefined}>
-      {children}
-    </RNText>
-  );
+  useEffect(() => {
+    if (tone === "error") announce(children);
+  }, [tone, children]);
+  return <RNText style={[styles.note, { color: NOTE[tone] }]}>{children}</RNText>;
 }
 
 /** Ink progress bar on a colour card (it draws from 0 on mount), with an optional ink tooltip ("79%") above the fill's end. */

@@ -28,11 +28,15 @@ function rowBottom(insetBottom: number) {
   return Math.max(20, insetBottom);
 }
 
+// iOS moves the keyboard and KeyboardAvoidingView on the Will events; Android only sends Did.
+const KEYBOARD_SHOW = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+const KEYBOARD_HIDE = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+
 function useKeyboardVisible() {
   const [visible, setVisible] = useState(Keyboard.isVisible());
   useEffect(() => {
-    const show = Keyboard.addListener("keyboardDidShow", () => setVisible(true));
-    const hide = Keyboard.addListener("keyboardDidHide", () => setVisible(false));
+    const show = Keyboard.addListener(KEYBOARD_SHOW, () => setVisible(true));
+    const hide = Keyboard.addListener(KEYBOARD_HIDE, () => setVisible(false));
     return () => {
       show.remove();
       hide.remove();

@@ -36,9 +36,12 @@ export function sanitizeAmountInput(text: string): string {
   if (s.includes(".") && s.includes(",")) {
     // "1,234.50" or "1.234,50": the last separator is the decimal point.
     const thousands = s.lastIndexOf(".") > s.lastIndexOf(",") ? "," : ".";
-    s = s.split(thousands).join("");
+    s = s.split(thousands).join("").replace(/,/g, ".");
+  } else if (s.includes(",")) {
+    // Commas only. One comma with 0-2 digits after it ("12,50", "12,", mid-typing) is the decimal point;
+    // anything else ("12,000", "1,50,000", "1,234,567") is digit grouping and is dropped.
+    s = /^\d*,\d{0,2}$/.test(s) ? s.replace(",", ".") : s.replace(/,/g, "");
   }
-  s = s.replace(/,/g, "."); // a lone "," is the decimal point
 
   const [whole = "", ...rest] = s.split(".");
   const integer = whole.slice(0, MAX_INTEGER_DIGITS);

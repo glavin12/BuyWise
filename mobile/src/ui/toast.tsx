@@ -2,6 +2,7 @@ import { useSyncExternalStore } from "react";
 import { StyleSheet, Text as RNText, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { announce } from "./a11y";
 import { colors, extra, fonts, radius, space } from "./tokens";
 
 // One message at a time. Any screen calls showToast(); <ToastHost /> in the app
@@ -19,6 +20,7 @@ function publish(next: string | null) {
 export function showToast(text: string) {
   clearTimeout(timer);
   publish(text);
+  announce(text);
   timer = setTimeout(() => publish(null), SHOW_MS);
 }
 
@@ -37,7 +39,7 @@ export function ToastHost() {
 
   return (
     <View pointerEvents="none" style={[styles.wrap, { bottom: insets.bottom + 88 }]}>
-      <View accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.toast}>
+      <View accessibilityRole="alert" style={styles.toast}>
         <RNText style={styles.text}>{text}</RNText>
       </View>
     </View>

@@ -1,6 +1,8 @@
 import { CircleAlert, Info, TriangleAlert } from "lucide-react-native";
+import { useEffect } from "react";
 import { StyleSheet, Text as RNText, View } from "react-native";
 
+import { announce } from "./a11y";
 import { IconTile } from "./Blocks";
 import { colors, radius, type } from "./tokens";
 
@@ -20,6 +22,9 @@ const LOOK = {
 export function Banner({ tone, message, surface = "dark" }: { tone: keyof typeof TONE; message: string; surface?: keyof typeof LOOK }) {
   const { icon, hue } = TONE[tone];
   const look = LOOK[surface];
+  useEffect(() => {
+    announce(message);
+  }, [message]);
   return (
     <View accessibilityRole="alert" style={[styles.banner, { backgroundColor: look.fill }]}>
       <IconTile icon={icon} color={hue} size={30} />

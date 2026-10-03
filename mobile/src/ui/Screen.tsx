@@ -22,7 +22,7 @@ export type ScreenProps = {
   keyboard?: boolean;
   /** Tab roots: content clears the floating tab bar (and scrolls under its fade) instead of the bottom inset. */
   tabBar?: boolean;
-  /** The background (charcoal unless told otherwise). `screen` and `peri` get a light status bar. */
+  /** The background (charcoal unless told otherwise). `screen` and `peri` get a light status bar, `sage` a dark one; `cream` sheets keep the style of the screen under them. */
   surface?: "screen" | "sage" | "peri" | "cream";
   /** A floating button (`Fab`) over the content; the content gets room to scroll clear of it. */
   fab?: ReactNode;
@@ -76,7 +76,7 @@ export function Screen({
 
   const screen = (
     <View style={[styles.root, frame, { backgroundColor: SURFACE[surface] }]}>
-      {(surface === "screen" || surface === "peri") && <StatusBar style="light" />}
+      {surface === "sage" ? <StatusBar style="dark" /> : surface !== "cream" ? <StatusBar style="light" /> : null}
       {body}
       {fab}
     </View>

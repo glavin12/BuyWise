@@ -38,7 +38,7 @@ export function EntryAmount({
         autoCorrect={false}
         autoFocus={autoFocus}
         placeholder="0"
-        placeholderTextColor={extra.dashedOnCream}
+        placeholderTextColor={extra.placeholderOnCream}
         accessibilityLabel={label}
         selectionColor={colors.tomato}
         cursorColor={colors.tomato}

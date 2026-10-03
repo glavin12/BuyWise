@@ -63,6 +63,15 @@ test("sanitizeAmountInput keeps pasted text inside what parseAmountToMinor accep
   assert.equal(sanitizeAmountInput("1e5"), "15");
   assert.equal(sanitizeAmountInput("0,5"), "0.5");
   assert.equal(sanitizeAmountInput("12345678901234"), "1234567890"); // 10 digits max
+  // A lone comma: the decimal point with 0-2 digits after it, digit grouping otherwise.
+  assert.equal(sanitizeAmountInput("12,50"), "12.50");
+  assert.equal(sanitizeAmountInput("12,5"), "12.5");
+  assert.equal(sanitizeAmountInput("12,"), "12.");
+  assert.equal(sanitizeAmountInput(",5"), ".5");
+  assert.equal(sanitizeAmountInput("12,000"), "12000");
+  assert.equal(sanitizeAmountInput("1,50,000"), "150000"); // lakh grouping
+  assert.equal(sanitizeAmountInput("1,234,567"), "1234567");
+  assert.equal(sanitizeAmountInput("12,000.50"), "12000.50");
   assert.equal(sanitizeAmountInput(""), "");
   for (const pasted of ["₹1,234.50", "1.234,50", "12a.3b4c5", "--1e5", "9,9,9", "١٢٣"]) {
     const clean = sanitizeAmountInput(pasted);

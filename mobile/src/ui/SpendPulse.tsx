@@ -2,14 +2,12 @@ import { useState } from "react";
 import { StyleSheet, Text as RNText, View } from "react-native";
 import Svg, { Circle, Defs, Line, Path, Pattern, Rect } from "react-native-svg";
 
-import { colors, fonts } from "./tokens";
+import { colors, extra, fonts } from "./tokens";
 
 // The Spend Pulse card's two drawings (DESIGN.md §3 `PulseBubbles`, `AreaChart`), hand-drawn with
 // react-native-svg; values and sizes from design/reference-html/Dashboard.html. Both lay the week
 // out in 7 equal columns so each bubble sits over its point on the chart.
 
-const WHITE = "#FFFFFF";
-const PERI_TEXT = "#DAD7FC"; // weekday labels on the peri card
 const FUTURE = "rgba(255,255,255,0.55)";
 const HEX = "rgba(255,255,255,0.28)";
 
@@ -95,13 +93,13 @@ export function AreaChart({ values, upto, focus, tooltip, label }: { values: num
 const styles = StyleSheet.create({
   row: { flexDirection: "row" },
   col: { flex: 1, alignItems: "center", gap: 6 },
-  day: { fontFamily: fonts.mono, fontSize: 10, color: PERI_TEXT },
-  dayToday: { fontFamily: fonts.monoBold, color: WHITE },
+  day: { fontFamily: fonts.mono, fontSize: 10, color: extra.labelOnPeri },
+  dayToday: { fontFamily: fonts.monoBold, color: extra.whiteOnPeri },
   bubble: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center" },
   bubblePast: { backgroundColor: colors.peri2 },
   bubbleToday: { backgroundColor: colors.cream },
   bubbleFuture: { borderWidth: 1.5, borderStyle: "dashed", borderColor: FUTURE },
-  pct: { fontFamily: fonts.mono, fontSize: 10, color: WHITE },
+  pct: { fontFamily: fonts.mono, fontSize: 10, color: extra.whiteOnPeri },
   pctToday: { fontFamily: fonts.monoBold, color: colors.ink },
   chart: { height: HEIGHT, marginTop: 8 },
   tipWrap: { position: "absolute", top: 0, width: TIP_W, alignItems: "center" },

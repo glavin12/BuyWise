@@ -16,13 +16,17 @@ const CHIP = {
   card: { bg: colors.card, fg: colors.text, border: undefined },
   lavender: { bg: colors.lavender, fg: colors.ink, border: undefined }, // category tag
   translucent: { bg: "transparent", fg: colors.text, border: undefined }, // legend on a colour card
-  peri: { bg: colors.peri2, fg: "#FFFFFF", border: undefined }, // dropdown on the peri card
+  peri: { bg: colors.peri2, fg: colors.ink, border: undefined }, // dropdown on the peri card (ink: white on peri2 is 3.1:1)
   outlined: { bg: "transparent", fg: colors.ink, border: colors.ink }, // on cream / colour
   outlinedDark: { bg: "transparent", fg: colors.text, border: colors.line }, // on charcoal
   mint: { bg: colors.mint, fg: colors.ink, border: undefined }, // QuickAdd suggestion
   creamLine: { bg: colors.cream, fg: colors.ink, border: colors.ink }, // Goals corner chips
 } as const;
 type ChipVariant = keyof typeof CHIP;
+
+// Chips are ~28 dp tall: widen the touch area to 44 dp vertically only, so neighbours' areas do not overlap.
+const CHIP_HIT_SLOP = { top: 8, bottom: 8, left: 2, right: 2 } as const;
+const TOGGLE_HIT_SLOP = { top: 7, bottom: 7 } as const; // the sage toggle's items are 30 dp tall
 
 type ChipProps = {
   label: string;
@@ -84,7 +88,7 @@ function ChipFrame({ label, variant = "cream", dot, icon: Icon, onPress, selecte
   ];
   if (!onPress) return <View style={style}>{body}</View>;
   return (
-    <PressableScale onPress={onPress} accessibilityLabel={accessibilityLabel ?? label} accessibilityState={{ selected }} style={style}>
+    <PressableScale onPress={onPress} accessibilityLabel={accessibilityLabel ?? label} accessibilityState={{ selected }} hitSlop={CHIP_HIT_SLOP} style={style}>
       {body}
     </PressableScale>
   );
@@ -121,6 +125,7 @@ export function Toggle<T extends string>({
             accessibilityRole="tab"
             accessibilityLabel={option.label}
             accessibilityState={{ selected: on }}
+            hitSlop={TOGGLE_HIT_SLOP}
             style={[styles.toggleItem, { height: t.height, backgroundColor: on ? t.on : "transparent" }, fill ? styles.toggleFill : styles.toggleHug]}
           >
             <RNText style={{ fontFamily: on ? fonts.monoBold : t.offFont, fontSize: t.size, color: on ? t.onFg : t.offFg }}>{option.label}</RNText>
