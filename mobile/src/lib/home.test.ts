@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { balanceSentence, compactMoney, dailyBudget, dailySpend, pulsePercents, splitFraction, topCategories, weekOf, wholeIfRound } from "./home.ts";
-import type { DashboardData, Transaction } from "./types";
+import { compactMoney, dailyBudget, dailySpend, monthFigures, pulsePercents, splitFraction, topCategories, weekOf, wholeIfRound } from "./home.ts";
+import type { Transaction } from "./types";
 
 function tx(date: string, amount: number, extra: Partial<Transaction> = {}): Transaction {
   return {
@@ -74,18 +74,13 @@ test("money strings", () => {
   assert.equal(compactMoney(150000000, "USD"), "$1.5M");
 });
 
-test("balanceSentence covers each budget state and pluralises goals", () => {
-  const base = {
-    net: 1786000, display_net: 17860, has_budget: true, unassigned: 486000, display_unassigned: 4860,
-    remaining_budget: 0, display_remaining_budget: 0, active_goals_count: 3,
-  } as DashboardData;
-  const money = (v: number) => `₹${v}`;
-  assert.equal(
-    balanceSentence(base, "this month", money),
-    "Up {mint:+₹17860} this month. {hi@budget:₹4860} is ready to assign. {dark@goals:3 goals} in progress.",
-  );
-  const over = { ...base, net: -100, display_net: -1, unassigned: 0, remaining_budget: -500, display_remaining_budget: -5, active_goals_count: 1 };
-  assert.equal(balanceSentence(over, "last month", money), "Down {coral:−₹1} last month. {coral@budget:₹5} over budget. {dark@goals:1 goal} in progress.");
-  const none = { ...base, net: 0, has_budget: false, active_goals_count: 0 };
-  assert.equal(balanceSentence(none, "this month", money), "Even this month. No budget yet: {hi@budget:set one}. No goals yet: {dark@goals:add one}.");
+test("monthFigures: In in mint, Out plain, Net signed and coloured by its direction", () => {
+  const money = (minor: number) => `₹${minor / 100}`;
+  assert.deepEqual(monthFigures({ total_income: 5000000, total_spent: 3214000, net: 1786000 }, "Oct", money), [
+    { label: "In · Oct", value: "₹50000", tone: "mint" },
+    { label: "Out", value: "₹32140", tone: "text" },
+    { label: "Net", value: "+₹17860", tone: "mint" },
+  ]);
+  assert.deepEqual(monthFigures({ total_income: 0, total_spent: 50000, net: -50000 }, "Oct", money)[2], { label: "Net", value: "−₹500", tone: "tomato" });
+  assert.deepEqual(monthFigures({ total_income: 0, total_spent: 0, net: 0 }, "Oct", money)[2], { label: "Net", value: "₹0", tone: "text" });
 });

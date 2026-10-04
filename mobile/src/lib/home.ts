@@ -1,7 +1,7 @@
 // Home screen maths as pure functions: the Spend Pulse week (daily expense totals,
 // their % of the daily budget, the top categories) and the money strings the design
 // shows (a hero amount split from its fraction, compact tile amounts, the balance
-// sentence). Type-only imports plus explicit .ts siblings so `npm test` can run it.
+// card's In / Out / Net). Type-only imports plus explicit .ts siblings so `npm test` can run it.
 // Every amount is an integer in minor units unless its name says `display`.
 
 import { parseDateOnly, shiftDays } from "./dates.ts";
@@ -92,29 +92,21 @@ export function compactMoney(minor: number, currency: string): string {
   return `${symbol}${Math.round(units)}`;
 }
 
+export type MonthFigure = { label: string; value: string; tone: "text" | "mint" | "tomato" };
+
 /**
- * The balance card's sentence as a RichText template: the month's net, then the budget
- * (ready to assign / over / left / none yet), then the goals. `@budget` and `@goals`
- * chips are links. `money` formats a display amount.
+ * The balance card's In / Out / Net for the dashboard's month (`month` is its short name, "Oct"). In is mint (money
+ * in); Net is signed, mint when up and tomato when down. `money` formats an unsigned amount in minor units.
  */
-export function balanceSentence(d: DashboardData, periodLabel: string, money: (display: number) => string): string {
-  const net =
-    d.net > 0
-      ? `Up {mint:+${money(d.display_net)}} ${periodLabel}.`
-      : d.net < 0
-        ? `Down {coral:−${money(Math.abs(d.display_net))}} ${periodLabel}.`
-        : `Even ${periodLabel}.`;
-
-  const budget = !d.has_budget
-    ? "No budget yet: {hi@budget:set one}."
-    : d.unassigned > 0
-      ? `{hi@budget:${money(d.display_unassigned)}} is ready to assign.`
-      : d.remaining_budget < 0
-        ? `{coral@budget:${money(Math.abs(d.display_remaining_budget))}} over budget.`
-        : `{hi@budget:${money(d.display_remaining_budget)}} left to spend.`;
-
-  const n = d.active_goals_count;
-  const goals = n > 0 ? `{dark@goals:${n} goal${n === 1 ? "" : "s"}} in progress.` : "No goals yet: {dark@goals:add one}.";
-
-  return `${net} ${budget} ${goals}`;
+export function monthFigures(
+  d: Pick<DashboardData, "total_income" | "total_spent" | "net">,
+  month: string,
+  money: (minor: number) => string,
+): MonthFigure[] {
+  const sign = d.net > 0 ? "+" : d.net < 0 ? "−" : "";
+  return [
+    { label: `In · ${month}`, value: money(d.total_income), tone: "mint" },
+    { label: "Out", value: money(d.total_spent), tone: "text" },
+    { label: "Net", value: `${sign}${money(Math.abs(d.net))}`, tone: d.net > 0 ? "mint" : d.net < 0 ? "tomato" : "text" },
+  ];
 }

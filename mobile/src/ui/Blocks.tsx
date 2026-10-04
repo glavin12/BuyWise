@@ -95,18 +95,55 @@ export function HeroAmount({
   );
 }
 
-/** A small uppercase section label with an optional link on the right ("RECENT … see all →"). `light`: on a cream sheet. */
-export function SectionLabel({ label, link, onLink, light }: { label: string; link?: string; onLink?: () => void; light?: boolean }) {
+/**
+ * A small uppercase section label with an optional link on the right ("RECENT … see all →"). `light`: on a cream sheet.
+ * `linkLabel` is the link's screen-reader name when its words alone are unclear.
+ */
+export function SectionLabel({
+  label,
+  link,
+  linkLabel,
+  onLink,
+  light,
+}: {
+  label: string;
+  link?: string;
+  linkLabel?: string;
+  onLink?: () => void;
+  light?: boolean;
+}) {
   return (
     <View style={styles.section}>
       <RNText accessibilityRole="header" style={[styles.sectionLabel, light && { color: extra.mutedOnCream }]}>
         {label}
       </RNText>
       {link && onLink && (
-        <PressableScale onPress={onLink} accessibilityRole="link" hitSlop={12}>
+        <PressableScale onPress={onLink} accessibilityRole="link" accessibilityLabel={linkLabel} hitSlop={12}>
           <RNText style={styles.sectionLink}>{link}</RNText>
         </PressableScale>
       )}
+    </View>
+  );
+}
+
+const FIGURE = { text: colors.text, mint: colors.mint, tomato: colors.tomato2 } as const; // tomato2: tomato text is hard to read on charcoal
+
+type Figure = { label: string; value: string; /** mint: money in or left; tomato: negative. */ tone?: keyof typeof FIGURE };
+
+/** Figures side by side under a hairline, each a small label over a Barlow number ("IN · OCT ₹50,000 | OUT ₹32,140 | NET +₹17,860"). */
+export function Figures({ items }: { items: Figure[] }) {
+  return (
+    <View style={styles.figures}>
+      {items.map((item) => (
+        <View key={item.label} style={styles.figure} accessible accessibilityLabel={`${item.label}: ${item.value}`}>
+          <RNText style={styles.figureLabel} numberOfLines={1}>
+            {item.label}
+          </RNText>
+          <RNText style={[styles.figureValue, { color: FIGURE[item.tone ?? "text"] }]} numberOfLines={1} adjustsFontSizeToFit>
+            {item.value}
+          </RNText>
+        </View>
+      ))}
     </View>
   );
 }
@@ -278,6 +315,10 @@ const styles = StyleSheet.create({
   section: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   sectionLabel: { ...type.label, color: colors.muted },
   sectionLink: { ...type.meta, color: colors.text },
+  figures: { flexDirection: "row", gap: 8, paddingTop: 12, borderTopWidth: 1, borderTopColor: colors.line },
+  figure: { flex: 1, minWidth: 0, gap: 4 },
+  figureLabel: { ...type.label, color: colors.muted },
+  figureValue: { ...type.rowAmount, lineHeight: 25 },
   mini: {
     flex: 1,
     minWidth: 0,

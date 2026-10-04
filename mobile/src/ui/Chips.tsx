@@ -47,24 +47,9 @@ export function Chip(props: ChipProps) {
   return <ChipFrame {...props} />;
 }
 
-/**
- * A dropdown trigger: a chip with a trailing chevron. `knob` is the Home month selector:
- * full width, 44 tall, the chevron inside an ink circle at the right.
- */
-export function Pill({ knob, ...props }: Omit<ChipProps, "dot" | "selected"> & { onPress: () => void; knob?: boolean }) {
-  if (!knob) return <ChipFrame {...props} chevron />;
-  const Icon = props.icon;
-  return (
-    <PressableScale onPress={props.onPress} accessibilityLabel={props.label} style={styles.knobPill}>
-      {Icon && <Icon size={16} color={colors.ink} strokeWidth={2.2} />}
-      <RNText style={styles.knobLabel} numberOfLines={1}>
-        {props.label}
-      </RNText>
-      <View style={styles.knob}>
-        <ChevronDown size={15} color={colors.cream} strokeWidth={2.6} />
-      </View>
-    </PressableScale>
-  );
+/** A dropdown trigger: a chip with a trailing chevron. */
+export function Pill(props: Omit<ChipProps, "dot" | "selected"> & { onPress: () => void }) {
+  return <ChipFrame {...props} chevron />;
 }
 
 function ChipFrame({ label, variant = "cream", dot, icon: Icon, onPress, selected, accessibilityLabel, chevron }: ChipProps & { chevron?: boolean }) {
@@ -212,25 +197,6 @@ const styles = StyleSheet.create({
   label: { ...type.chip, flexShrink: 1 },
   labelSmall: { fontSize: type.meta.fontSize },
   dot: { width: 8, height: 8, borderRadius: radius.pill },
-  knobPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    height: 44,
-    paddingLeft: 16,
-    paddingRight: 6,
-    borderRadius: radius.pill,
-    backgroundColor: colors.cream,
-  },
-  knobLabel: { flex: 1, fontFamily: fonts.monoBold, fontSize: 12.5, color: colors.ink },
-  knob: {
-    width: 32,
-    height: 32,
-    borderRadius: radius.pill,
-    backgroundColor: colors.ink,
-    alignItems: "center",
-    justifyContent: "center",
-  },
   toggle: { flexDirection: "row", borderRadius: radius.pill },
   toggleInline: { alignSelf: "flex-start" },
   toggleItem: { borderRadius: radius.pill, alignItems: "center", justifyContent: "center" },

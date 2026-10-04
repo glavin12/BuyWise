@@ -30,7 +30,7 @@ export { ChatThread } from "./ChatThread";
 export { ConversationHeader, ConversationRow, ConversationSkeletons } from "./ConversationRow";
 export { Markdown } from "./Markdown";
 // Design v3 kit (DESIGN.md §3). Screens pass lucide-react-native icons to it.
-export { DayHeader, GoalTile, HeroAmount, IconTile, Meter, MiniTile, Note, Panel, SectionLabel, Title, TxRow } from "./Blocks";
+export { DayHeader, Figures, GoalTile, HeroAmount, IconTile, Meter, MiniTile, Note, Panel, SectionLabel, Title, TxRow } from "./Blocks";
 export { CategoryChoice, CategoryTile, categoryTone, DashedChoice } from "./CategoryTile";
 export { AreaChart, PulseBubbles, type PulseDay } from "./SpendPulse";
 export { CircleButton, Fab, PillButton, PrimaryButton, SecondaryButton } from "./Buttons";

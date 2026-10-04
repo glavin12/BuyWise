@@ -1,17 +1,17 @@
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
-import { ArrowUpRight, Calendar, Plus, Search } from "lucide-react-native";
+import { ArrowUpRight, Plus, Search } from "lucide-react-native";
 import { useState } from "react";
 
 import { userMessage } from "@/lib/api";
-import { currentMonth, monthShift, todayLocal } from "@/lib/dates";
-import { formatCurrency, formatMinor, formatMonth } from "@/lib/format";
+import { currentMonth, todayLocal } from "@/lib/dates";
+import { formatCurrency, formatMinor, formatMonthShort } from "@/lib/format";
 import {
-  balanceSentence,
   compactMoney,
   currencySymbol,
   dailyBudget,
   dailySpend,
+  monthFigures,
   pulsePercents,
   splitFraction,
   topCategories,
@@ -19,14 +19,7 @@ import {
   wholeIfRound,
 } from "@/lib/home";
 import { sumMinor } from "@/lib/money";
-import {
-  dashboardQuery,
-  expensesInRangeQuery,
-  monthBudgetsQuery,
-  profileQuery,
-  recentTransactionsQuery,
-  type DashboardPeriod,
-} from "@/lib/queries";
+import { dashboardQuery, expensesInRangeQuery, monthBudgetsQuery, profileQuery, recentTransactionsQuery } from "@/lib/queries";
 import { escapeRich } from "@/lib/richText";
 import type { Transaction } from "@/lib/types";
 import { useRefetchStaleOnFocus } from "@/lib/useRefetchStaleOnFocus";
@@ -38,6 +31,7 @@ import {
   categoryTone,
   Chip,
   CircleButton,
+  Figures,
   HeroAmount,
   IconTile,
   Illustration,
@@ -56,15 +50,15 @@ import {
   Title,
 } from "@/ui";
 
-// Home (design/screens/02-home.png, values from design/reference-html/Dashboard.html):
-// greeting, month pill, balance card, Spend Pulse, three recent tiles.
+// Home (design/screens/02-home.png, values from design/reference-html/Dashboard.html, and the UX review of
+// 2026-10-04): greeting, balance card with this month's In / Out / Net and the goals, Spend Pulse, three
+// recent tiles. Home is about now: the design's this / last month pill is left out (Reports compares months).
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 export default function HomeScreen() {
   const router = useRouter();
   const { session } = useAuth();
-  const [period, setPeriod] = useState<DashboardPeriod>("this_month");
   const [weeksBack, setWeeksBack] = useState<0 | 1>(0);
   const [pickedCategory, setPickedCategory] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -73,7 +67,7 @@ export default function HomeScreen() {
   const now = currentMonth();
   const week = weekOf(today, weeksBack);
 
-  const dashboard = useQuery(dashboardQuery(period));
+  const dashboard = useQuery(dashboardQuery("this_month"));
   const recent = useQuery(recentTransactionsQuery);
   const profile = useQuery(profileQuery);
   const expenses = useQuery(expensesInRangeQuery({ date_from: week[0], date_to: week[6] }));
@@ -93,9 +87,9 @@ export default function HomeScreen() {
 
   const data = dashboard.data;
   const currency = data?.currency ?? profile.data?.currency ?? "INR";
-  const money = (display: number) => wholeIfRound(formatCurrency(display, currency));
+  const money = (minor: number) => wholeIfRound(formatMinor(minor, currency));
   const name = profile.data?.full_name?.trim().split(/\s+/)[0] || session?.user.email?.split("@")[0] || "there";
-  const shownMonth = period === "this_month" ? now : monthShift(now.month, now.year, -1);
+  const goals = data?.active_goals_count ?? 0;
 
   return (
     <Screen surface="screen" tabBar enter onRefresh={refresh} refreshing={refreshing}>
@@ -117,14 +111,6 @@ export default function HomeScreen() {
         </Row>
       </Row>
 
-      {/* The API only has this month and last month, so the dropdown flips between the two. */}
-      <Pill
-        knob
-        icon={Calendar}
-        label={formatMonth(shownMonth.month, shownMonth.year)}
-        onPress={() => setPeriod(period === "this_month" ? "last_month" : "this_month")}
-      />
-
       {/* C8: a background refresh failed but cached numbers exist, so keep showing them. */}
       {data && dashboard.isError ? <Banner tone="warning" message="Couldn't refresh. Showing your last known numbers." /> : null}
 
@@ -139,15 +125,13 @@ export default function HomeScreen() {
               <CircleButton icon={ArrowUpRight} size={38} label="Open reports" onPress={() => router.push("/reports")} />
             </Row>
             <HeroAmount to={data.display_current_balance} format={(n) => toParts(formatCurrency(n, currency))} />
-            <RichText
-              tone="card"
-              links={{
-                budget: () => router.navigate("/budget"),
-                goals: () => router.push(data.active_goals_count > 0 ? "/goals" : "/goals/new"),
-              }}
-            >
-              {balanceSentence(data, period === "this_month" ? "this month" : "last month", money)}
-            </RichText>
+            <Figures items={monthFigures(data, formatMonthShort(now.month, now.year, now.year), money)} />
+            <SectionLabel
+              label="Goals"
+              link={goals > 0 ? `${goals} in progress →` : "add one →"}
+              linkLabel={goals > 0 ? `Open your ${goals === 1 ? "goal" : `${goals} goals`}` : "Add a goal"}
+              onLink={() => router.push(goals > 0 ? "/goals" : "/goals/new")}
+            />
           </Stack>
         </Panel>
       ) : dashboard.isError ? (
@@ -166,9 +150,14 @@ export default function HomeScreen() {
               <Skeleton tone="dark" width={44} height={44} round="tile" />
               <Skeleton tone="dark" width={90} height={36} />
             </Row>
-            <Skeleton tone="dark" width="65%" height={40} />
-            <Skeleton tone="dark" height={14} />
-            <Skeleton tone="dark" width="70%" height={14} />
+            <Skeleton tone="dark" width="65%" height={44} />
+            <Row gap="sm">
+              {[0, 1, 2].map((i) => (
+                <Stack key={i} grow>
+                  <Skeleton tone="dark" height={40} />
+                </Stack>
+              ))}
+            </Row>
           </Stack>
         </Panel>
       )}

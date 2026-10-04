@@ -74,7 +74,6 @@ export default function KitScreen() {
       </Row>
 
       <Title size="cardTitle">Pills</Title>
-      <Pill knob icon={Calendar} label="September 2026" onPress={tap("month")} />
       <Row gap="sm">
         <Pill label="all" onPress={tap("all")} />
         <Pill label="Sep" variant="outlinedDark" onPress={tap("Sep")} />
