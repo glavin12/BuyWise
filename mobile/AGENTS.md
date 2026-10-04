@@ -54,7 +54,7 @@ No privacy policy or Terms pages exist yet (the owner hosts them and sets the tw
 
 ### Baseline
 
-2026-10-04: `npm test` 180 passing; `npx tsc --noEmit` and `npx expo lint` clean. 2026-10-03: `npx expo export --platform android` bundles. The app-review fixes (2026-10-03) and the UX review changes (2026-10-04) have not been run on a device yet: the owner checks them in Expo Go.
+2026-10-04: `npm test` 180 passing; `npx tsc --noEmit` and `npx expo lint` clean; `npx expo export --platform android` bundles. The app-review fixes (2026-10-03) and the UX review changes (2026-10-04) have not been run on a device yet: the owner checks them in Expo Go.
 
 ## Stack
 
