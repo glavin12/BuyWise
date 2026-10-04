@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
-import { ArrowUpRight, Bell, Calendar, Plus, Search } from "lucide-react-native";
+import { ArrowUpRight, Calendar, Plus, Search } from "lucide-react-native";
 import { useState } from "react";
 
 import { userMessage } from "@/lib/api";
@@ -51,7 +51,6 @@ import {
   Row,
   Screen,
   SectionLabel,
-  showToast,
   Skeleton,
   Stack,
   Title,
@@ -101,15 +100,20 @@ export default function HomeScreen() {
   return (
     <Screen surface="screen" tabBar enter onRefresh={refresh} refreshing={refreshing}>
       <Row justify="between">
-        <PressableScale onPress={() => router.navigate("/profile")} accessibilityLabel={`Hi, ${name}! Open your profile`}>
-          <Row gap="md">
-            <Illustration name="avatar_user" width={42} />
-            <RichText>{`Hi, ${escapeRich(name)}!`}</RichText>
-          </Row>
-        </PressableScale>
+        {/* The greeting takes what the buttons leave, so a long name wraps instead of pushing them off screen. */}
+        <Stack grow>
+          <PressableScale onPress={() => router.navigate("/profile")} accessibilityLabel={`Hi, ${name}! Open your profile`}>
+            <Row gap="md">
+              <Illustration name="avatar_user" width={42} />
+              <Stack grow>
+                <RichText>{`Hi, ${escapeRich(name)}!`}</RichText>
+              </Stack>
+            </Row>
+          </PressableScale>
+        </Stack>
         <Row gap="sm">
+          <Chip label="Log" icon={Plus} accessibilityLabel="Log a transaction" onPress={() => router.push("/add-transaction")} />
           <CircleButton icon={Search} variant="outline" label="Search transactions" onPress={() => router.navigate("/transactions")} />
-          <CircleButton icon={Bell} variant="outline" label="Alerts" onPress={() => showToast("Notifications — coming soon")} />
         </Row>
       </Row>
 
@@ -210,7 +214,7 @@ export default function HomeScreen() {
           // D1: a brand-new user with no transactions.
           <Panel>
             <Stack gap="md">
-              <RichText tone="card">{"Nothing logged yet. Add your first expense, or hold the {hi:+} button below any time."}</RichText>
+              <RichText tone="card">{"Nothing logged yet. Add your first expense here, or hold the centre button any time."}</RichText>
               <PrimaryButton label="Add transaction" icon={Plus} onPress={() => router.push("/add-transaction")} />
             </Stack>
           </Panel>
