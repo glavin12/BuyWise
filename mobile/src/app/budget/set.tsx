@@ -35,16 +35,17 @@ import {
 // Opens from the Budget tab with ?categoryId=…&month=…&year=…: set a budget for
 // that category and month, or edit / delete the one that is there. A cream sheet in the QuickAdd look.
 // Budgets roll over, so it also names what earlier months left (or overspent) and, when the category is
-// overspent, offers the amount that covers it.
+// overspent, offers the amount that covers it. `&cover=1` (Budget's "Cover ₹X") opens with that amount
+// already typed in; nothing is saved until Save.
 export default function BudgetSetRoute() {
-  const params = useLocalSearchParams<{ categoryId?: string; month?: string; year?: string }>();
+  const params = useLocalSearchParams<{ categoryId?: string; month?: string; year?: string; cover?: string }>();
   const period = parseMonthYear(params.month, params.year);
   // These come from a URL, so anything malformed is "not found".
   if (!isUuid(params.categoryId) || !period) return <SheetNotFound title="Budget" what="Budget" />;
-  return <BudgetSetLoader categoryId={params.categoryId} period={period} />;
+  return <BudgetSetLoader categoryId={params.categoryId} period={period} fillCover={params.cover === "1"} />;
 }
 
-function BudgetSetLoader({ categoryId, period }: { categoryId: string; period: MonthYear }) {
+function BudgetSetLoader({ categoryId, period, fillCover }: { categoryId: string; period: MonthYear; fillCover: boolean }) {
   const budgets = useQuery(monthBudgetsQuery(period));
   const categories = useQuery(categoriesQuery("expense"));
   const existing = budgets.data?.budgets.find((b) => b.category_id === categoryId);
@@ -59,8 +60,12 @@ function BudgetSetLoader({ categoryId, period }: { categoryId: string; period: M
 
   if (budgets.data) {
     // An existing budget can always be edited or deleted, even if its category has since been archived.
-    if (existing) return <BudgetForm categoryId={categoryId} name={existing.category ?? "Category"} category={category} existing={existing} carry={carry} period={period} />;
-    if (category) return <BudgetForm categoryId={categoryId} name={category.name} category={category} carry={carry} period={period} />;
+    if (existing) {
+      return (
+        <BudgetForm categoryId={categoryId} name={existing.category ?? "Category"} category={category} existing={existing} carry={carry} period={period} fillCover={fillCover} />
+      );
+    }
+    if (category) return <BudgetForm categoryId={categoryId} name={category.name} category={category} carry={carry} period={period} fillCover={fillCover} />;
     // Not in the active expense categories, so it cannot take a new budget.
     if (categories.data) return <SheetNotFound title="Set budget" what="Category" />;
   }
@@ -76,6 +81,7 @@ function BudgetForm({
   existing,
   carry,
   period,
+  fillCover,
 }: {
   categoryId: string;
   name: string;
@@ -84,10 +90,14 @@ function BudgetForm({
   existing?: Budget;
   carry?: { carriedIn: number; available: number };
   period: MonthYear;
+  /** Start with the amount that covers the overspend typed in (when there is one). */
+  fillCover: boolean;
 }) {
   const router = useRouter();
+  const cover = carry ? coverAmount(existing?.budgeted_amount ?? 0, carry.available) : null;
   const [initial] = useState(() => (existing ? minorToAmountText(existing.budgeted_amount) : ""));
-  const [text, setText] = useState(initial);
+  // A filled-in cover is a change like any other: leaving without saving asks first.
+  const [text, setText] = useState(() => (fillCover && cover !== null ? minorToAmountText(cover) : initial));
   const [attempted, setAttempted] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
   const profile = useQuery(profileQuery);
@@ -101,7 +111,6 @@ function BudgetForm({
   const money = (amount: number) => wholeIfRound(formatMinor(amount, currency));
   const { minor, error } = parsePositiveAmount(text);
   const unchanged = existing !== undefined && minor === existing.budgeted_amount;
-  const cover = carry ? coverAmount(existing?.budgeted_amount ?? 0, carry.available) : null;
   const busy = set.isPending || update.isPending || remove.isPending;
 
   const finish = (message: string) => {
@@ -152,16 +161,16 @@ function BudgetForm({
           <Title size="cardTitle" tone="ink">
             {name}
           </Title>
-          <Note tone="cream">{monthLabel}</Note>
+          <Note tone="cream">{`Budgeted for ${monthLabel}`}</Note>
         </Stack>
       </Row>
 
       <Stack gap="xs">
-        <EntryAmount value={text} onChange={setText} symbol={currencySymbol(currency)} label={`Budget for ${monthLabel}`} autoFocus />
+        <EntryAmount value={text} onChange={setText} symbol={currencySymbol(currency)} label={`Budgeted for ${monthLabel}`} autoFocus />
         {(attempted || text !== initial) && error ? <Note tone="error">{error}</Note> : null}
         {carry && carry.carriedIn !== 0 ? (
           <Note tone="cream">
-            {carry.carriedIn > 0 ? `${money(carry.carriedIn)} carried in from earlier months.` : `${money(-carry.carriedIn)} overspent earlier, carried in.`}
+            {carry.carriedIn > 0 ? `Plus ${money(carry.carriedIn)} left over from earlier months.` : `Minus ${money(-carry.carriedIn)} overspent in earlier months.`}
           </Note>
         ) : null}
       </Stack>

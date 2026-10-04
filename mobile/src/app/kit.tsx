@@ -3,6 +3,8 @@ import { ArrowLeft, Bell, Calendar, Check, Copy, Fuel, History, LayoutGrid, Penc
 import { useState } from "react";
 
 import { todayLocal } from "@/lib/dates";
+import { formatMinor } from "@/lib/format";
+import { wholeIfRound } from "@/lib/home";
 import {
   BudgetRow,
   BudgetTable,
@@ -11,6 +13,7 @@ import {
   DateChip,
   Dial,
   FieldButton,
+  Figures,
   GoalTile,
   PillButton,
   ReadyCard,
@@ -25,12 +28,15 @@ import {
   PrimaryButton,
   RichText,
   Row,
+  SafeCard,
   Screen,
   SecondaryButton,
   showToast,
   Stack,
   Title,
 } from "@/ui";
+
+const money = (minor: number) => wholeIfRound(formatMinor(minor, "INR"));
 
 // Dev-only gallery of the design v3 kit (DESIGN.md §3) and illustrations (§2), to check
 // against design/screens/*.png. Opened from Profile → "Design kit" in development builds.
@@ -100,7 +106,7 @@ export default function KitScreen() {
       <Title size="cardTitle">Rich text</Title>
       <Panel>
         <RichText tone="card" links={{ budget: tap("→ Budget"), goals: tap("→ Goals") }}>
-          {"Up {mint:+₹17,860} this month. {hi@budget:₹4,860} is ready to assign and {dark@goals:3 goals} are on track."}
+          {"Up {mint:+₹17,860} this month. {hi@budget:₹4,860} is left to budget and {dark@goals:3 goals} are on track."}
         </RichText>
       </Panel>
       <Panel>
@@ -165,16 +171,46 @@ export default function KitScreen() {
         </Stack>
       </Panel>
 
+      <Title size="cardTitle">Safe to spend</Title>
+      <SafeCard safe={{ kind: "ok", perDay: 148800, left: 1488000, days: 10, usedPercent: 68, monthPercent: 71, ahead: false }} month="Oct" money={money} onPress={tap("budget")} />
+      <SafeCard safe={{ kind: "over", overBy: 120000, days: 10, usedPercent: 103, monthPercent: 71 }} month="Oct" money={money} onPress={tap("budget")} />
+      <SafeCard safe={{ kind: "none" }} month="Oct" money={money} onPress={tap("budget")} />
+
       <Title size="cardTitle">Budget</Title>
       <ReadyCard
         amount="₹4,860"
-        line="give every rupee a job"
+        line="Money you have that isn't in a budget yet."
         action={<PillButton label="Copy Aug" icon={Copy} onPress={tap("copy")} />}
       />
+      <Panel>
+        <Figures
+          items={[
+            { label: "Started", value: "₹74,860" },
+            { label: "In", value: "+₹50,000", tone: "mint" },
+            { label: "Out", value: "−₹32,140" },
+            { label: "Now", value: "₹92,720" },
+          ]}
+        />
+      </Panel>
       <BudgetTable>
-        <BudgetRow first name="Rent" dot="peri" assigned="₹18,000" state={{ kind: "done", available: "₹0", line: "fully spent", barPercent: 100 }} onPress={tap("rent")} />
-        <BudgetRow name="Food" dot="tomato" assigned="₹8,000" state={{ kind: "left", available: "₹1,700", line: "₹6,300 of ₹8,000 spent", barPercent: 79 }} onPress={tap("food")} />
-        <BudgetRow name="Groceries" dot="mint" assigned="₹5,000" state={{ kind: "over", available: "−₹1,200", line: "overspent by ₹1,200", barPercent: 100 }} onPress={tap("groceries")} />
+        <BudgetRow
+          first
+          name="Groceries"
+          dot="mint"
+          tick={71}
+          state={{ kind: "over", figure: "₹1,200", word: "over", line: "₹7,200 of ₹6,000 spent", barPercent: 100, available: -120000 }}
+          onPress={tap("groceries")}
+          onCover={tap("cover")}
+        />
+        <BudgetRow name="Food" dot="tomato" tick={71} state={{ kind: "near", figure: "₹1,700", word: "left", line: "₹6,300 of ₹8,000 spent", barPercent: 79, available: 170000 }} onPress={tap("food")} />
+        <BudgetRow
+          name="Transport"
+          dot="mint"
+          tick={71}
+          state={{ kind: "left", figure: "₹2,300", word: "left", line: "₹200 of ₹2,000 spent · +₹500 from Sep", barPercent: 8, available: 230000 }}
+          onPress={tap("transport")}
+        />
+        <BudgetRow name="Rent" dot="peri" tick={71} state={{ kind: "done", figure: "₹0", word: "left", line: "₹18,000 of ₹18,000 spent", barPercent: 100, available: 0 }} onPress={tap("rent")} />
       </BudgetTable>
       <BudgetTable loading />
 

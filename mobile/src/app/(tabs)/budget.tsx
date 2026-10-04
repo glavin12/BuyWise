@@ -4,8 +4,8 @@ import { Copy, Plus, RotateCw } from "lucide-react-native";
 import { useState } from "react";
 
 import { userMessage } from "@/lib/api";
-import { budgetRow, byAssigned, carriedRow, copySummary, readyLine, unbudgetedCategories } from "@/lib/budget";
-import { currentMonth, monthKey, monthShift, type MonthYear } from "@/lib/dates";
+import { budgetRow, byAttention, carriedRow, copySummary, monthFlow, monthGone, readyLine, unbudgetedCategories } from "@/lib/budget";
+import { currentMonth, monthKey, monthShift, todayLocal, type MonthYear } from "@/lib/dates";
 import { formatMinor, formatMonth, formatMonthShort } from "@/lib/format";
 import { wholeIfRound } from "@/lib/home";
 import { useCopyBudgets } from "@/lib/mutations";
@@ -17,8 +17,8 @@ import {
   BudgetRow,
   BudgetTable,
   categoryTone,
-  Chip,
   confirm,
+  Figures,
   hapticSuccess,
   OptionSheet,
   Panel,
@@ -30,18 +30,19 @@ import {
   Row,
   Screen,
   SecondaryButton,
+  SectionLabel,
   Stack,
   Title,
   type OptionGroup,
 } from "@/ui";
 
-// Budget (the owner's list mockup, 2026-09-29): title and month pill, the marigold "ready to assign"
-// card with "Copy <last month>", opening / income / spent /
-// closing chips (the month's slice of the one running balance), then the categories with a budget,
-// most assigned first, then those that only carry money in. Budgets roll over: Available is what
-// earlier months left (or overspent) plus this month's budget minus this month's spending, and
-// "ready to assign" is the closing balance minus the money in every envelope; both come from the API.
-// At the end, how many categories still have no budget, with a way to set one.
+// Budget (the owner's list mockup, 2026-09-29, with the UX review's changes of 2026-10-04): title and month
+// pill, the marigold "left to budget" card with "Copy <last month>", the month as Started → In → Out → Now
+// (the month's slice of the one running balance), then one list of the categories with a budget and those that
+// only carry money in, in the order they need you (overspent, nearly spent, the rest, finished). Budgets roll
+// over: a category's Left is what earlier months left (or overspent) plus this month's budget minus this month's
+// spending, and "left to budget" is the closing balance minus the money left in every budget; both come from the
+// API. At the end, how many categories still have no budget, with a way to set one.
 
 const MONTHS_AHEAD = 3;
 const MONTHS_BACK = 11;
@@ -72,18 +73,32 @@ export default function BudgetTab() {
   const activeIds = expenseCategories ? new Set(expenseCategories.filter((c) => c.is_active).map((c) => c.id)) : null;
   const colorOf = new Map(expenseCategories?.map((c) => [c.id, c.color]));
   const ready = budgets.data?.unassigned ?? null;
-  const sorted = rows ? byAssigned(rows) : [];
   const rest = rows && expenseCategories ? unbudgetedCategories(expenseCategories, rows) : [];
   const previous = monthShift(period.month, period.year, -1);
+  const isNow = period.month === now.month && period.year === now.year;
+  // Carried money is named by the month it came from: "+₹500 from Sep".
+  const from = formatMonthShort(previous.month, previous.year, previous.year);
+  const sorted = byAttention([
+    ...(rows ?? []).map((b) => ({ key: b.id, categoryId: b.category_id, category: b.category, name: b.category ?? "Unknown category", state: budgetRow(b, money, from) })),
+    ...carried.map((c) => ({
+      key: `carried-${c.category_id}`,
+      categoryId: c.category_id,
+      category: c.category,
+      name: c.category ?? "Unknown category",
+      state: carriedRow(c, money, from),
+    })),
+  ]);
+  const tick = monthGone(todayLocal(), period.month, period.year);
 
   const months = Array.from({ length: MONTHS_AHEAD + 1 + MONTHS_BACK }, (_, i) => monthShift(now.month, now.year, MONTHS_AHEAD - i));
   const monthGroups: OptionGroup[] = [{ options: months.map((m) => ({ value: monthKey(m.month, m.year), label: formatMonth(m.month, m.year) })) }];
   const moreGroups: OptionGroup[] = [{ options: rest.map((c) => ({ value: c.id, label: c.name })) }];
 
-  const openSet = (categoryId: string) =>
+  /** `cover`: the sheet opens with the amount that covers the overspend already typed in. */
+  const openSet = (categoryId: string, cover?: boolean) =>
     router.push({
       pathname: "/budget/set",
-      params: { categoryId, month: String(period.month), year: String(period.year) },
+      params: { categoryId, month: String(period.month), year: String(period.year), ...(cover ? { cover: "1" } : {}) },
     });
 
   const refresh = async () => {
@@ -170,12 +185,12 @@ export default function BudgetTab() {
       />
 
       {budgets.data && summary.data ? (
-        <Row gap="xs" wrap>
-          <Chip variant="card" label={`opening ${signedMoney(budgets.data.opening_balance)}`} />
-          <Chip variant="card" label={`income ${money(summary.data.income)}`} />
-          <Chip variant="card" label={`spent ${money(summary.data.expenses)}`} />
-          <Chip variant="card" label={`closing ${signedMoney(budgets.data.closing_balance)}`} />
-        </Row>
+        <Panel>
+          <Stack gap="sm">
+            <SectionLabel label={isNow ? `${monthLabel} so far` : monthLabel} />
+            <Figures items={monthFlow(budgets.data.opening_balance, budgets.data.closing_balance, summary.data.expenses, isNow, money)} />
+          </Stack>
+        </Panel>
       ) : null}
 
       {copyResult ? <Banner tone={copyResult.tone} message={copyResult.message} /> : null}
@@ -193,32 +208,25 @@ export default function BudgetTab() {
         ) : (
           <BudgetTable loading />
         )
-      ) : sorted.length + carried.length > 0 ? (
+      ) : sorted.length > 0 ? (
         <BudgetTable>
-          {sorted.map((b, i) => (
-            <BudgetRow
-              key={b.id}
-              first={i === 0}
-              name={b.category ?? "Unknown category"}
-              dot={categoryTone(b.category, colorOf.get(b.category_id))}
-              assigned={money(b.budgeted_amount)}
-              state={budgetRow(b, money)}
-              archived={activeIds ? !activeIds.has(b.category_id) : false}
-              onPress={() => openSet(b.category_id)}
-            />
-          ))}
-          {carried.map((c, i) => (
-            <BudgetRow
-              key={`carried-${c.category_id}`}
-              first={sorted.length === 0 && i === 0}
-              name={c.category ?? "Unknown category"}
-              dot={categoryTone(c.category, colorOf.get(c.category_id))}
-              assigned={money(0)}
-              state={carriedRow(c, money)}
-              archived={activeIds ? !activeIds.has(c.category_id) : false}
-              onPress={() => openSet(c.category_id)}
-            />
-          ))}
+          {sorted.map((row, i) => {
+            const archived = activeIds ? !activeIds.has(row.categoryId) : false;
+            return (
+              <BudgetRow
+                key={row.key}
+                first={i === 0}
+                name={row.name}
+                dot={categoryTone(row.category, colorOf.get(row.categoryId))}
+                state={row.state}
+                tick={tick}
+                archived={archived}
+                onPress={() => openSet(row.categoryId)}
+                // An archived category takes no new budget, so there is nothing to cover it with.
+                onCover={archived ? undefined : () => openSet(row.categoryId, true)}
+              />
+            );
+          })}
         </BudgetTable>
       ) : (
         <Panel>
@@ -230,10 +238,10 @@ export default function BudgetTab() {
         </Panel>
       )}
 
-      {sorted.length + carried.length > 0 && rest.length > 0 ? (
+      {sorted.length > 0 && rest.length > 0 ? (
         <Panel>
           <Stack>
-            <RichText tone="card">{`{hi:${left}} still left to assign.`}</RichText>
+            <RichText tone="card">{`{hi:${left}} ${rest.length === 1 ? "has" : "have"} no budget yet.`}</RichText>
             <SecondaryButton label="Manage your budget →" surface="dark" onPress={() => setSheet("more")} />
           </Stack>
         </Panel>
