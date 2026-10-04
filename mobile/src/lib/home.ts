@@ -92,6 +92,55 @@ export function compactMoney(minor: number, currency: string): string {
   return `${symbol}${Math.round(units)}`;
 }
 
+export type SafeToSpend =
+  /** No budget this month (or budgets of 0): nothing to share out. */
+  | { kind: "none" }
+  /** The month's budget is spent (`overBy` 0) or overspent. */
+  | { kind: "over"; overBy: number; days: number; usedPercent: number; monthPercent: number }
+  | { kind: "ok"; perDay: number; left: number; days: number; usedPercent: number; monthPercent: number; ahead: boolean };
+
+/**
+ * Home's "Safe to spend today": what is left of this month's budget (the dashboard's `remaining_budget`: the month's
+ * budgets minus all of its spending; money carried over from earlier months is not in it) shared over the days left,
+ * today included (`days_remaining_in_month` leaves today out). Rounded down, so it never offers more than is left.
+ * `usedPercent` is the month's spending against its budgets, `monthPercent` how much of the month has gone (today
+ * included), and `ahead` says spending is running faster than the month, decided on the integers.
+ */
+export function safeToSpend(
+  d: Pick<DashboardData, "has_budget" | "total_budgeted" | "total_spent" | "remaining_budget" | "days_remaining_in_month">,
+  month: number,
+  year: number,
+): SafeToSpend {
+  if (!d.has_budget || d.total_budgeted <= 0) return { kind: "none" };
+  const length = new Date(year, month, 0).getDate();
+  const gone = Math.max(1, Math.min(length, length - d.days_remaining_in_month));
+  const days = length - gone + 1;
+  const usedPercent = Math.round((d.total_spent * 100) / d.total_budgeted);
+  const monthPercent = Math.round((gone * 100) / length);
+  if (d.remaining_budget <= 0) return { kind: "over", overBy: Math.max(0, -d.remaining_budget), days, usedPercent, monthPercent }; // never −0
+  return {
+    kind: "ok",
+    perDay: Math.floor(d.remaining_budget / days),
+    left: d.remaining_budget,
+    days,
+    usedPercent,
+    monthPercent,
+    ahead: d.total_spent * length > d.total_budgeted * gone,
+  };
+}
+
+/** The Safe to spend card's badge: "10 days left", today counted; "last day" on the month's last. */
+export function daysLeft(days: number): string {
+  return days === 1 ? "last day" : `${days} days left`;
+}
+
+/** The line under the Safe to spend figure. `money` formats an unsigned amount in minor units. */
+export function safeLine(s: SafeToSpend, money: (minor: number) => string): string {
+  if (s.kind === "none") return "Set a budget for this month to see what you can spend each day.";
+  if (s.kind === "over") return s.overBy > 0 ? `${money(s.overBy)} over this month's budget.` : "This month's budget is all spent.";
+  return `${s.ahead ? "Spending faster than the month" : "On track"}: ${money(s.left)} left in your budget.`;
+}
+
 export type MonthFigure = { label: string; value: string; tone: "text" | "mint" | "tomato" };
 
 /**

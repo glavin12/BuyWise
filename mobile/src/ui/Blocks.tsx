@@ -2,14 +2,16 @@ import type { LucideIcon } from "lucide-react-native";
 import { useEffect, type ReactNode } from "react";
 import { StyleSheet, Text as RNText, View, type StyleProp, type ViewStyle } from "react-native";
 
+import { daysLeft, safeLine, type SafeToSpend } from "@/lib/home";
+
 import { announce } from "./a11y";
 import { Chip, InlineChip, type Hue } from "./Chips";
 import { DrawnFill, useCountUp } from "./motion";
 import { PressableScale } from "./PressableScale";
 import { colors, extra, fonts, radius, type } from "./tokens";
 
-// Title, Panel and IconTile (DESIGN.md §3), plus the Home screen's HeroAmount, SectionLabel and MiniTile
-// and the Activity screen's TxRow and DayHeader.
+// Title, Panel and IconTile (DESIGN.md §3), plus the Home screen's HeroAmount, Figures, SafeCard, SectionLabel and
+// MiniTile and the Activity screen's TxRow and DayHeader.
 
 /** Condensed uppercase heading. Put "\n" in the text for the two-line titles ("MONEY\nBUDDY"). */
 export function Title({
@@ -189,8 +191,11 @@ export function Note({ children, tone = "muted" }: { children: string; tone?: ke
   return <RNText style={[styles.note, { color: NOTE[tone] }]}>{children}</RNText>;
 }
 
-/** Ink progress bar on a colour card (it draws from 0 on mount), with an optional ink tooltip ("79%") above the fill's end. */
-export function Meter({ percent, height = 8, tooltip, label }: { percent: number; height?: 8 | 12; tooltip?: string; label: string }) {
+/**
+ * Ink progress bar on a colour card (it draws from 0 on mount), with an optional ink tooltip ("79%") above the fill's end
+ * and an optional `tick`: a thin ink mark at that % (how much of the month has gone).
+ */
+export function Meter({ percent, height = 8, tooltip, tick, label }: { percent: number; height?: 8 | 12; tooltip?: string; tick?: number; label: string }) {
   const p = Math.max(0, Math.min(100, percent));
   return (
     <View
@@ -207,7 +212,61 @@ export function Meter({ percent, height = 8, tooltip, label }: { percent: number
           </View>
         ) : null}
       </DrawnFill>
+      {tick !== undefined ? <View style={[styles.tick, { left: `${Math.max(0, Math.min(100, tick))}%` }]} /> : null}
     </View>
+  );
+}
+
+/**
+ * Home's SAFE TO SPEND TODAY card (the UX review, 2026-10-04), drawn from `lib/home` `safeToSpend`: marigold, tomato once
+ * the month's budget is spent. The days-left badge, the day's figure (it counts up), a meter of the budget used with a
+ * tick at how much of `month` ("Oct") has gone, then a line. With no budget, the line and "Set a budget →". The whole
+ * card is one button (to the budget). `money` formats an unsigned amount in minor units.
+ */
+export function SafeCard({ safe, month, money, onPress }: { safe: SafeToSpend; month: string; money: (minor: number) => string; onPress: () => void }) {
+  const line = safeLine(safe, money);
+  if (safe.kind === "none") {
+    return (
+      <PressableScale onPress={onPress} accessibilityLabel={`Safe to spend today. ${line}`} accessibilityHint="Opens your budget" style={[styles.safe, { backgroundColor: colors.marigold }]}>
+        <RNText style={styles.safeLabel}>Safe to spend today</RNText>
+        <RNText style={styles.safeLine}>{line}</RNText>
+        <Chip label="Set a budget →" variant="ink" />
+      </PressableScale>
+    );
+  }
+  const perDay = safe.kind === "ok" ? safe.perDay : 0;
+  const used = `${safe.usedPercent}% of budget used`;
+  const gone = `${safe.monthPercent}% of ${month} gone`;
+  return (
+    <PressableScale
+      onPress={onPress}
+      accessibilityLabel={`Safe to spend today: ${money(perDay)}, ${daysLeft(safe.days)}. ${used}, ${gone}. ${line}`}
+      accessibilityHint="Opens your budget"
+      style={[styles.safe, { backgroundColor: safe.kind === "over" ? colors.tomato : colors.marigold }]}
+    >
+      <View style={styles.safeHead}>
+        <RNText style={styles.safeLabel}>Safe to spend today</RNText>
+        <Chip label={daysLeft(safe.days)} variant="ink" />
+      </View>
+      <SafeFigure to={perDay} money={money} />
+      <View style={styles.safeMeter}>
+        <Meter percent={safe.usedPercent} tick={safe.monthPercent} label={`${used}, ${gone}`} />
+        <View style={styles.safeKey}>
+          <RNText style={styles.safeSmall}>{used}</RNText>
+          <RNText style={[styles.safeSmall, styles.safeRight]}>{gone}</RNText>
+        </View>
+      </View>
+      <RNText style={styles.safeLine}>{line}</RNText>
+    </PressableScale>
+  );
+}
+
+function SafeFigure({ to, money }: { to: number; money: (minor: number) => string }) {
+  const shown = useCountUp(to);
+  return (
+    <RNText style={styles.safeAmount} numberOfLines={1} adjustsFontSizeToFit>
+      {money(Math.round(shown))}
+    </RNText>
   );
 }
 
@@ -342,6 +401,16 @@ const styles = StyleSheet.create({
   meter: { borderRadius: radius.pill, backgroundColor: extra.trackOnColour },
   meterTipRoom: { marginTop: 22 },
   meterFill: { height: "100%", borderRadius: radius.pill, backgroundColor: colors.ink },
+  tick: { position: "absolute", top: -4, bottom: -4, width: 2, marginLeft: -1, borderRadius: 1, backgroundColor: colors.ink },
+  safe: { gap: 10, padding: 16, borderRadius: radius.cardLg },
+  safeHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
+  safeLabel: { ...type.label, flexShrink: 1, color: colors.ink },
+  safeAmount: { ...type.heroAmount, color: colors.ink },
+  safeMeter: { gap: 6 },
+  safeKey: { flexDirection: "row", justifyContent: "space-between", gap: 8 },
+  safeSmall: { ...type.meta, flexShrink: 1, color: colors.ink },
+  safeRight: { textAlign: "right" },
+  safeLine: { ...type.meta, color: colors.ink },
   tipAnchor: { position: "absolute", top: -26, left: "100%", width: 60, marginLeft: -30, alignItems: "center" },
   tip: {
     fontFamily: fonts.mono,

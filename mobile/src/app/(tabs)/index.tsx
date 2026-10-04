@@ -13,6 +13,7 @@ import {
   dailySpend,
   monthFigures,
   pulsePercents,
+  safeToSpend,
   splitFraction,
   topCategories,
   weekOf,
@@ -43,6 +44,7 @@ import {
   PulseBubbles,
   RichText,
   Row,
+  SafeCard,
   Screen,
   SectionLabel,
   Skeleton,
@@ -51,8 +53,8 @@ import {
 } from "@/ui";
 
 // Home (design/screens/02-home.png, values from design/reference-html/Dashboard.html, and the UX review of
-// 2026-10-04): greeting, balance card with this month's In / Out / Net and the goals, Spend Pulse, three
-// recent tiles. Home is about now: the design's this / last month pill is left out (Reports compares months).
+// 2026-10-04): greeting, balance card with this month's In / Out / Net and the goals, Safe to spend today, Spend
+// Pulse, three recent tiles. Home is about now: the design's this / last month pill is left out (Reports compares months).
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -90,6 +92,7 @@ export default function HomeScreen() {
   const money = (minor: number) => wholeIfRound(formatMinor(minor, currency));
   const name = profile.data?.full_name?.trim().split(/\s+/)[0] || session?.user.email?.split("@")[0] || "there";
   const goals = data?.active_goals_count ?? 0;
+  const monthShort = formatMonthShort(now.month, now.year, now.year);
 
   return (
     <Screen surface="screen" tabBar enter onRefresh={refresh} refreshing={refreshing}>
@@ -125,7 +128,7 @@ export default function HomeScreen() {
               <CircleButton icon={ArrowUpRight} size={38} label="Open reports" onPress={() => router.push("/reports")} />
             </Row>
             <HeroAmount to={data.display_current_balance} format={(n) => toParts(formatCurrency(n, currency))} />
-            <Figures items={monthFigures(data, formatMonthShort(now.month, now.year, now.year), money)} />
+            <Figures items={monthFigures(data, monthShort, money)} />
             <SectionLabel
               label="Goals"
               link={goals > 0 ? `${goals} in progress →` : "add one →"}
@@ -160,6 +163,13 @@ export default function HomeScreen() {
             </Row>
           </Stack>
         </Panel>
+      )}
+
+      {/* With nothing cached and the API down, the balance card above already says so and offers Try again. */}
+      {data ? (
+        <SafeCard safe={safeToSpend(data, now.month, now.year)} month={monthShort} money={money} onPress={() => router.navigate("/budget")} />
+      ) : dashboard.isError ? null : (
+        <Skeleton tone="dark" height={168} round="cardLg" />
       )}
 
       <Panel color="peri" large>
