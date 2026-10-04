@@ -76,20 +76,23 @@ class BudgetService:
             for entry in entries
         ]
         budgeted_now = {entry.category_id for entry in entries}
-        carried = []
-        for category_id, carry in carried_in.items():
-            if category_id in budgeted_now:
-                continue
-            spent_now = spent.get(category_id, 0)
-            if carry == 0 and spent_now == 0:
-                continue
-            category = await self.categories.get(user_id, category_id)
-            carried.append(self._carried_row(category_id, category.name if category else None, carry, spent_now))
+        # Categories that carry money in (or were spent from) but have no entry this month. They are named with
+        # one query: a lookup per category made this view's cost grow with how many there are.
+        carried_ids = [
+            category_id
+            for category_id, carry in carried_in.items()
+            if category_id not in budgeted_now and (carry != 0 or spent.get(category_id, 0) != 0)
+        ]
+        names = {category.id: category.name for category in await self.categories.get_many(user_id, carried_ids)}
+        carried = [
+            self._carried_row(category_id, names.get(category_id), carried_in[category_id], spent.get(category_id, 0))
+            for category_id in carried_ids
+        ]
         carried.sort(key=lambda row: (row["category"] or "", row["category_id"]))
 
         envelopes = sum(row["available"] for row in rows) + sum(row["available"] for row in carried)
-        opening = await self.transactions.get_balance(user_id, before=window.start)
-        closing = await self.transactions.get_balance(user_id, before=window.end)
+        # One pass over the user's rows gives the opening and closing balances and the live one.
+        opening, closing, current = await self.transactions.get_balances(user_id, [window.start, window.end, None])
         unassigned = closing - envelopes
         return {
             "month": month,
@@ -102,9 +105,18 @@ class BudgetService:
             "display_closing_balance": minor_to_amount(closing),
             "unassigned": unassigned,
             "display_unassigned": minor_to_amount(unassigned),
+            "current_balance": current,  # the live balance, for the dashboard (`budget_status`); the month route omits it
         }
 
-    async def budget_status(self, user_id: uuid.UUID, *, period: str = "this_month", today: date | None = None) -> dict:
+    async def budget_status(
+        self,
+        user_id: uuid.UUID,
+        *,
+        period: str = "this_month",
+        today: date | None = None,
+        with_current_balance: bool = False,
+    ) -> dict:
+        """The month's budget picture; `with_current_balance` adds the live balance, read with the month's own."""
         window = resolve_period(period, today)
         view = await self.month_view(user_id, window.month, window.year)
         rows = view["budgets"]
@@ -115,7 +127,7 @@ class BudgetService:
             start=window.start,
             end=window.end,
         )
-        return {
+        status = {
             "period": period,
             "month": window.month_name,
             "year": window.year,
@@ -135,6 +147,9 @@ class BudgetService:
             "unassigned": view["unassigned"],
             "display_unassigned": view["display_unassigned"],
         }
+        if with_current_balance:
+            status["current_balance"] = view["current_balance"]
+        return status
 
     async def get_budget(self, user_id: uuid.UUID, budget_id: uuid.UUID) -> dict:
         entry = await self.budgets.get(user_id, budget_id)

@@ -10,11 +10,13 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
+from langchain_core.callbacks import AsyncCallbackHandler
 from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
 from langchain_groq import ChatGroq
 from langgraph.prebuilt import create_react_agent
 
 from ai_service.core.config import get_settings
+from ai_service.core.context import get_db_session
 from ai_service.schemas.chat import ToolCallInfo
 from ai_service.tools import all_tools
 
@@ -210,13 +212,30 @@ Tools understand only this_month and last_month.
 
 _agent = None
 
-# Hard bounds on one chat turn (AI cost and DB-session hold time). A turn that
-# exceeds either takes the graceful-failure path in ChatService.
-# ponytail: the request holds its DB session during the LLM call, so with the
-# default pool (5 + 10) ~15 slow chats stall every route; the timeout bounds it.
-# Move the LLM call outside the session if that ever bites.
+# Hard bounds on one chat turn (AI cost and latency). A turn that exceeds either
+# takes the graceful-failure path in ChatService.
 AGENT_TIMEOUT_SECONDS = 60
 AGENT_RECURSION_LIMIT = 12  # graph steps (~5 tool rounds); LangGraph's default is 25
+
+
+class _ReleaseDbConnection(AsyncCallbackHandler):
+    """Ends the request session's transaction before every model call.
+
+    A session keeps its pooled connection from its first read until a commit or rollback, and a chat turn spends
+    nearly all its time waiting on the model (seconds per call, 60 s at worst). Without this the turn held one
+    connection throughout, so about 15 slow chats (the default pool is 5 + 10) stalled every route. Now a connection
+    is held only while a tool's own queries run; the next transaction opens when a tool needs it.
+    """
+
+    async def on_chat_model_start(self, serialized: dict[str, Any], messages: list[list[BaseMessage]], **kwargs: Any) -> None:
+        try:
+            session = get_db_session()
+        except RuntimeError:  # outside request_context(): no chat turn, nothing to release
+            return
+        try:
+            await session.commit()
+        except Exception:  # a tool left its transaction failed: roll back, which frees the connection too
+            await session.rollback()
 
 
 @dataclass
@@ -239,6 +258,7 @@ def _get_agent():
             timeout=45,
             max_retries=1,
             max_tokens=4096,
+            callbacks=[_ReleaseDbConnection()],
         )
         _agent = create_react_agent(
             model=llm,

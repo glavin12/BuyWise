@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date
 
@@ -201,18 +202,28 @@ class TransactionRepository:
         earlier only): a month's opening balance is ``before=first day``, its closing balance
         ``before=first day of the next month``. Without it, every transaction counts.
         """
+        return (await self.get_balances(user_id, [before]))[0]
+
+    async def get_balances(self, user_id: uuid.UUID, cutoffs: Sequence[date | None]) -> list[int]:
+        """`get_balance` for several ``before`` dates (None: every transaction) in one statement.
+
+        The balance is summed from the user's whole history, so asking for the opening, closing and
+        live balance together reads those rows once instead of three times.
+        """
         signed_amount = case(
             (Transaction.transaction_type.in_(("income", "starting_balance")), Transaction.amount),
             (Transaction.transaction_type == "expense", -Transaction.amount),
             else_=0,
         )
-        stmt = select(func.coalesce(func.sum(signed_amount), 0)).where(
-            Transaction.user_id == user_id,
-            Transaction.parent_transaction_id.is_(None),
-        )
-        if before is not None:
-            stmt = stmt.where(Transaction.transaction_date < before)
-        return int(await self.session.scalar(stmt) or 0)
+        balances = [
+            func.coalesce(
+                func.sum(signed_amount if cutoff is None else case((Transaction.transaction_date < cutoff, signed_amount), else_=0)),
+                0,
+            )
+            for cutoff in cutoffs
+        ]
+        stmt = select(*balances).where(Transaction.user_id == user_id, Transaction.parent_transaction_id.is_(None))
+        return [int(balance or 0) for balance in (await self.session.execute(stmt)).one()]
 
     async def spent_since_first_budget(
         self, user_id: uuid.UUID, *, month: int, year: int, before: date

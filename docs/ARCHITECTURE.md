@@ -35,10 +35,10 @@ Repositories never trust an owner ID from an LLM or request body. Services valid
 - `CategoryService`: user-owned category CRUD and default seeding.
 - `PayeeService`: normalized payee CRUD.
 - `TransactionService`: ledger CRUD, ownership validation, filters, and serialization.
-- `BudgetService`: per-category monthly budget upsert and CRUD, and `month_view`, which works out a month's rollover (carried-in and available per category), the opening and closing balance and the unassigned money from the budget entries and the ledger, storing nothing.
+- `BudgetService`: per-category monthly budget upsert and CRUD, and `month_view`, which works out a month's rollover (carried-in and available per category), the opening and closing balance and the unassigned money from the budget entries and the ledger, storing nothing. It reads the opening, closing and live balance in one statement and names the categories that carry money without a budget with one query, so its cost does not grow with them.
 - `AnalyticsService`: monthly summary, category spending, comparison, and AI-facing breakdowns.
 - `GoalService`: category-linked goals and manual progress completion.
-- `DashboardService`: composition of profile, the running balance, analytics, budgets, and goals. Takes the caller's `today` so "this month" follows the user's calendar, not the server's UTC clock.
+- `DashboardService`: composition of profile, the budget view (which carries the opening, closing and live balance and the month's spending), the month's income, and goals, in at most 10 SQL statements (`tests/test_request_cost.py` holds it there). Takes the caller's `today` so "this month" follows the user's calendar, not the server's UTC clock.
 
 ## Ledger Invariants
 
@@ -46,7 +46,7 @@ Repositories never trust an owner ID from an LLM or request body. Services valid
 - Expenses and income require an owned category of the matching type; starting balances do not.
 - There are no accounts and no transfers. Each user has one balance: `starting_balance + income - expense`.
 - Starting balances are ledger rows but are never counted as income or expenses.
-- The balance is never stored and never resets: a month's opening and closing balance are the same sum taken up to the month's start and end (`TransactionRepository.get_balance(before=...)`).
+- The balance is never stored and never resets: a month's opening and closing balance are the same sum taken up to the month's start and end (`TransactionRepository.get_balance(before=...)`; `get_balances` takes several dates, and `None` for now, in one statement).
 - Budgets roll over: `available = carried_in + assigned - spent` per category and `unassigned = closing balance - sum(available)`, so the closing balance always equals the money in envelopes plus the unassigned money.
 - Each transaction has an optional `payment_method` (`cash`, `upi`, `bank_transfer`, `card`, `other`).
 - Split child rows are excluded from the balance and from aggregate queries; parent/child persistence is extensible but split creation is not exposed yet.
@@ -62,7 +62,7 @@ Repositories never trust an owner ID from an LLM or request body. Services valid
 4. Persist the user message and derive a title when needed.
 5. Build lightweight profile and UTC-date context.
 6. Load the capped recent message history and rebuild LangChain messages.
-7. Run the ReAct agent inside `request_context(user_id, session)`, bounded to 60 s and 12 graph steps.
+7. Run the ReAct agent inside `request_context(user_id, session)`, bounded to 60 s and 12 graph steps. A callback on the model client (`_ReleaseDbConnection`) ends the session's transaction before every model call, so the turn holds a pooled connection only while a tool's queries run, not while the model thinks.
 8. Parse assistant tool calls, tool results, and final text.
 9. Persist the complete assistant turn in order in one commit.
 10. On provider failure or timeout, roll the session back (a tool may have left it mid-transaction), persist a failed assistant row, and return the existing apology response contract.
