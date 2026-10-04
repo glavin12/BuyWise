@@ -97,17 +97,21 @@ export type SafeToSpend =
   | { kind: "none" }
   /** The month's budget is spent (`overBy` 0) or overspent. */
   | { kind: "over"; overBy: number; days: number; usedPercent: number; monthPercent: number }
-  | { kind: "ok"; perDay: number; left: number; days: number; usedPercent: number; monthPercent: number; ahead: boolean };
+  /** The budget has room, but the balance is 0 or less: there is no money to spend. */
+  | { kind: "empty"; days: number; usedPercent: number; monthPercent: number }
+  /** `left` is shared over `days`: the budget's (`budgetLeft`), or the balance when that is lower (`byBalance`). */
+  | { kind: "ok"; perDay: number; left: number; budgetLeft: number; byBalance: boolean; days: number; usedPercent: number; monthPercent: number; ahead: boolean };
 
 /**
  * Home's "Safe to spend today": what is left of this month's budget (the dashboard's `remaining_budget`: the month's
- * budgets minus all of its spending; money carried over from earlier months is not in it) shared over the days left,
- * today included (`days_remaining_in_month` leaves today out). Rounded down, so it never offers more than is left.
- * `usedPercent` is the month's spending against its budgets, `monthPercent` how much of the month has gone (today
- * included), and `ahead` says spending is running faster than the month, decided on the integers.
+ * budgets minus all of its spending; money carried over from earlier months is not in it), but never more than the
+ * money actually in hand (`current_balance`, which income and starting balances raise and every expense lowers),
+ * shared over the days left, today included (`days_remaining_in_month` leaves today out). Rounded down, so it never
+ * offers more than is left. `usedPercent` is the month's spending against its budgets, `monthPercent` how much of the
+ * month has gone (today included), and `ahead` says spending is running faster than the month, decided on the integers.
  */
 export function safeToSpend(
-  d: Pick<DashboardData, "has_budget" | "total_budgeted" | "total_spent" | "remaining_budget" | "days_remaining_in_month">,
+  d: Pick<DashboardData, "has_budget" | "total_budgeted" | "total_spent" | "remaining_budget" | "current_balance" | "days_remaining_in_month">,
   month: number,
   year: number,
 ): SafeToSpend {
@@ -118,10 +122,14 @@ export function safeToSpend(
   const usedPercent = Math.round((d.total_spent * 100) / d.total_budgeted);
   const monthPercent = Math.round((gone * 100) / length);
   if (d.remaining_budget <= 0) return { kind: "over", overBy: Math.max(0, -d.remaining_budget), days, usedPercent, monthPercent }; // never −0
+  if (d.current_balance <= 0) return { kind: "empty", days, usedPercent, monthPercent };
+  const left = Math.min(d.remaining_budget, d.current_balance);
   return {
     kind: "ok",
-    perDay: Math.floor(d.remaining_budget / days),
-    left: d.remaining_budget,
+    perDay: Math.floor(left / days),
+    left,
+    budgetLeft: d.remaining_budget,
+    byBalance: left < d.remaining_budget,
     days,
     usedPercent,
     monthPercent,
@@ -138,6 +146,8 @@ export function daysLeft(days: number): string {
 export function safeLine(s: SafeToSpend, money: (minor: number) => string): string {
   if (s.kind === "none") return "Set a budget for this month to see what you can spend each day.";
   if (s.kind === "over") return s.overBy > 0 ? `${money(s.overBy)} over this month's budget.` : "This month's budget is all spent.";
+  if (s.kind === "empty") return "Your balance is empty, so nothing is safe to spend.";
+  if (s.byBalance) return `Capped by your balance: ${money(s.left)} in hand, ${money(s.budgetLeft)} left in your budget.`;
   return `${s.ahead ? "Spending faster than the month" : "On track"}: ${money(s.left)} left in your budget.`;
 }
 

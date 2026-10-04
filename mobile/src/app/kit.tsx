@@ -172,7 +172,9 @@ export default function KitScreen() {
       </Panel>
 
       <Title size="cardTitle">Safe to spend</Title>
-      <SafeCard safe={{ kind: "ok", perDay: 148800, left: 1488000, days: 10, usedPercent: 68, monthPercent: 71, ahead: false }} month="Oct" money={money} onPress={tap("budget")} />
+      <SafeCard safe={{ kind: "ok", perDay: 148800, left: 1488000, budgetLeft: 1488000, byBalance: false, days: 10, usedPercent: 68, monthPercent: 71, ahead: false }} month="Oct" money={money} onPress={tap("budget")} />
+      <SafeCard safe={{ kind: "ok", perDay: 50000, left: 500000, budgetLeft: 1488000, byBalance: true, days: 10, usedPercent: 68, monthPercent: 71, ahead: false }} month="Oct" money={money} onPress={tap("budget")} />
+      <SafeCard safe={{ kind: "empty", days: 10, usedPercent: 68, monthPercent: 71 }} month="Oct" money={money} onPress={tap("budget")} />
       <SafeCard safe={{ kind: "over", overBy: 120000, days: 10, usedPercent: 103, monthPercent: 71 }} month="Oct" money={money} onPress={tap("budget")} />
       <SafeCard safe={{ kind: "none" }} month="Oct" money={money} onPress={tap("budget")} />
 

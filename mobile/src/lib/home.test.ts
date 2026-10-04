@@ -87,14 +87,23 @@ test("money strings", () => {
   assert.equal(compactMoney(150000000, "USD"), "$1.5M");
 });
 
-// 22 October 2026: 9 days left after today, so 10 to share over; 22 of 31 days gone.
-const october22 = { has_budget: true, total_budgeted: 4700000, total_spent: 3212000, remaining_budget: 1488000, days_remaining_in_month: 9 };
+// 22 October 2026: 9 days left after today, so 10 to share over; 22 of 31 days gone. ₹1,24,860 in hand.
+const october22 = {
+  has_budget: true,
+  total_budgeted: 4700000,
+  total_spent: 3212000,
+  remaining_budget: 1488000,
+  current_balance: 12486000,
+  days_remaining_in_month: 9,
+};
 
 test("safeToSpend shares what is left over the days left, today included, and compares spending with the month", () => {
   assert.deepEqual(safeToSpend(october22, 10, 2026), {
     kind: "ok",
     perDay: 148800, // ₹14,880 over 10 days
     left: 1488000,
+    budgetLeft: 1488000,
+    byBalance: false,
     days: 10,
     usedPercent: 68,
     monthPercent: 71,
@@ -127,6 +136,38 @@ test("safeToSpend: a spent or overspent budget has nothing safe to spend and say
   });
   const exact = safeToSpend({ ...october22, total_spent: 4700000, remaining_budget: 0 }, 10, 2026);
   assert.equal(exact.kind === "over" && exact.overBy, 0);
+});
+
+test("safeToSpend never offers more than the balance holds, so income and spending both move it", () => {
+  const money = (minor: number) => `₹${(minor / 100).toLocaleString("en-IN")}`;
+  // ₹5,000 in hand against ₹14,880 left in the budget: the balance is the limit.
+  const capped = safeToSpend({ ...october22, current_balance: 500000 }, 10, 2026);
+  assert.deepEqual(capped, {
+    kind: "ok",
+    perDay: 50000, // ₹5,000 over 10 days
+    left: 500000,
+    budgetLeft: 1488000,
+    byBalance: true,
+    days: 10,
+    usedPercent: 68,
+    monthPercent: 71,
+    ahead: false,
+  });
+  assert.equal(safeLine(capped, money), "Capped by your balance: ₹5,000 in hand, ₹14,880 left in your budget.");
+  // More income lifts it until the budget is the lower of the two again; a balance equal to it is not a cap.
+  assert.equal((safeToSpend({ ...october22, current_balance: 900000 }, 10, 2026) as { perDay: number }).perDay, 90000);
+  const level = safeToSpend({ ...october22, current_balance: 1488000 }, 10, 2026);
+  assert.equal(level.kind === "ok" && level.byBalance, false);
+  assert.equal(level.kind === "ok" && level.perDay, 148800);
+  // No money at all (or in debt): nothing is safe, whatever the budget says.
+  for (const current_balance of [0, -50000]) {
+    assert.deepEqual(safeToSpend({ ...october22, current_balance }, 10, 2026), { kind: "empty", days: 10, usedPercent: 68, monthPercent: 71 });
+  }
+  assert.equal(safeLine({ kind: "empty", days: 10, usedPercent: 68, monthPercent: 71 }, money), "Your balance is empty, so nothing is safe to spend.");
+  // An overspent budget still reads as over, with or without money in hand.
+  assert.equal(safeToSpend({ ...october22, remaining_budget: -120000, current_balance: 0 }, 10, 2026).kind, "over");
+  // No budget this month: unchanged, the card asks for one.
+  assert.deepEqual(safeToSpend({ ...october22, has_budget: false, current_balance: 500000 }, 10, 2026), { kind: "none" });
 });
 
 test("safeLine and daysLeft word each state", () => {

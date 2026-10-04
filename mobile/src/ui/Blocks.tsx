@@ -219,9 +219,9 @@ export function Meter({ percent, height = 8, tooltip, tick, label }: { percent: 
 
 /**
  * Home's SAFE TO SPEND TODAY card (the UX review, 2026-10-04), drawn from `lib/home` `safeToSpend`: marigold, tomato once
- * the month's budget is spent. The days-left badge, the day's figure (it counts up), a meter of the budget used with a
- * tick at how much of `month` ("Oct") has gone, then a line. With no budget, the line and "Set a budget →". The whole
- * card is one button (to the budget). `money` formats an unsigned amount in minor units.
+ * the month's budget is spent or the balance is empty. The days-left badge, the day's figure (it counts up), a meter of
+ * the budget used with a tick at how much of `month` ("Oct") has gone, then a line. With no budget, the line and "Set a
+ * budget →". The whole card is one button (to the budget). `money` formats an unsigned amount in minor units.
  */
 export function SafeCard({ safe, month, money, onPress }: { safe: SafeToSpend; month: string; money: (minor: number) => string; onPress: () => void }) {
   const line = safeLine(safe, money);
@@ -242,7 +242,7 @@ export function SafeCard({ safe, month, money, onPress }: { safe: SafeToSpend; m
       onPress={onPress}
       accessibilityLabel={`Safe to spend today: ${money(perDay)}, ${daysLeft(safe.days)}. ${used}, ${gone}. ${line}`}
       accessibilityHint="Opens your budget"
-      style={[styles.safe, { backgroundColor: safe.kind === "over" ? colors.tomato : colors.marigold }]}
+      style={[styles.safe, { backgroundColor: safe.kind === "ok" ? colors.marigold : colors.tomato }]}
     >
       <View style={styles.safeHead}>
         <RNText style={styles.safeLabel}>Safe to spend today</RNText>
