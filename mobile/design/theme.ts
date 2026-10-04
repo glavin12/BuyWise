@@ -53,14 +53,15 @@ export const type = {
   titleXL:    { fontFamily: fonts.display, fontSize: 36, lineHeight: 32, textTransform: 'uppercase' },
   cardTitle:  { fontFamily: fonts.display, fontSize: 19, lineHeight: 18, textTransform: 'uppercase', letterSpacing: 0.2 },
   rowTitle:   { fontFamily: fonts.display, fontSize: 18, lineHeight: 17, textTransform: 'uppercase' },
-  heroAmount: { fontFamily: fonts.number, fontSize: 42, lineHeight: 42 },
+  // body, meta, label, chip and heroAmount: the UX review's scale (2026-10-04), so the smallest everyday text is 12.
+  heroAmount: { fontFamily: fonts.number, fontSize: 44, lineHeight: 48 },
   statAmount: { fontFamily: fonts.numberBold, fontSize: 44, lineHeight: 44 },
   entryAmount:{ fontFamily: fonts.numberBold, fontSize: 86, lineHeight: 86 },
   rowAmount:  { fontFamily: fonts.number, fontSize: 21 },
-  body:       { fontFamily: fonts.mono, fontSize: 12, lineHeight: 21 },   // 1.75 — room for inline chips
-  meta:       { fontFamily: fonts.mono, fontSize: 10.5, lineHeight: 15 },
-  label:      { fontFamily: fonts.mono, fontSize: 10, letterSpacing: 1, textTransform: 'uppercase' },
-  chip:       { fontFamily: fonts.monoMedium, fontSize: 11 },
+  body:       { fontFamily: fonts.mono, fontSize: 14, lineHeight: 22 },   // room for inline chips
+  meta:       { fontFamily: fonts.mono, fontSize: 12, lineHeight: 17 },
+  label:      { fontFamily: fonts.mono, fontSize: 11, letterSpacing: 1.2, textTransform: 'uppercase' },
+  chip:       { fontFamily: fonts.monoMedium, fontSize: 12.5 },
 } as const;
 
 export const space = { xxs: 4, xs: 6, sm: 8, md: 10, lg: 12, xl: 14, xxl: 18, screenX: 18, screenTop: 8 } as const;

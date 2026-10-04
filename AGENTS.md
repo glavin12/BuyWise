@@ -16,12 +16,12 @@ Both clients call this API with a Supabase access token and use Supabase for aut
 
 ## Status
 
-Verified against the code on 2026-09-24; the backend and mobile rows were rechecked on 2026-10-03. Update this section in the same change as any feature in any part.
+Verified against the code on 2026-09-24; the backend row was rechecked on 2026-10-03 and the mobile row on 2026-10-04. Update this section in the same change as any feature in any part.
 
 | Part | State | Checks (2026-09-24) |
 |---|---|---|
 | Backend | Everything under [HTTP API](#http-api) is implemented, with 13 AI tools and migrations 001 to 004 | `pytest tests`: 89 passing (2026-10-03) |
-| Mobile | Every phase done: auth, Dashboard, Transactions, Budget, Goals, AI chat (1 to 4), Reports and full Settings (5). Design v3 (charcoal) done: tokens, fonts, illustrations, component kit, the new tab bar (centre = AI chat, hold = add; Settings is now the Profile tab), every screen rebuilt (the ones with no PNG reuse the rebuilt look; forms are cream sheets like Quick Add) and the DESIGN.md §6 motion. The old cream look (1.5) is removed. Details: `mobile/AGENTS.md` | 175 unit tests passing; `tsc` and lint clean; the Android bundle exports (2026-10-03). The app-review fixes of 2026-10-03 (timeouts, reinstall sign-out, layout, accessibility, idempotent Save, account deletion, AI consent) are in the code but not yet checked on a device |
+| Mobile | Every phase done: auth, Dashboard, Transactions, Budget, Goals, AI chat (1 to 4), Reports and full Settings (5). Design v3 (charcoal) done: tokens, fonts, illustrations, component kit, the new tab bar (centre = AI chat, hold = add; Settings is now the Profile tab), every screen rebuilt (the ones with no PNG reuse the rebuilt look; forms are cream sheets like Quick Add) and the DESIGN.md §6 motion. The old cream look (1.5) is removed. The UX review's "Now" group (2026-10-04) is under way: the bigger type scale is done. Details: `mobile/AGENTS.md` | 175 unit tests passing; `tsc` and lint clean (2026-10-04); the Android bundle exports (2026-10-03). The app-review fixes of 2026-10-03 (timeouts, reinstall sign-out, layout, accessibility, idempotent Save, account deletion, AI consent) and the UX review changes are in the code but not yet checked on a device |
 | Web | Every sidebar screen exists (see below) | `tsc` clean; `npm run lint` reports 24 errors; no tests |
 
 ### Web app (`frontend/`)

@@ -76,5 +76,5 @@ const styles = StyleSheet.create({
   title: { ...type.rowTitle, color: colors.text },
   meta: { ...type.meta, marginTop: 4, color: colors.muted },
   header: { paddingTop: 6, backgroundColor: colors.screen },
-  headerLabel: { fontFamily: fonts.monoBold, fontSize: 10.5, letterSpacing: 1, textTransform: "uppercase", color: colors.text },
+  headerLabel: { ...type.label, fontFamily: fonts.monoBold, color: colors.text },
 });

@@ -7,7 +7,7 @@ import { useOnline } from "@/lib/network";
 
 import { PressableScale } from "./PressableScale";
 import { showToast } from "./toast";
-import { colors, fonts, radius } from "./tokens";
+import { colors, fonts, radius, type } from "./tokens";
 
 // The composer (design/reference-html/Chat.html): a + circle that starts a new chat, and a pill
 // holding the input. The pill's right end is the voice glyph (a "coming soon" toast) until
@@ -16,8 +16,8 @@ import { colors, fonts, radius } from "./tokens";
 const MAX_LENGTH = 4000; // the server's cap per message
 const MAX_LINES = 4;
 const HEIGHT = 48;
-const LINE = 17;
-const PAD = 15; // 15 + 17 + 15 fills the design's 48 for one line
+const LINE = 20;
+const PAD = 14; // 14 + 20 + 14 fills the design's 48 for one line
 
 /** Multiline composer. Send is disabled while `busy` (a reply is on its way) and offline. */
 export function ChatInput({
@@ -104,7 +104,7 @@ const styles = StyleSheet.create({
     paddingLeft: 16,
     paddingVertical: PAD,
     fontFamily: fonts.mono,
-    fontSize: 12,
+    fontSize: type.body.fontSize,
     lineHeight: LINE,
     color: colors.text,
   },

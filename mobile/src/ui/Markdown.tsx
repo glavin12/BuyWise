@@ -10,7 +10,7 @@ import { colors, extra, fonts, space, type } from "./tokens";
 
 // The only file that imports the markdown library: if it breaks, only this file changes.
 // The library's defaults already open links with Linking.openURL. The look is Chat.html's: mono
-// prose (12 / 21), a bordered table with a muted header row, and amounts and percentages drawn as
+// prose (`type.body`), a bordered table with a muted header row, and amounts and percentages drawn as
 // inline chips (lib/chat.ts `prosePieces` finds them, so old conversations get them too).
 
 /** Long-press selects and copies (native, no clipboard dependency). */
@@ -30,7 +30,7 @@ const MARK: Record<string, TextStyle> = { bold: strong, italic: em, strike, code
 const MARK_OF: Record<string, string | undefined> = { strong: "bold", em: "italic", s: "strike" };
 
 const heading = { ...type.rowTitle, color: colors.text, marginBottom: space.xs };
-const codeText = { fontFamily: fonts.mono, fontSize: 11, lineHeight: 17, color: colors.text };
+const codeText = { ...type.meta, color: colors.text };
 // Fixed-basis cells keep the columns aligned; a table wider than the bubble scrolls sideways.
 const cell = { flexGrow: 1, flexShrink: 0, flexBasis: 96, paddingHorizontal: space.md, paddingVertical: space.xs, ...codeText, lineHeight: 16 };
 
@@ -48,7 +48,7 @@ const style: MarkdownStyleMap = {
   code_block: { ...codeText, backgroundColor: extra.inlineDark, borderColor: colors.line, borderRadius: TABLE_RADIUS, padding: space.md, marginBottom: space.sm },
   fence: { borderColor: colors.line, borderRadius: TABLE_RADIUS, marginBottom: space.sm },
   fence_header: { backgroundColor: colors.card2, borderBottomColor: colors.line },
-  fence_language_label: { fontFamily: fonts.mono, fontSize: 10, color: colors.muted },
+  fence_language_label: { ...type.meta, color: colors.muted },
   fence_code: { backgroundColor: extra.inlineDark, padding: space.md },
   fence_token: codeText,
   blockquote: { backgroundColor: extra.inlineDark, borderColor: colors.line, borderLeftWidth: 3, marginLeft: 0, paddingHorizontal: space.md, marginBottom: space.sm },

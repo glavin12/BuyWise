@@ -3,7 +3,7 @@ import { StyleSheet, Text as RNText, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { announce } from "./a11y";
-import { colors, extra, fonts, radius, space } from "./tokens";
+import { colors, extra, radius, space, type } from "./tokens";
 
 // One message at a time. Any screen calls showToast(); <ToastHost /> in the app
 // shell shows it above whatever is on screen, then clears it.
@@ -56,5 +56,5 @@ const styles = StyleSheet.create({
     backgroundColor: colors.cream,
     boxShadow: `0 8px 20px ${extra.coachShadow}`,
   },
-  text: { fontFamily: fonts.monoMedium, fontSize: 12, lineHeight: 18, textAlign: "center", color: colors.ink },
+  text: { ...type.chip, lineHeight: 18, textAlign: "center", color: colors.ink },
 });

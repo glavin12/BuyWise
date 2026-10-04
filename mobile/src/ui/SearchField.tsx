@@ -3,7 +3,7 @@ import { StyleSheet, TextInput, View } from "react-native";
 import Svg, { Path } from "react-native-svg";
 
 import { PressableScale } from "./PressableScale";
-import { colors, fonts, radius } from "./tokens";
+import { colors, fonts, radius, type } from "./tokens";
 
 // The v3 search pill (design/reference-html/Transactions.html): card fill, mono placeholder,
 // a voice glyph on the right that becomes a clear button once something is typed.
@@ -62,5 +62,5 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     backgroundColor: colors.card,
   },
-  input: { flex: 1, minWidth: 0, padding: 0, fontFamily: fonts.mono, fontSize: 12.5, color: colors.text },
+  input: { flex: 1, minWidth: 0, padding: 0, fontFamily: fonts.mono, fontSize: type.body.fontSize, color: colors.text },
 });

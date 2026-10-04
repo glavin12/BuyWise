@@ -77,7 +77,7 @@ export function IconTile({ icon: Icon, color, size = 44 }: { icon: LucideIcon | 
 type HeroParts = { whole: string; fraction: string };
 
 /**
- * The 40px balance figure with its fraction smaller and muted: ₹1,24,860.00. Pass the formatted parts, or `to`
+ * The balance figure (`type.heroAmount`) with its fraction smaller and muted: ₹1,24,860.00. Pass the formatted parts, or `to`
  * and a `format` that writes them to have it count up to them (DESIGN.md §6.4).
  */
 export function HeroAmount({
@@ -202,7 +202,7 @@ export function TxRow({
           {title}
         </RNText>
         {meta ? (
-          <RNText style={styles.txMeta} numberOfLines={1}>
+          <RNText style={styles.txMeta} numberOfLines={2}>
             {meta}
           </RNText>
         ) : null}
@@ -273,11 +273,11 @@ const styles = StyleSheet.create({
   panelTitle: { ...type.cardTitle, fontSize: 24, lineHeight: 23 },
   tile: { alignItems: "center", justifyContent: "center" },
   tileGlyph: { fontFamily: fonts.numberBold, color: colors.ink },
-  hero: { fontFamily: fonts.number, fontSize: 40, lineHeight: 44, letterSpacing: -0.3, color: colors.text },
+  hero: { ...type.heroAmount, letterSpacing: -0.3, color: colors.text },
   heroFraction: { fontSize: 26, color: colors.muted },
   section: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  sectionLabel: { fontFamily: fonts.mono, fontSize: 10.5, letterSpacing: 1, textTransform: "uppercase", color: colors.muted },
-  sectionLink: { fontFamily: fonts.mono, fontSize: 10.5, color: colors.text },
+  sectionLabel: { ...type.label, color: colors.muted },
+  sectionLink: { ...type.meta, color: colors.text },
   mini: {
     flex: 1,
     minWidth: 0,
@@ -295,9 +295,9 @@ const styles = StyleSheet.create({
   note: { ...type.meta },
   goal: { flex: 1, gap: 10, padding: 14, borderRadius: 22 },
   goalTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  goalPercent: { fontFamily: fonts.monoBold, fontSize: 11, color: colors.ink },
+  goalPercent: { ...type.meta, fontFamily: fonts.monoBold, color: colors.ink },
   goalTitle: { color: colors.ink },
-  goalAmounts: { fontFamily: fonts.mono, fontSize: 10.5, color: colors.ink },
+  goalAmounts: { ...type.meta, color: colors.ink },
   meter: { borderRadius: radius.pill, backgroundColor: extra.trackOnColour },
   meterTipRoom: { marginTop: 22 },
   meterFill: { height: "100%", borderRadius: radius.pill, backgroundColor: colors.ink },
@@ -319,7 +319,7 @@ const styles = StyleSheet.create({
   txTag: { marginTop: 6 },
   // Opaque so rows scroll under it while it sticks.
   day: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingTop: 6, backgroundColor: colors.screen },
-  dayLabel: { fontFamily: fonts.monoBold, fontSize: 10.5, letterSpacing: 1, textTransform: "uppercase", color: colors.text },
+  dayLabel: { ...type.label, fontFamily: fonts.monoBold, color: colors.text },
   dayNet: { flexDirection: "row", alignItems: "center", gap: 6 },
   dayNetWord: { ...type.meta, color: colors.muted },
 });

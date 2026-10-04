@@ -149,7 +149,7 @@ export default function ActivityTab() {
         label="Search transactions"
         onVoice={() => showToast("Voice search — coming soon")}
       />
-      <Row justify="between">
+      <Row justify="between" gap="xs" wrap>
         <Row gap="xs">
           {TYPES.map((t) => (
             <Chip key={t.value} label={t.label} variant={type === t.value ? "cream" : "card"} selected={type === t.value} onPress={() => changeType(t.value)} />

@@ -11,7 +11,7 @@ Expo / React Native client for the BuyWise backend (FastAPI + Supabase, in the r
 
 ## Status
 
-Verified against the code on 2026-09-30. Phase names come from the README and code comments; the scope of phases 1.5 and 5 came from the owner's Day-0 plan, which is not in the repo.
+Verified against the code on 2026-09-30, and the UX review row on 2026-10-04. Phase names come from the README and code comments; the scope of phases 1.5 and 5 came from the owner's Day-0 plan, which is not in the repo.
 
 | Phase | Scope | State |
 |---|---|---|
@@ -22,6 +22,7 @@ Verified against the code on 2026-09-30. Phase names come from the README and co
 | 4 | AI chat | Done: new chat on the Chat tab, History, open and delete a conversation |
 | 5 | Reports and full Settings | Done |
 | v3 design | The charcoal redesign from `design/` (Claude Design handoff; `design/README.md` lists the phases). 0: plan. 1: tokens, fonts, SVG illustrations. 2: component kit. 3: the tab bar. 4+: one screen at a time | Done. Phases 1 to 3, then every screen rebuilt: Home (2026-09-27); Activity, Quick Add, Budget, Goals (2026-09-28); AI Chat and History, Reports, Profile and the settings screens, Login and sign-up, and the screens with no PNG (transaction detail and edit, Set budget, the goal forms), which reuse the rebuilt screens' look (2026-09-30). Polish: the DESIGN.md §6 motion (see [Design v3 rules](#design-v3-rules)). Not done: comparing each screen with its PNG on a device, which the owner does in Expo Go |
+| UX review | The "Now" group of the owner's UX review of 2026-10-04 (`design/ux-review-2026-10-04.html`, not committed), one commit each: 1 type scale, 2 "+ Log" pills, 3 dead controls removed, 4 Home's In / Out / Net, 5 Safe to spend, 6 Budget rows, 7 tap-through to Activity. The owner's calls: the centre button stays (tap = chat, hold = add), the budget words become "Left to budget / Budgeted / Left", the default currency and goal money wait for later | In progress: 1 done. Not checked on a device |
 
 ### Screens (`src/app/`)
 
@@ -53,7 +54,7 @@ No privacy policy or Terms pages exist yet (the owner hosts them and sets the tw
 
 ### Baseline
 
-2026-10-03: `npm test` 175 passing; `npx tsc --noEmit` and `npx expo lint` clean; `npx expo export --platform android` bundles. The app-review fixes (2026-10-03) have not been run on a device yet: the owner checks them in Expo Go.
+2026-10-04: `npm test` 175 passing; `npx tsc --noEmit` and `npx expo lint` clean. 2026-10-03: `npx expo export --platform android` bundles. The app-review fixes (2026-10-03) and the UX review changes (2026-10-04) have not been run on a device yet: the owner checks them in Expo Go.
 
 ## Stack
 
@@ -112,6 +113,7 @@ From `design/CLAUDE.design.md`, with its paths adapted to this app (the kit is i
 
 - Visual source of truth: `design/DESIGN.md`, `design/theme.ts` (copied to `src/ui/tokens.ts`) and `design/screens/*.png`. Exact values (padding, radius, sizes, copy) are in `design/reference-html/*.html`: read them instead of guessing. The one deliberate departure is contrast: `extra.mutedOnCream` is darker than the design's `#6E685C` (4.5:1 on a cream field), the amount placeholder has its own `extra.placeholderOnCream`, and the `peri` chip uses ink text.
 - Colours, fonts, radii and durations come from `src/ui/tokens.ts`; never hardcode hex or font names outside `src/ui`. Screens compose the kit and never write one-off styles for something it covers.
+- Type sizes come from the UX review (2026-10-04), not DESIGN.md or `reference-html`: `type.body` 14 / 22, `meta` 12 / 17, `label` 11 with 1.2 tracking, `chip` 12.5 and `heroAmount` 44 (what `HeroAmount` draws), set in both `design/theme.ts` and `tokens.ts`. Kit text in those roles reads the tokens; text sized to its shape keeps its own size (the pulse bubbles' %, chart labels, Quick Add's tile captions, the ticket stubs' words, tooltips). A chip too wide for its row shrinks and wraps to two lines, and a transaction row's meta line and a budget row's line wrap too, instead of being cut off.
 - Titles are uppercase Barlow Semi Condensed; all body copy is JetBrains Mono. No emoji (category icons are lucide glyphs on `IconTile`s).
 - Tabs are Home · Activity · [AI chat] · Budget · Profile, drawn by `TabBar` (no container, border or hairline; DESIGN.md §5). The centre opens Chat on tap and the QuickAdd sheet on a 350 ms hold (medium haptic, a ring fills while held; screen readers get an "Add a transaction" action). Every tab uses the dark bar (the design's `marigold` surface is unused since Budget turned charcoal), and `coachOn` names the tab that shows the first-run coach mark (Activity). The bar hides while the keyboard is up. The tabs use `backBehavior="history"`, so back (Chat's header button, or Android's) returns to the tab the user came from.
 - Forms are cream sheets in the Quick Add look (`quickAddSheetOptions` and `SheetScreen`, with the same fields, chips and buttons), so moving from a charcoal screen into a form never changes style; lists and details are charcoal, in Activity's look. That was the owner's rule for the screens that have no PNG.

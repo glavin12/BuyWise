@@ -77,7 +77,7 @@ export function Ticket({
           </RNText>
           <View style={[styles.chip, { backgroundColor: soft ? extra.ticketChip : colors.ink }]}>
             {check ? <Check size={13} color={colors.mint} strokeWidth={2.4} /> : null}
-            <RNText style={[styles.chipText, { color: soft ? colors.ink : colors.cream }]} numberOfLines={1}>
+            <RNText style={[styles.chipText, { color: soft ? colors.ink : colors.cream }]} numberOfLines={2}>
               {chip}
             </RNText>
           </View>

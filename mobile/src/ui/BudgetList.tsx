@@ -114,9 +114,7 @@ export function BudgetRow({
         <View style={styles.track}>
           <DrawnFill percent={state.barPercent} style={[styles.fill, { backgroundColor: look.bar }]} />
         </View>
-        <RNText style={[styles.line, { color: look.line }]} numberOfLines={1}>
-          {line}
-        </RNText>
+        <RNText style={[styles.line, { color: look.line }]}>{line}</RNText>
       </View>
       <RNText style={[styles.assigned, styles.assignedCol]} numberOfLines={1}>
         {assigned}
@@ -146,7 +144,7 @@ const styles = StyleSheet.create({
   readyText: { flex: 1, minWidth: 0, gap: 2 },
   readyLabel: { ...type.label, color: colors.ink },
   readyAmount: { fontFamily: fonts.numberBold, fontSize: 38, lineHeight: 40, color: colors.ink },
-  readyLine: { fontFamily: fonts.mono, fontSize: 11, color: colors.ink },
+  readyLine: { ...type.meta, color: colors.ink },
   readyActions: { alignItems: "flex-end", gap: 8 },
   table: { gap: 10 },
   head: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 14 },

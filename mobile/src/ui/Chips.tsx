@@ -74,7 +74,7 @@ function ChipFrame({ label, variant = "cream", dot, icon: Icon, onPress, selecte
     <>
       {dot && <View style={[styles.dot, { backgroundColor: colors[dot] }]} />}
       {Icon && <Icon size={13} color={look.fg} strokeWidth={2.2} />}
-      <RNText style={[styles.label, small && styles.labelSmall, { color: look.fg }]} numberOfLines={1}>
+      <RNText style={[styles.label, small && styles.labelSmall, { color: look.fg }]} numberOfLines={2}>
         {label}
       </RNText>
       {chevron && <ChevronDown size={13} color={look.fg} strokeWidth={2.6} />}
@@ -197,8 +197,10 @@ export function RichText({
 }
 
 const styles = StyleSheet.create({
+  // A chip too wide for its row shrinks and its label takes a second line, instead of running off the screen.
   chip: {
     flexDirection: "row",
+    flexShrink: 1,
     alignItems: "center",
     alignSelf: "flex-start",
     gap: 6,
@@ -207,8 +209,8 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
   },
   chipSmall: { paddingVertical: 2, paddingHorizontal: 8 },
-  label: { ...type.chip },
-  labelSmall: { fontSize: 10 },
+  label: { ...type.chip, flexShrink: 1 },
+  labelSmall: { fontSize: type.meta.fontSize },
   dot: { width: 8, height: 8, borderRadius: radius.pill },
   knobPill: {
     flexDirection: "row",
@@ -235,7 +237,7 @@ const styles = StyleSheet.create({
   toggleFill: { flex: 1 },
   toggleHug: { paddingHorizontal: 12 },
   inline: { borderRadius: radius.inlineChip, borderWidth: 1, paddingHorizontal: 6 },
-  inlineText: { fontFamily: fonts.monoMedium, fontSize: 12, lineHeight: 17 },
+  inlineText: { fontFamily: fonts.monoMedium, fontSize: type.body.fontSize, lineHeight: 18 }, // 20 tall with its border: fits a body line
   link: { textDecorationLine: "underline" },
   rich: { flexDirection: "row", flexWrap: "wrap", alignItems: "center" },
   richChip: { flexDirection: "row", alignItems: "center", height: type.body.lineHeight },

@@ -2,7 +2,7 @@ import { ChevronRight, X, type LucideIcon } from "lucide-react-native";
 import { StyleSheet, Text as RNText, TextInput, View, type TextInputProps } from "react-native";
 
 import { PressableScale } from "./PressableScale";
-import { colors, extra, fonts, radius } from "./tokens";
+import { colors, extra, fonts, radius, type } from "./tokens";
 
 // A field on a cream sheet (design/reference-html/QuickAdd.html payee row): cream-field fill,
 // radius 17, 50 tall, a leading icon. `FieldButton` opens a chooser; `FieldInput` is typed into.
@@ -76,7 +76,7 @@ const styles = StyleSheet.create({
   inputField: { gap: 10, paddingHorizontal: 14 },
   text: { flex: 1, fontFamily: fonts.mono, fontSize: 13, color: colors.ink },
   placeholder: { color: extra.mutedOnCream },
-  hint: { fontFamily: fonts.mono, fontSize: 10.5, color: extra.mutedOnCream },
+  hint: { ...type.meta, color: extra.mutedOnCream },
   clear: { paddingRight: 14 },
   input: { flex: 1, height: "100%", fontFamily: fonts.mono, fontSize: 13, color: colors.ink, padding: 0 },
   growField: { height: undefined, minHeight: 50, alignItems: "flex-start", paddingVertical: 14 },

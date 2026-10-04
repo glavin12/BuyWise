@@ -43,5 +43,5 @@ const styles = StyleSheet.create({
     paddingRight: 14,
     borderRadius: radius.field,
   },
-  message: { flex: 1, ...type.body, lineHeight: 18, paddingVertical: 4 },
+  message: { flex: 1, ...type.body, lineHeight: 20, paddingVertical: 4 },
 });

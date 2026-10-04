@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOnline } from "@/lib/network";
 
 import { PressableScale } from "./PressableScale";
-import { colors, extra, fonts, radius, space } from "./tokens";
+import { colors, extra, fonts, radius, space, type } from "./tokens";
 
 // Design v3 buttons (DESIGN.md §3). Sizes come from design/reference-html.
 
@@ -178,7 +178,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     backgroundColor: colors.ink,
   },
-  pillLabel: { fontFamily: fonts.monoBold, fontSize: 11, color: colors.cream },
+  pillLabel: { fontFamily: fonts.monoBold, fontSize: type.chip.fontSize, color: colors.cream },
   fab: {
     position: "absolute",
     width: 60,
@@ -225,6 +225,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 16,
   },
-  secondaryLabel: { fontFamily: fonts.monoBold, fontSize: 12 },
+  secondaryLabel: { fontFamily: fonts.monoBold, fontSize: type.chip.fontSize },
   inactive: { opacity: 0.5 },
 });
