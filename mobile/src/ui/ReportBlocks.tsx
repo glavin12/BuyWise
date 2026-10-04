@@ -1,3 +1,4 @@
+import { ChevronRight } from "lucide-react-native";
 import type { ReactNode } from "react";
 import { StyleSheet, Text as RNText, View } from "react-native";
 
@@ -6,6 +7,7 @@ import type { Trend } from "@/lib/reports";
 import type { Hue } from "./Chips";
 import { Illustration } from "./Illustration";
 import { DrawnFill } from "./motion";
+import { PressableScale } from "./PressableScale";
 import { Skeleton } from "./Skeleton";
 import { colors, extra, fonts, radius, type } from "./tokens";
 
@@ -139,7 +141,10 @@ export function SegmentBar({ parts }: { parts: { key: string; tone: Hue; weight:
   );
 }
 
-/** One category: colour dot, name and "· 14 txns", the amount and its %. `first` has no line above it. */
+/**
+ * One category: colour dot, name and "· 14 txns", the amount and its %. `first` has no line above it. With `onPress`
+ * the row is a button, with a chevron, that opens its transactions.
+ */
 export function CategoryRow({
   name,
   tone,
@@ -147,6 +152,7 @@ export function CategoryRow({
   amount,
   percent,
   first,
+  onPress,
 }: {
   name: string;
   tone: Hue;
@@ -154,9 +160,12 @@ export function CategoryRow({
   amount: string;
   percent: string;
   first?: boolean;
+  onPress?: () => void;
 }) {
-  return (
-    <View style={[styles.row, first ? styles.rowFirst : styles.rowLine]} accessible accessibilityLabel={`${name}, ${count}, ${amount}, ${percent}`}>
+  const style = [styles.row, first ? styles.rowFirst : styles.rowLine];
+  const label = `${name}, ${count}, ${amount}, ${percent}`;
+  const body = (
+    <>
       <View style={[styles.dot, { backgroundColor: colors[tone] }]} />
       <RNText style={styles.name}>
         {name}
@@ -167,7 +176,20 @@ export function CategoryRow({
         {amount}
       </RNText>
       <RNText style={styles.percent}>{percent}</RNText>
-    </View>
+      {onPress ? <ChevronRight size={16} color={colors.muted} strokeWidth={2.4} /> : null}
+    </>
+  );
+  if (!onPress) {
+    return (
+      <View style={style} accessible accessibilityLabel={label}>
+        {body}
+      </View>
+    );
+  }
+  return (
+    <PressableScale onPress={onPress} scaleTo={0.98} accessibilityLabel={label} accessibilityHint="Shows these transactions in Activity" style={style}>
+      {body}
+    </PressableScale>
   );
 }
 

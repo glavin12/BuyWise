@@ -9,6 +9,7 @@ import {
   monthBounds,
   monthKey,
   monthShift,
+  monthUpTo,
   parseDateOnly,
   parseMonthYear,
   relativeDayLabel,
@@ -115,4 +116,14 @@ test("parseMonthYear accepts only a month the backend allows (route params are u
   }
   assert.equal(parseMonthYear(undefined, "2026"), null);
   assert.equal(parseMonthYear(["8"], "2026"), null); // a repeated query param arrives as an array
+});
+
+test("monthUpTo reads a YYYY-MM param as any month up to now; anything else is now", () => {
+  const now = { month: 10, year: 2026 };
+  assert.deepEqual(monthUpTo("2026-10", now), now);
+  assert.deepEqual(monthUpTo("2025-03", now), { month: 3, year: 2025 }); // older than the month sheet's year
+  assert.deepEqual(monthUpTo("2026-11", now), now); // a later month
+  for (const key of [undefined, "", "2026-1", "2026-13", "garbage", ["2026-09"]]) {
+    assert.deepEqual(monthUpTo(key, now), now, String(key));
+  }
 });

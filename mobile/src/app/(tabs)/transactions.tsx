@@ -4,7 +4,7 @@ import { Plus } from "lucide-react-native";
 import { useState } from "react";
 
 import { userMessage } from "@/lib/api";
-import { currentMonth, loggedTime, monthBounds, monthKey, monthShift, relativeDayLabel, todayLocal, type MonthYear } from "@/lib/dates";
+import { currentMonth, loggedTime, monthBounds, monthKey, monthShift, monthUpTo, relativeDayLabel, todayLocal, type MonthYear } from "@/lib/dates";
 import { formatCurrency, formatDate, formatMinor, formatMonth, formatMonthShort } from "@/lib/format";
 import { wholeIfRound } from "@/lib/home";
 import { METHOD_LABEL, TYPE_LABEL } from "@/lib/labels";
@@ -61,8 +61,8 @@ export default function ActivityTab() {
   const months = Array.from({ length: MONTHS_BACK }, (_, i) => monthShift(now.month, now.year, -i));
   const type: TypeFilter = TYPES.find((t) => t.value === params.type)?.value ?? "all";
   const categoryId = params.category || null;
-  // A month outside the list (a future budget month) shows this month.
-  const month: MonthYear = months.find((m) => monthKey(m.month, m.year) === params.month) ?? now;
+  // Any month up to this one, also one older than the sheet's year (Reports can open one); anything else shows this month.
+  const month: MonthYear = monthUpTo(params.month, now);
   const setCategoryId = (id: string | null) => router.setParams({ category: id ?? undefined });
   const setMonth = (m: MonthYear) => router.setParams({ month: monthKey(m.month, m.year) });
   const [sheet, setSheet] = useState<"category" | "month" | null>(null);

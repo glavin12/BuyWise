@@ -189,6 +189,9 @@ export default function HomeScreen() {
               currency={currency}
               picked={pickedCategory}
               onPick={setPickedCategory}
+              // The month of the day the pulse is on ("2026-10-04" -> "2026-10"); the type too, so a type filter
+              // left on Activity cannot hide the rows.
+              onOpen={(id, day) => router.navigate({ pathname: "/transactions", params: { type: "expense", category: id, month: day.slice(0, 7) } })}
             />
           ) : expenses.isError ? (
             <RichText links={{ retry: () => expenses.refetch() }}>{"Couldn't load this week. {dark@retry:Try again}"}</RichText>
@@ -238,7 +241,10 @@ function toParts(formatted: string) {
   return { whole, fraction };
 }
 
-/** The Spend Pulse body: day bubbles, the area chart and the category legend (which filters both). */
+/**
+ * The Spend Pulse body: day bubbles, the area chart and the category legend (which filters both). While a category is
+ * picked, a chip opens its transactions in Activity (`onOpen` gets its id and the shown day, for the month).
+ */
 function SpendPulse({
   rows,
   week,
@@ -249,6 +255,7 @@ function SpendPulse({
   currency,
   picked,
   onPick,
+  onOpen,
 }: {
   rows: Transaction[];
   week: string[];
@@ -259,6 +266,7 @@ function SpendPulse({
   currency: string;
   picked: string | null;
   onPick: (id: string | null) => void;
+  onOpen: (categoryId: string, day: string) => void;
 }) {
   const top = topCategories(rows, 3);
   // A category picked on another week may not be in this week's top three.
@@ -296,6 +304,14 @@ function SpendPulse({
           />
         ))}
       </Row>
+      {category ? (
+        <Chip
+          variant="peri"
+          label={`See ${category.name} in Activity →`}
+          accessibilityLabel={`Show ${category.name} spending in Activity`}
+          onPress={() => onOpen(category.id, week[upto])}
+        />
+      ) : null}
     </>
   );
 }
