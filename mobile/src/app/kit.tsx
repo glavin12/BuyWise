@@ -171,7 +171,6 @@ export default function KitScreen() {
         amount="₹4,860"
         line="give every rupee a job"
         action={<PillButton label="Copy Aug" icon={Copy} onPress={tap("copy")} />}
-        secondary={<Chip variant="outlined" icon={Sparkles} label="Auto-assign · soon" onPress={tap("auto-assign")} />}
       />
       <BudgetTable>
         <BudgetRow first name="Rent" dot="peri" assigned="₹18,000" state={{ kind: "done", available: "₹0", line: "fully spent", barPercent: 100 }} onPress={tap("rent")} />

@@ -49,7 +49,7 @@ const CIRCLE = {
   sage: { backgroundColor: colors.sage2, fg: colors.ink, borderWidth: 0, borderColor: undefined }, // Goals back
 } as const;
 
-/** Round icon button: back, ↗, search, bell, edit, history. 40 on a screen, 38 inside a card, 58 beside a PrimaryButton. */
+/** Round icon button: back, ↗, search, edit, history. 40 on a screen, 38 inside a card, 58 beside a PrimaryButton. */
 export function CircleButton({
   icon: Icon,
   label,

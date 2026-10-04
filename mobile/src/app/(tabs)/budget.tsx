@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
-import { Copy, Plus, RotateCw, Sparkles } from "lucide-react-native";
+import { Copy, Plus, RotateCw } from "lucide-react-native";
 import { useState } from "react";
 
 import { userMessage } from "@/lib/api";
@@ -30,14 +30,13 @@ import {
   Row,
   Screen,
   SecondaryButton,
-  showToast,
   Stack,
   Title,
   type OptionGroup,
 } from "@/ui";
 
 // Budget (the owner's list mockup, 2026-09-29): title and month pill, the marigold "ready to assign"
-// card with "Copy <last month>" (Auto-assign is a "coming soon" chip), opening / income / spent /
+// card with "Copy <last month>", opening / income / spent /
 // closing chips (the month's slice of the one running balance), then the categories with a budget,
 // most assigned first, then those that only carry money in. Budgets roll over: Available is what
 // earlier months left (or overspent) plus this month's budget minus this month's spending, and
@@ -167,15 +166,6 @@ export default function BudgetTab() {
               onPress={copyFromLastMonth}
             />
           )
-        }
-        secondary={
-          <Chip
-            variant="outlined"
-            icon={Sparkles}
-            label="Auto-assign · soon"
-            accessibilityLabel="Auto-assign, coming soon"
-            onPress={() => showToast("Auto-assign — coming soon")}
-          />
         }
       />
 

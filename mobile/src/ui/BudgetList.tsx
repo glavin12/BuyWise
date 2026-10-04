@@ -20,10 +20,10 @@ const ROW = {
 } as const;
 
 /**
- * The marigold "READY TO ASSIGN" card: the amount (a placeholder while it loads), a line under it, actions on the
+ * The marigold "READY TO ASSIGN" card: the amount (a placeholder while it loads), a line under it, an action on the
  * right. The amount is text as it is, or a number to count up to (DESIGN.md §6.4) with the helper that writes it.
  */
-export function ReadyCard({ amount, line, action, secondary }: { amount: string | Counted | null; line: string; action: ReactNode; secondary?: ReactNode }) {
+export function ReadyCard({ amount, line, action }: { amount: string | Counted | null; line: string; action: ReactNode }) {
   const said = typeof amount === "object" && amount ? amount.format(amount.to) : amount; // screen readers hear the real figure, not the count
   return (
     <View style={styles.ready}>
@@ -32,10 +32,7 @@ export function ReadyCard({ amount, line, action, secondary }: { amount: string 
         {amount === null ? <Skeleton tone="light" width="60%" height={34} /> : <Figure amount={amount} />}
         <RNText style={styles.readyLine}>{line}</RNText>
       </View>
-      <View style={styles.readyActions}>
-        {action}
-        {secondary}
-      </View>
+      <View style={styles.readyActions}>{action}</View>
     </View>
   );
 }

@@ -142,13 +142,7 @@ export default function ActivityTab() {
         <Title>Activity</Title>
         <Chip label="Log" icon={Plus} accessibilityLabel="Log a transaction" onPress={() => router.push("/add-transaction")} />
       </Row>
-      <SearchField
-        value={search}
-        onChangeText={setSearch}
-        placeholder="Search by payee or note"
-        label="Search transactions"
-        onVoice={() => showToast("Voice search — coming soon")}
-      />
+      <SearchField value={search} onChangeText={setSearch} placeholder="Search by payee or note" label="Search transactions" />
       <Stack gap="sm">
         <Row gap="xs">
           {TYPES.map((t) => (
