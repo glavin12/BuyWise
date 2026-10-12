@@ -1,23 +1,21 @@
 import { ArrowUp, Plus } from "lucide-react-native";
 import type { Ref } from "react";
 import { StyleSheet, TextInput, View } from "react-native";
-import Svg, { Path } from "react-native-svg";
 
 import { useOnline } from "@/lib/network";
 
 import { PressableScale } from "./PressableScale";
-import { showToast } from "./toast";
-import { colors, fonts, radius } from "./tokens";
+import { colors, fonts, radius, type } from "./tokens";
 
 // The composer (design/reference-html/Chat.html): a + circle that starts a new chat, and a pill
-// holding the input. The pill's right end is the voice glyph (a "coming soon" toast) until
-// something is typed, then Send.
+// holding the input. Send takes the pill's right end once something is typed; the design's voice
+// glyph is left out until voice input exists.
 
 const MAX_LENGTH = 4000; // the server's cap per message
 const MAX_LINES = 4;
 const HEIGHT = 48;
-const LINE = 17;
-const PAD = 15; // 15 + 17 + 15 fills the design's 48 for one line
+const LINE = 20;
+const PAD = 14; // 14 + 20 + 14 fills the design's 48 for one line
 
 /** Multiline composer. Send is disabled while `busy` (a reply is on its way) and offline. */
 export function ChatInput({
@@ -49,7 +47,7 @@ export function ChatInput({
       <View style={styles.pill}>
         <TextInput
           ref={inputRef}
-          style={styles.input}
+          style={[styles.input, empty && styles.inputAlone]}
           value={value}
           onChangeText={onChangeText}
           multiline
@@ -60,13 +58,7 @@ export function ChatInput({
           cursorColor={colors.text}
           accessibilityLabel="Message"
         />
-        {empty ? (
-          <PressableScale onPress={() => showToast("Voice input — coming soon")} accessibilityLabel="Voice input" style={styles.end}>
-            <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
-              <Path d="M4 10v4M8 7v10M12 4v16M16 8v8M20 11v2" stroke={colors.text} strokeWidth={2.1} strokeLinecap="round" />
-            </Svg>
-          </PressableScale>
-        ) : (
+        {empty ? null : (
           <PressableScale
             onPress={onSend}
             disabled={inactive}
@@ -104,10 +96,11 @@ const styles = StyleSheet.create({
     paddingLeft: 16,
     paddingVertical: PAD,
     fontFamily: fonts.mono,
-    fontSize: 12,
+    fontSize: type.body.fontSize,
     lineHeight: LINE,
     color: colors.text,
   },
+  inputAlone: { paddingRight: 16 }, // no Send beside it yet
   end: { width: HEIGHT, height: HEIGHT, alignItems: "center", justifyContent: "center" },
   send: {
     width: 34,

@@ -4,8 +4,7 @@ import { Globe, LayoutGrid, Pencil, User } from "lucide-react-native";
 import { useState } from "react";
 
 import { userMessage } from "@/lib/api";
-import { useDeleteAccount, useUpdateProfile } from "@/lib/mutations";
-import { useOnline } from "@/lib/network";
+import { useDeleteAccount } from "@/lib/mutations";
 import { categoriesQuery, payeesQuery, profileQuery } from "@/lib/queries";
 import { displayName, regionLabel, sinceLabel } from "@/lib/settings";
 import { useRefetchStaleOnFocus } from "@/lib/useRefetchStaleOnFocus";
@@ -33,9 +32,9 @@ import {
 } from "@/ui";
 
 // Profile (design/screens/09-profile.png, values from design/reference-html/Settings.html): the profile card,
-// four tilted tickets (Categories, Payees, Budget alerts, Region) and Sign out. Each ticket opens its list
-// or form; the alerts ticket is the switch itself. The web's "coming soon" rows are gone: the backend has
-// nothing behind them.
+// three tilted tickets (Categories, Payees, Region) and Sign out. Each ticket opens its list or form. The
+// design's Budget alerts ticket and the web's "coming soon" rows are left out: nothing sends alerts yet,
+// and the backend has nothing behind the rows.
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -46,9 +45,7 @@ export default function ProfileScreen() {
   const incomeCategories = useQuery(categoriesQuery("income"));
   const expensePayees = useQuery(payeesQuery("expense"));
   const incomePayees = useQuery(payeesQuery("income"));
-  const updateProfile = useUpdateProfile();
   const deleteAccount = useDeleteAccount();
-  const online = useOnline();
   const [refreshing, setRefreshing] = useState(false);
   useRefetchStaleOnFocus();
 
@@ -99,15 +96,6 @@ export default function ProfileScreen() {
     await signOut();
   };
 
-  /** R3: the switch flips at once (useUpdateProfile is optimistic) and settles on the server's answer either way. */
-  const toggleBudgetAlerts = async () => {
-    try {
-      await updateProfile.mutateAsync({ budget_alerts: !data?.budget_alerts });
-    } catch (err) {
-      showToast(userMessage(err, "save that setting"));
-    }
-  };
-
   return (
     <Screen surface="screen" tabBar onRefresh={refresh} refreshing={refreshing}>
       <Title>Profile</Title>
@@ -150,24 +138,11 @@ export default function ProfileScreen() {
               onPress={() => router.push("/settings/payees")}
               label={["Payees", saved, "search"].filter(Boolean).join(", ")}
             />
-            {/* Only the on / off preference is stored and nothing sends alerts yet, so the chip does not promise a rule. C1: writes are off offline. */}
-            <Ticket
-              title="Budget alerts"
-              color="sky"
-              tilt={-3}
-              order={2}
-              chip="alerts arrive soon"
-              soft
-              stub={{ on: data.budget_alerts }}
-              onPress={toggleBudgetAlerts}
-              disabled={updateProfile.isPending || !online}
-              label="Budget alerts, alerts arrive soon"
-            />
             <Ticket
               title="Region"
               color="mint"
-              tilt={4}
-              order={3}
+              tilt={-3}
+              order={2}
               chip={regionLabel(data.currency, data.timezone)}
               stub={{ icon: Globe, label: "change" }}
               onPress={() => router.push("/settings/profile")}
@@ -180,7 +155,7 @@ export default function ProfileScreen() {
       ) : (
         <>
           <Skeleton tone="dark" height={84} round="card" />
-          {[0, 1, 2, 3].map((i) => (
+          {[0, 1, 2].map((i) => (
             <Skeleton key={i} tone="dark" height={104} round="card" />
           ))}
         </>

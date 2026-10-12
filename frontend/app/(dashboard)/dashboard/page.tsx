@@ -172,7 +172,7 @@ export default function DashboardPage() {
                     <div>
                       <span className="opacity-70">Ready to assign</span>
                       <div>
-                        <AmountText amount={dashboard?.display_remaining_budget ?? 0} currency={currency} size="md" />
+                        <AmountText amount={dashboard?.display_unassigned ?? 0} currency={currency} size="md" />
                       </div>
                     </div>
                   )}

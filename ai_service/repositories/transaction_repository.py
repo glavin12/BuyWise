@@ -1,15 +1,16 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date
 
-from sqlalchemy import case, func, select
+from sqlalchemy import case, extract, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from ai_service.models import Category, Payee, Transaction
+from ai_service.models import BudgetEntry, Category, Payee, Transaction
 
 
 @dataclass
@@ -194,18 +195,64 @@ class TransactionRepository:
             for category, amount, count in result.all()
         ]
 
-    async def get_balance(self, user_id: uuid.UUID) -> int:
-        """Single running balance for the user: income + starting balances - expenses."""
+    async def get_balance(self, user_id: uuid.UUID, *, before: date | None = None) -> int:
+        """Single running balance for the user: income + starting balances - expenses.
+
+        With ``before`` it is the balance as it stood at the start of that date (transactions dated
+        earlier only): a month's opening balance is ``before=first day``, its closing balance
+        ``before=first day of the next month``. Without it, every transaction counts.
+        """
+        return (await self.get_balances(user_id, [before]))[0]
+
+    async def get_balances(self, user_id: uuid.UUID, cutoffs: Sequence[date | None]) -> list[int]:
+        """`get_balance` for several ``before`` dates (None: every transaction) in one statement.
+
+        The balance is summed from the user's whole history, so asking for the opening, closing and
+        live balance together reads those rows once instead of three times.
+        """
         signed_amount = case(
             (Transaction.transaction_type.in_(("income", "starting_balance")), Transaction.amount),
             (Transaction.transaction_type == "expense", -Transaction.amount),
             else_=0,
         )
-        stmt = select(func.coalesce(func.sum(signed_amount), 0)).where(
-            Transaction.user_id == user_id,
-            Transaction.parent_transaction_id.is_(None),
+        balances = [
+            func.coalesce(
+                func.sum(signed_amount if cutoff is None else case((Transaction.transaction_date < cutoff, signed_amount), else_=0)),
+                0,
+            )
+            for cutoff in cutoffs
+        ]
+        stmt = select(*balances).where(Transaction.user_id == user_id, Transaction.parent_transaction_id.is_(None))
+        return [int(balance or 0) for balance in (await self.session.execute(stmt)).one()]
+
+    async def spent_since_first_budget(
+        self, user_id: uuid.UUID, *, month: int, year: int, before: date
+    ) -> dict[uuid.UUID, int]:
+        """Expenses per category from the month it first had a budget up to (not including) ``before``.
+
+        Only categories with a budget entry earlier than ``month``/``year`` appear, and spending
+        from before that first budgeted month is left out: it was never part of an envelope.
+        """
+        first = (
+            select(BudgetEntry.category_id.label("category_id"), func.min(BudgetEntry.year * 12 + BudgetEntry.month).label("first_month"))
+            .where(BudgetEntry.user_id == user_id, BudgetEntry.year * 12 + BudgetEntry.month < year * 12 + month)
+            .group_by(BudgetEntry.category_id)
+            .subquery()
         )
-        return int(await self.session.scalar(stmt) or 0)
+        spent_month = extract("year", Transaction.transaction_date) * 12 + extract("month", Transaction.transaction_date)
+        stmt = (
+            select(Transaction.category_id, func.sum(Transaction.amount))
+            .join(first, first.c.category_id == Transaction.category_id)
+            .where(
+                Transaction.user_id == user_id,
+                Transaction.transaction_type == "expense",
+                Transaction.parent_transaction_id.is_(None),
+                Transaction.transaction_date < before,
+                spent_month >= first.c.first_month,
+            )
+            .group_by(Transaction.category_id)
+        )
+        return {category_id: int(amount or 0) for category_id, amount in (await self.session.execute(stmt)).all()}
 
     async def sum_by_payment_method(
         self,

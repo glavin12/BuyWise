@@ -198,10 +198,10 @@ const styles = StyleSheet.create({
   intro: { marginTop: 10, maxWidth: 300 },
   fields: { marginTop: 18, gap: 10 },
   action: { marginTop: 16 },
-  footer: { marginTop: "auto", paddingTop: 24, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5 },
-  footerText: { fontFamily: fonts.mono, fontSize: 12, color: colors.muted },
+  footer: { marginTop: "auto", paddingTop: 24, flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "center", gap: 5 },
+  footerText: { fontFamily: fonts.mono, fontSize: type.body.fontSize, color: colors.muted },
   link: { borderBottomWidth: 1.5, borderBottomColor: colors.tomato },
-  linkText: { fontFamily: fonts.monoBold, fontSize: 12, color: colors.text },
+  linkText: { fontFamily: fonts.monoBold, fontSize: type.body.fontSize, color: colors.text },
   field: {
     flexDirection: "row",
     alignItems: "center",

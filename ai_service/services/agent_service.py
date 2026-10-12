@@ -10,11 +10,13 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
+from langchain_core.callbacks import AsyncCallbackHandler
 from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
 from langchain_groq import ChatGroq
 from langgraph.prebuilt import create_react_agent
 
 from ai_service.core.config import get_settings
+from ai_service.core.context import get_db_session
 from ai_service.schemas.chat import ToolCallInfo
 from ai_service.tools import all_tools
 
@@ -71,11 +73,18 @@ reasoned assessment of the numbers available right now.
   income and expense analytics.
 - Do not claim that a logged transaction list is complete unless the tool data says
   so. Unlogged bills and existing balances may matter.
-- A category's or budget's "remaining" (budgeted minus spent) is room left in the
-  plan, not spendable cash. Before treating several categories' remaining amounts
-  as money still available to spend, check get_dashboard's unassigned: if it is
-  negative, income does not fully cover the assigned budgets and that combined
-  "remaining" overstates what is actually available.
+- Budgets roll over. A category's "remaining" (budgeted minus spent) is this
+  month's room alone; "available" is carried_in (what earlier months left over, or
+  overspent when negative) plus remaining. Categories that carry money but have no
+  budget this month are listed under "carried". Available is room left in the plan,
+  not spendable cash. get_dashboard's and get_budget_status's unassigned is the
+  closing balance minus the money held in every envelope, so money not yet given a
+  job. Before treating several categories' available amounts as money still free to
+  spend, check unassigned: if it is negative, the envelopes hold more than the
+  balance and that combined "available" overstates what is actually there.
+- opening_balance and closing_balance are the one running balance at the start and
+  end of the month; current_balance is the balance across all transactions. The
+  balance never resets at month end.
 
 ## No guilt scripts
 
@@ -135,9 +144,11 @@ when the data supports it without an arbitrary threshold or an unsupported infer
 
 - Spending is above recorded category budgets, when budgets exist.
 - get_dashboard's unassigned is negative: the user has assigned more to category
-  budgets than their income for the period. State the exact shortfall
+  budgets than the money they have. State the exact shortfall
   (display_unassigned) plainly. This applies even when total_spent is low, since
   low spending so far does not mean the plan is fully funded.
+- A category's available is negative: it is overspent and the amount carries into the
+  next month until covered.
 - One category or merchant is clearly dominant or exceptional in the returned data.
 - get_budget_status reports spending above a category budget.
 - A goal has a meaningful target date and monthly_needed_to_hit_target is a material
@@ -201,13 +212,30 @@ Tools understand only this_month and last_month.
 
 _agent = None
 
-# Hard bounds on one chat turn (AI cost and DB-session hold time). A turn that
-# exceeds either takes the graceful-failure path in ChatService.
-# ponytail: the request holds its DB session during the LLM call, so with the
-# default pool (5 + 10) ~15 slow chats stall every route; the timeout bounds it.
-# Move the LLM call outside the session if that ever bites.
+# Hard bounds on one chat turn (AI cost and latency). A turn that exceeds either
+# takes the graceful-failure path in ChatService.
 AGENT_TIMEOUT_SECONDS = 60
 AGENT_RECURSION_LIMIT = 12  # graph steps (~5 tool rounds); LangGraph's default is 25
+
+
+class _ReleaseDbConnection(AsyncCallbackHandler):
+    """Ends the request session's transaction before every model call.
+
+    A session keeps its pooled connection from its first read until a commit or rollback, and a chat turn spends
+    nearly all its time waiting on the model (seconds per call, 60 s at worst). Without this the turn held one
+    connection throughout, so about 15 slow chats (the default pool is 5 + 10) stalled every route. Now a connection
+    is held only while a tool's own queries run; the next transaction opens when a tool needs it.
+    """
+
+    async def on_chat_model_start(self, serialized: dict[str, Any], messages: list[list[BaseMessage]], **kwargs: Any) -> None:
+        try:
+            session = get_db_session()
+        except RuntimeError:  # outside request_context(): no chat turn, nothing to release
+            return
+        try:
+            await session.commit()
+        except Exception:  # a tool left its transaction failed: roll back, which frees the connection too
+            await session.rollback()
 
 
 @dataclass
@@ -230,6 +258,7 @@ def _get_agent():
             timeout=45,
             max_retries=1,
             max_tokens=4096,
+            callbacks=[_ReleaseDbConnection()],
         )
         _agent = create_react_agent(
             model=llm,

@@ -29,8 +29,7 @@ async def get_month_budgets(month: str, request: Request, response: Response, se
     try:
         year_text, month_text = month.split("-", 1)
         year, month_number = int(year_text), int(month_text)
-        budgets = await BudgetService(session).get_month_budgets(current_user.id, month_number, year)
-        return {"month": month_number, "year": year, "budgets": budgets}
+        return await BudgetService(session).month_view(current_user.id, month_number, year)
     except (ValueError, TypeError) as exc:
         raise HTTPException(status_code=400, detail="month must use YYYY-MM format") from exc
 

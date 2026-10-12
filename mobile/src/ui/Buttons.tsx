@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOnline } from "@/lib/network";
 
 import { PressableScale } from "./PressableScale";
-import { colors, extra, fonts, radius, space } from "./tokens";
+import { colors, extra, fonts, radius, space, type } from "./tokens";
 
 // Design v3 buttons (DESIGN.md §3). Sizes come from design/reference-html.
 
@@ -49,7 +49,7 @@ const CIRCLE = {
   sage: { backgroundColor: colors.sage2, fg: colors.ink, borderWidth: 0, borderColor: undefined }, // Goals back
 } as const;
 
-/** Round icon button: back, ↗, search, bell, edit, history. 40 on a screen, 38 inside a card, 58 beside a PrimaryButton. */
+/** Round icon button: back, ↗, search, edit, history. 40 on a screen, 38 inside a card, 58 beside a PrimaryButton. */
 export function CircleButton({
   icon: Icon,
   label,
@@ -178,7 +178,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     backgroundColor: colors.ink,
   },
-  pillLabel: { fontFamily: fonts.monoBold, fontSize: 11, color: colors.cream },
+  pillLabel: { fontFamily: fonts.monoBold, fontSize: type.chip.fontSize, color: colors.cream },
   fab: {
     position: "absolute",
     width: 60,
@@ -225,6 +225,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 16,
   },
-  secondaryLabel: { fontFamily: fonts.monoBold, fontSize: 12 },
+  secondaryLabel: { fontFamily: fonts.monoBold, fontSize: type.chip.fontSize },
   inactive: { opacity: 0.5 },
 });

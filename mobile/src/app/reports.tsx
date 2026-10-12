@@ -138,6 +138,11 @@ export default function ReportsScreen() {
   // C8: a refresh failed but cached numbers are on screen, so keep showing them and say so once.
   const stale = [...history, comparison, categories, methods].some((q) => q.isError && q.data !== undefined);
 
+  // Activity filtered to one category in the month shown. dismissTo pops back to the tab shell (a navigate would
+  // stack a second one); the type is set too, so a type filter left on Activity cannot hide the rows.
+  const openActivity = (categoryId: string) =>
+    router.dismissTo({ pathname: "/transactions", params: { type: "expense", category: categoryId, month: monthKey(period.month, period.year) } });
+
   const choices = Array.from({ length: MONTHS_BACK + 1 }, (_, i) => monthShift(now.month, now.year, -i));
   const groups: OptionGroup[] = [{ options: choices.map((m) => ({ value: monthKey(m.month, m.year), label: periodLabel(m, now) })) }];
 
@@ -218,6 +223,8 @@ export default function ReportsScreen() {
                   count={txnLabel(s.count)}
                   amount={money(s.amount)}
                   percent={`${Math.round(s.percent)}%`}
+                  // "Other" sums several categories, and Activity filters one at a time.
+                  onPress={s.other ? undefined : () => openActivity(s.key)}
                 />
               ))}
             </>

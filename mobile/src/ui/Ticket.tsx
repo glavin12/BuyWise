@@ -8,9 +8,10 @@ import { PressableScale } from "./PressableScale";
 import { colors, extra, fonts, motion, radius, type } from "./tokens";
 
 // The Profile tickets (DESIGN.md §3 `Ticket`, values from design/reference-html/Settings.html): a tilted
-// colour ticket, its title and a chip on the left, a dark stub on the right (an icon over a word, or a
-// switch), and a notch in the screen colour at each end of the seam. On mount each one settles from
-// rotate(0) to its tilt with a spring (§6.6); with reduce motion on they simply start tilted.
+// colour ticket, its title and a chip on the left, a dark stub on the right (an icon over a word), and a
+// notch in the screen colour at each end of the seam. On mount each one settles from rotate(0) to its tilt
+// with a spring (§6.6); with reduce motion on they simply start tilted. The design's switch stub (Budget
+// alerts) is left out until the backend sends alerts.
 
 const STUB = 104;
 const NOTCH = 18;
@@ -27,10 +28,8 @@ export function Ticket({
   order = 0,
   chip,
   check,
-  soft,
   stub,
   onPress,
-  disabled,
   label,
 }: {
   title: string;
@@ -42,12 +41,9 @@ export function Ticket({
   chip: string;
   /** A mint ✓ before the chip's words. */
   check?: boolean;
-  /** A translucent chip in place of the ink one (the sky ticket). */
-  soft?: boolean;
-  /** The dark block: an icon over a word, or a switch (`on`) over "on" / "off". */
-  stub: { icon: LucideIcon; label: string } | { on: boolean };
+  /** The dark block: an icon over a word. */
+  stub: { icon: LucideIcon; label: string };
   onPress: () => void;
-  disabled?: boolean;
   /** Screen-reader name: what the ticket says, as one line. */
   label: string;
 }) {
@@ -58,26 +54,23 @@ export function Ticket({
   }, [angle, order, reduceMotion, tilt]);
   const rotate = useAnimatedStyle(() => ({ transform: [{ rotate: `${angle.get()}deg` }] }));
 
-  const isSwitch = "on" in stub;
-  const Icon = "icon" in stub ? stub.icon : null;
+  const Icon = stub.icon;
 
   return (
     <Animated.View style={rotate}>
       <PressableScale
         onPress={onPress}
-        disabled={disabled}
-        accessibilityRole={isSwitch ? "switch" : "button"}
+        accessibilityRole="button"
         accessibilityLabel={label}
-        accessibilityState={isSwitch ? { checked: stub.on, disabled } : { disabled }}
-        style={[styles.ticket, { backgroundColor: colors[color] }, disabled && styles.inactive]}
+        style={[styles.ticket, { backgroundColor: colors[color] }]}
       >
         <View style={styles.main}>
           <RNText style={styles.title} numberOfLines={1}>
             {title}
           </RNText>
-          <View style={[styles.chip, { backgroundColor: soft ? extra.ticketChip : colors.ink }]}>
+          <View style={styles.chip}>
             {check ? <Check size={13} color={colors.mint} strokeWidth={2.4} /> : null}
-            <RNText style={[styles.chipText, { color: soft ? colors.ink : colors.cream }]} numberOfLines={1}>
+            <RNText style={styles.chipText} numberOfLines={2}>
               {chip}
             </RNText>
           </View>
@@ -85,14 +78,8 @@ export function Ticket({
 
         <View style={styles.stub}>
           <View style={styles.block}>
-            {isSwitch ? (
-              <View style={[styles.track, { backgroundColor: stub.on ? colors.mint : colors.line }]}>
-                <View style={[styles.knob, { left: stub.on ? 25 : 3, backgroundColor: stub.on ? colors.ink : colors.muted }]} />
-              </View>
-            ) : Icon ? (
-              <Icon size={28} color={colors.cream} strokeWidth={2} />
-            ) : null}
-            <RNText style={styles.word}>{isSwitch ? (stub.on ? "on" : "off") : stub.label}</RNText>
+            <Icon size={28} color={colors.cream} strokeWidth={2} />
+            <RNText style={styles.word}>{stub.label}</RNText>
           </View>
         </View>
 
@@ -106,16 +93,22 @@ export function Ticket({
 const styles = StyleSheet.create({
   stack: { marginTop: 22, marginBottom: 18, paddingHorizontal: 4, gap: 12 },
   ticket: { flexDirection: "row", height: 104, borderRadius: radius.card, boxShadow: `0 10px 14px ${extra.ticketShadow}` },
-  inactive: { opacity: 0.5 },
   main: { flex: 1, minWidth: 0, justifyContent: "space-between", paddingTop: 16, paddingRight: 14, paddingBottom: 14, paddingLeft: 18 },
   title: { ...type.cardTitle, fontSize: 26, lineHeight: 25, color: colors.ink },
-  chip: { flexDirection: "row", alignItems: "center", alignSelf: "flex-start", gap: 6, paddingVertical: 4, paddingHorizontal: 10, borderRadius: radius.pill },
-  chipText: { ...type.chip, flexShrink: 1 },
+  chip: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: radius.pill,
+    backgroundColor: colors.ink,
+  },
+  chipText: { ...type.chip, flexShrink: 1, color: colors.cream },
   stub: { width: STUB, paddingVertical: 8, paddingRight: 8 },
   block: { flex: 1, borderRadius: 18, backgroundColor: colors.ink, alignItems: "center", justifyContent: "center", gap: 6 },
   word: { fontFamily: fonts.mono, fontSize: 10, color: colors.cream },
-  track: { width: 50, height: 28, borderRadius: radius.pill },
-  knob: { position: "absolute", top: 3, width: 22, height: 22, borderRadius: radius.pill },
   // Half outside the ticket, centred on the seam, in the screen colour: it reads as a bite out of the edge.
   notch: { position: "absolute", right: STUB - NOTCH / 2, width: NOTCH, height: NOTCH, borderRadius: radius.pill, backgroundColor: colors.screen, pointerEvents: "none" },
 });

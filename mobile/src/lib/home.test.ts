@@ -1,8 +1,21 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { balanceSentence, compactMoney, dailyBudget, dailySpend, pulsePercents, splitFraction, topCategories, weekOf, wholeIfRound } from "./home.ts";
-import type { DashboardData, Transaction } from "./types";
+import {
+  compactMoney,
+  dailyBudget,
+  dailySpend,
+  daysLeft,
+  monthFigures,
+  pulsePercents,
+  safeLine,
+  safeToSpend,
+  splitFraction,
+  topCategories,
+  weekOf,
+  wholeIfRound,
+} from "./home.ts";
+import type { Transaction } from "./types";
 
 function tx(date: string, amount: number, extra: Partial<Transaction> = {}): Transaction {
   return {
@@ -74,18 +87,110 @@ test("money strings", () => {
   assert.equal(compactMoney(150000000, "USD"), "$1.5M");
 });
 
-test("balanceSentence covers each budget state and pluralises goals", () => {
-  const base = {
-    net: 1786000, display_net: 17860, has_budget: true, unassigned: 486000, display_unassigned: 4860,
-    remaining_budget: 0, display_remaining_budget: 0, active_goals_count: 3,
-  } as DashboardData;
-  const money = (v: number) => `₹${v}`;
+// 22 October 2026: 9 days left after today, so 10 to share over; 22 of 31 days gone. ₹1,24,860 in hand.
+const october22 = {
+  has_budget: true,
+  total_budgeted: 4700000,
+  total_spent: 3212000,
+  remaining_budget: 1488000,
+  current_balance: 12486000,
+  days_remaining_in_month: 9,
+};
+
+test("safeToSpend shares what is left over the days left, today included, and compares spending with the month", () => {
+  assert.deepEqual(safeToSpend(october22, 10, 2026), {
+    kind: "ok",
+    perDay: 148800, // ₹14,880 over 10 days
+    left: 1488000,
+    budgetLeft: 1488000,
+    byBalance: false,
+    days: 10,
+    usedPercent: 68,
+    monthPercent: 71,
+    ahead: false,
+  });
+  // ₹36,000 of ₹47,000 is 77%, against 71% of the month: spending faster than the month.
+  const faster = safeToSpend({ ...october22, total_spent: 3600000, remaining_budget: 1100000 }, 10, 2026);
+  assert.equal(faster.kind === "ok" && faster.ahead, true);
+});
+
+test("safeToSpend rounds down, counts the last day as one, and has nothing to share without a budget", () => {
+  // ₹10,000 over 9 days is ₹1,111.11 and a third: never offer the third.
+  const odd = safeToSpend({ ...october22, remaining_budget: 1000000, days_remaining_in_month: 8 }, 10, 2026);
+  assert.equal(odd.kind === "ok" && odd.perDay, 111111);
+  const last = safeToSpend({ ...october22, days_remaining_in_month: 0 }, 10, 2026);
+  assert.equal(last.kind === "ok" && last.days, 1);
+  assert.equal(last.kind === "ok" && last.perDay, 1488000);
+  assert.equal(last.kind === "ok" && last.monthPercent, 100);
+  assert.deepEqual(safeToSpend({ ...october22, has_budget: false }, 10, 2026), { kind: "none" });
+  assert.deepEqual(safeToSpend({ ...october22, total_budgeted: 0, remaining_budget: -3212000 }, 10, 2026), { kind: "none" });
+});
+
+test("safeToSpend: a spent or overspent budget has nothing safe to spend and says by how much", () => {
+  assert.deepEqual(safeToSpend({ ...october22, total_spent: 4820000, remaining_budget: -120000 }, 10, 2026), {
+    kind: "over",
+    overBy: 120000,
+    days: 10,
+    usedPercent: 103,
+    monthPercent: 71,
+  });
+  const exact = safeToSpend({ ...october22, total_spent: 4700000, remaining_budget: 0 }, 10, 2026);
+  assert.equal(exact.kind === "over" && exact.overBy, 0);
+});
+
+test("safeToSpend never offers more than the balance holds, so income and spending both move it", () => {
+  const money = (minor: number) => `₹${(minor / 100).toLocaleString("en-IN")}`;
+  // ₹5,000 in hand against ₹14,880 left in the budget: the balance is the limit.
+  const capped = safeToSpend({ ...october22, current_balance: 500000 }, 10, 2026);
+  assert.deepEqual(capped, {
+    kind: "ok",
+    perDay: 50000, // ₹5,000 over 10 days
+    left: 500000,
+    budgetLeft: 1488000,
+    byBalance: true,
+    days: 10,
+    usedPercent: 68,
+    monthPercent: 71,
+    ahead: false,
+  });
+  assert.equal(safeLine(capped, money), "Capped by your balance: ₹5,000 in hand, ₹14,880 left in your budget.");
+  // More income lifts it until the budget is the lower of the two again; a balance equal to it is not a cap.
+  assert.equal((safeToSpend({ ...october22, current_balance: 900000 }, 10, 2026) as { perDay: number }).perDay, 90000);
+  const level = safeToSpend({ ...october22, current_balance: 1488000 }, 10, 2026);
+  assert.equal(level.kind === "ok" && level.byBalance, false);
+  assert.equal(level.kind === "ok" && level.perDay, 148800);
+  // No money at all (or in debt): nothing is safe, whatever the budget says.
+  for (const current_balance of [0, -50000]) {
+    assert.deepEqual(safeToSpend({ ...october22, current_balance }, 10, 2026), { kind: "empty", days: 10, usedPercent: 68, monthPercent: 71 });
+  }
+  assert.equal(safeLine({ kind: "empty", days: 10, usedPercent: 68, monthPercent: 71 }, money), "Your balance is empty, so nothing is safe to spend.");
+  // An overspent budget still reads as over, with or without money in hand.
+  assert.equal(safeToSpend({ ...october22, remaining_budget: -120000, current_balance: 0 }, 10, 2026).kind, "over");
+  // No budget this month: unchanged, the card asks for one.
+  assert.deepEqual(safeToSpend({ ...october22, has_budget: false, current_balance: 500000 }, 10, 2026), { kind: "none" });
+});
+
+test("safeLine and daysLeft word each state", () => {
+  const money = (minor: number) => `₹${(minor / 100).toLocaleString("en-IN")}`;
+  assert.equal(safeLine(safeToSpend(october22, 10, 2026), money), "On track: ₹14,880 left in your budget.");
   assert.equal(
-    balanceSentence(base, "this month", money),
-    "Up {mint:+₹17860} this month. {hi@budget:₹4860} is ready to assign. {dark@goals:3 goals} in progress.",
+    safeLine(safeToSpend({ ...october22, total_spent: 3600000, remaining_budget: 1100000 }, 10, 2026), money),
+    "Spending faster than the month: ₹11,000 left in your budget.",
   );
-  const over = { ...base, net: -100, display_net: -1, unassigned: 0, remaining_budget: -500, display_remaining_budget: -5, active_goals_count: 1 };
-  assert.equal(balanceSentence(over, "last month", money), "Down {coral:−₹1} last month. {coral@budget:₹5} over budget. {dark@goals:1 goal} in progress.");
-  const none = { ...base, net: 0, has_budget: false, active_goals_count: 0 };
-  assert.equal(balanceSentence(none, "this month", money), "Even this month. No budget yet: {hi@budget:set one}. No goals yet: {dark@goals:add one}.");
+  assert.equal(safeLine({ kind: "over", overBy: 120000, days: 10, usedPercent: 103, monthPercent: 71 }, money), "₹1,200 over this month's budget.");
+  assert.equal(safeLine({ kind: "over", overBy: 0, days: 10, usedPercent: 100, monthPercent: 71 }, money), "This month's budget is all spent.");
+  assert.equal(safeLine({ kind: "none" }, money), "Set a budget for this month to see what you can spend each day.");
+  assert.equal(daysLeft(10), "10 days left");
+  assert.equal(daysLeft(1), "last day");
+});
+
+test("monthFigures: In in mint, Out plain, Net signed and coloured by its direction", () => {
+  const money = (minor: number) => `₹${minor / 100}`;
+  assert.deepEqual(monthFigures({ total_income: 5000000, total_spent: 3214000, net: 1786000 }, "Oct", money), [
+    { label: "In · Oct", value: "₹50000", tone: "mint" },
+    { label: "Out", value: "₹32140", tone: "text" },
+    { label: "Net", value: "+₹17860", tone: "mint" },
+  ]);
+  assert.deepEqual(monthFigures({ total_income: 0, total_spent: 50000, net: -50000 }, "Oct", money)[2], { label: "Net", value: "−₹500", tone: "tomato" });
+  assert.deepEqual(monthFigures({ total_income: 0, total_spent: 0, net: 0 }, "Oct", money)[2], { label: "Net", value: "₹0", tone: "text" });
 });

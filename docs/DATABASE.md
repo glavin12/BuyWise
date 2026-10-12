@@ -68,7 +68,7 @@ starting_balance + income - expense
 
 ### `budget_entries`
 
-Per-category monthly budgets. Columns are `id`, `user_id`, `category_id`, `month`, `year`, `budgeted_amount` in minor units, and timestamps. `(user_id, category_id, month, year)` is unique. Month is 1-12, year is 2020-2100, and amount is non-negative. The service only accepts active user-owned expense categories.
+Per-category monthly budgets. Columns are `id`, `user_id`, `category_id`, `month`, `year`, `budgeted_amount` in minor units, and timestamps. `(user_id, category_id, month, year)` is unique. Month is 1-12, year is 2020-2100, and amount is non-negative. The service only accepts active user-owned expense categories. Rollover is not stored: a category's carried-in money is worked out from these rows and the ledger on each request (see `docs/DESIGN_DECISIONS.md` section 14).
 
 ### `goals`
 

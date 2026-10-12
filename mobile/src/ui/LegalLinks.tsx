@@ -5,7 +5,7 @@ import { openLegal, PRIVACY_URL, TERMS_URL } from "@/lib/legal";
 
 import { PressableScale } from "./PressableScale";
 import { showToast } from "./toast";
-import { colors, extra, fonts } from "./tokens";
+import { colors, extra, type } from "./tokens";
 
 const LINKS = [
   { label: "Privacy policy", url: PRIVACY_URL },
@@ -39,6 +39,6 @@ export function LegalLinks({ surface = "dark" }: { surface?: "dark" | "cream" })
 
 const styles = StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 14 },
-  text: { fontFamily: fonts.mono, fontSize: 11 },
+  text: { ...type.meta },
   link: { textDecorationLine: "underline" },
 });

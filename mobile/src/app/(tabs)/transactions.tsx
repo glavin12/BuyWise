@@ -4,7 +4,7 @@ import { Plus } from "lucide-react-native";
 import { useState } from "react";
 
 import { userMessage } from "@/lib/api";
-import { currentMonth, loggedTime, monthBounds, monthKey, monthShift, relativeDayLabel, todayLocal, type MonthYear } from "@/lib/dates";
+import { currentMonth, loggedTime, monthBounds, monthKey, monthShift, monthUpTo, relativeDayLabel, todayLocal, type MonthYear } from "@/lib/dates";
 import { formatCurrency, formatDate, formatMinor, formatMonth, formatMonthShort } from "@/lib/format";
 import { wholeIfRound } from "@/lib/home";
 import { METHOD_LABEL, TYPE_LABEL } from "@/lib/labels";
@@ -38,9 +38,9 @@ import {
 } from "@/ui";
 
 // Activity (design/screens/03-activity.png, values from design/reference-html/Transactions.html):
-// title + category pill, search, type chips + month pill, count, day groups with their net.
-// The first-run coach mark above the centre tab is drawn by TabBar (`coachOn`). The filters live in
-// the URL (`type`, `category`, `month` as YYYY-MM), so Budget's ↗ can open an envelope's expenses here.
+// title + "Log" pill (opens Quick Add), search, type chips, then the category and month pills, count,
+// day groups with their net. The filters live in the URL (`type`, `category`, `month` as YYYY-MM), so
+// another screen can open it already filtered.
 
 type TypeFilter = "all" | "expense" | "income";
 
@@ -61,8 +61,8 @@ export default function ActivityTab() {
   const months = Array.from({ length: MONTHS_BACK }, (_, i) => monthShift(now.month, now.year, -i));
   const type: TypeFilter = TYPES.find((t) => t.value === params.type)?.value ?? "all";
   const categoryId = params.category || null;
-  // A month outside the list (a future budget month) shows this month.
-  const month: MonthYear = months.find((m) => monthKey(m.month, m.year) === params.month) ?? now;
+  // Any month up to this one, also one older than the sheet's year (Reports can open one); anything else shows this month.
+  const month: MonthYear = monthUpTo(params.month, now);
   const setCategoryId = (id: string | null) => router.setParams({ category: id ?? undefined });
   const setMonth = (m: MonthYear) => router.setParams({ month: monthKey(m.month, m.year) });
   const [sheet, setSheet] = useState<"category" | "month" | null>(null);
@@ -140,23 +140,31 @@ export default function ActivityTab() {
     <Stack gap="md">
       <Row justify="between">
         <Title>Activity</Title>
-        <Pill label={picked?.name ?? "all"} onPress={openCategories} />
+        <Chip label="Log" icon={Plus} accessibilityLabel="Log a transaction" onPress={() => router.push("/add-transaction")} />
       </Row>
-      <SearchField
-        value={search}
-        onChangeText={setSearch}
-        placeholder="Search by payee or note"
-        label="Search transactions"
-        onVoice={() => showToast("Voice search — coming soon")}
-      />
-      <Row justify="between">
+      <SearchField value={search} onChangeText={setSearch} placeholder="Search by payee or note" label="Search transactions" />
+      <Stack gap="sm">
         <Row gap="xs">
           {TYPES.map((t) => (
             <Chip key={t.value} label={t.label} variant={type === t.value ? "cream" : "card"} selected={type === t.value} onPress={() => changeType(t.value)} />
           ))}
         </Row>
-        <Pill variant="outlinedDark" label={formatMonthShort(month.month, month.year, now.year)} onPress={() => setSheet("month")} />
-      </Row>
+        {/* Category and month together, on their own line: at the 12.5 chip size the five never fit one phone line. */}
+        <Row gap="xs">
+          <Pill
+            variant={picked ? "cream" : "outlinedDark"}
+            label={picked?.name ?? "Category"}
+            accessibilityLabel={`Category: ${picked?.name ?? "all"}`}
+            onPress={openCategories}
+          />
+          <Pill
+            variant="outlinedDark"
+            label={formatMonthShort(month.month, month.year, now.year)}
+            accessibilityLabel={`Month: ${formatMonth(month.month, month.year)}`}
+            onPress={() => setSheet("month")}
+          />
+        </Row>
+      </Stack>
       {found ? <Note>{found}</Note> : null}
       {/* C8: a refresh failed but rows are cached, so keep showing them. */}
       {list.isError && list.data && !list.isFetchNextPageError ? <Banner tone="warning" message="Couldn't refresh. Showing what we have." /> : null}
@@ -185,7 +193,7 @@ export default function ActivityTab() {
     <Panel>
       <Stack gap="md">
         <RichText tone="card">
-          {`Nothing logged in ${escapeRich(formatMonth(month.month, month.year))}${type !== "all" || picked ? " for these filters" : ""}. Add one here, or hold the {hi:+} button below any time.`}
+          {`Nothing logged in ${escapeRich(formatMonth(month.month, month.year))}${type !== "all" || picked ? " for these filters" : ""}. Add one here, or hold the centre button any time.`}
         </RichText>
         <PrimaryButton label="Add transaction" icon={Plus} onPress={() => router.push("/add-transaction")} />
       </Stack>

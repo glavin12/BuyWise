@@ -22,7 +22,6 @@ import {
   Screen,
   SearchField,
   SettingsRow,
-  showToast,
   Skeleton,
   Stack,
   Title,
@@ -66,7 +65,7 @@ export default function PayeesSettingsScreen() {
         <Title>Payees</Title>
       </Row>
 
-      <SearchField value={query} onChangeText={setQuery} placeholder="Search payees" label="Search payees" onVoice={() => showToast("Voice search — coming soon")} />
+      <SearchField value={query} onChangeText={setQuery} placeholder="Search payees" label="Search payees" />
 
       <Row gap="xs">
         {TYPES.map((t) => (

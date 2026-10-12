@@ -1,3 +1,4 @@
+import { ChevronRight } from "lucide-react-native";
 import type { ReactNode } from "react";
 import { StyleSheet, Text as RNText, View } from "react-native";
 
@@ -6,6 +7,7 @@ import type { Trend } from "@/lib/reports";
 import type { Hue } from "./Chips";
 import { Illustration } from "./Illustration";
 import { DrawnFill } from "./motion";
+import { PressableScale } from "./PressableScale";
 import { Skeleton } from "./Skeleton";
 import { colors, extra, fonts, radius, type } from "./tokens";
 
@@ -139,7 +141,10 @@ export function SegmentBar({ parts }: { parts: { key: string; tone: Hue; weight:
   );
 }
 
-/** One category: colour dot, name and "· 14 txns", the amount and its %. `first` has no line above it. */
+/**
+ * One category: colour dot, name and "· 14 txns", the amount and its %. `first` has no line above it. With `onPress`
+ * the row is a button, with a chevron, that opens its transactions.
+ */
 export function CategoryRow({
   name,
   tone,
@@ -147,6 +152,7 @@ export function CategoryRow({
   amount,
   percent,
   first,
+  onPress,
 }: {
   name: string;
   tone: Hue;
@@ -154,9 +160,12 @@ export function CategoryRow({
   amount: string;
   percent: string;
   first?: boolean;
+  onPress?: () => void;
 }) {
-  return (
-    <View style={[styles.row, first ? styles.rowFirst : styles.rowLine]} accessible accessibilityLabel={`${name}, ${count}, ${amount}, ${percent}`}>
+  const style = [styles.row, first ? styles.rowFirst : styles.rowLine];
+  const label = `${name}, ${count}, ${amount}, ${percent}`;
+  const body = (
+    <>
       <View style={[styles.dot, { backgroundColor: colors[tone] }]} />
       <RNText style={styles.name}>
         {name}
@@ -167,7 +176,20 @@ export function CategoryRow({
         {amount}
       </RNText>
       <RNText style={styles.percent}>{percent}</RNText>
-    </View>
+      {onPress ? <ChevronRight size={16} color={colors.muted} strokeWidth={2.4} /> : null}
+    </>
+  );
+  if (!onPress) {
+    return (
+      <View style={style} accessible accessibilityLabel={label}>
+        {body}
+      </View>
+    );
+  }
+  return (
+    <PressableScale onPress={onPress} scaleTo={0.98} accessibilityLabel={label} accessibilityHint="Shows these transactions in Activity" style={style}>
+      {body}
+    </PressableScale>
   );
 }
 
@@ -221,10 +243,10 @@ const styles = StyleSheet.create({
     borderColor: colors.ink,
     backgroundColor: colors.cream,
   },
-  badgeText: { fontFamily: fonts.monoMedium, fontSize: 10.5, color: colors.ink },
+  badgeText: { ...type.chip, color: colors.ink },
   statBody: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", gap: 8, minHeight: 44, marginTop: 10 },
   statAmount: { flexShrink: 1, ...type.statAmount, color: colors.ink },
-  statAside: { fontFamily: fonts.mono, fontSize: 10.5, lineHeight: 14, textAlign: "right", color: colors.ink },
+  statAside: { ...type.meta, textAlign: "right", color: colors.ink },
   chartBlock: { marginTop: 10 },
   chartHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 8 },
   chartTitle: { ...type.cardTitle, fontSize: 16, lineHeight: 15, color: colors.ink },
@@ -258,16 +280,16 @@ const styles = StyleSheet.create({
   rowFirst: { marginTop: 8 },
   rowLine: { borderTopWidth: 1, borderTopColor: colors.line },
   dot: { width: 10, height: 10, borderRadius: radius.pill },
-  name: { flex: 1, fontFamily: fonts.mono, fontSize: 12, color: colors.text },
-  count: { fontSize: 10.5, color: colors.muted },
+  name: { flex: 1, fontFamily: fonts.mono, fontSize: type.body.fontSize, color: colors.text },
+  count: { fontSize: type.meta.fontSize, color: colors.muted },
   amount: { fontFamily: fonts.number, fontSize: 17, color: colors.text },
-  percent: { width: 38, textAlign: "right", fontFamily: fonts.mono, fontSize: 10.5, color: colors.muted },
+  percent: { width: 38, textAlign: "right", ...type.meta, color: colors.muted },
   tile: { flex: 1, minWidth: 0, padding: 12, borderRadius: radius.row, backgroundColor: colors.card },
-  tileLabel: { fontFamily: fonts.mono, fontSize: 10, color: colors.muted },
+  tileLabel: { ...type.meta, color: colors.muted },
   tileValue: { marginTop: 4, fontFamily: fonts.numberBold, fontSize: 22, lineHeight: 26 },
   method: { flexDirection: "row", alignItems: "center", gap: 10 },
-  methodLabel: { width: 48, fontFamily: fonts.mono, fontSize: 11, color: colors.text },
+  methodLabel: { width: 56, ...type.meta, color: colors.text }, // "Not set" fits on one line
   methodTrack: { flex: 1, height: 10, borderRadius: radius.pill, backgroundColor: extra.trackOnCard },
   methodFill: { height: "100%", borderRadius: radius.pill },
-  methodPercent: { width: 34, textAlign: "right", fontFamily: fonts.mono, fontSize: 11, color: colors.muted },
+  methodPercent: { width: 34, textAlign: "right", ...type.meta, color: colors.muted },
 });

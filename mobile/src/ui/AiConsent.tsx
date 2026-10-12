@@ -3,7 +3,7 @@ import { StyleSheet, Text as RNText } from "react-native";
 import { PrimaryButton, SecondaryButton } from "./Buttons";
 import { LegalLinks } from "./LegalLinks";
 import { Sheet } from "./OptionSheet";
-import { colors, fonts } from "./tokens";
+import { colors, type } from "./tokens";
 
 /**
  * Shown before the first chat message is sent: BuyWise AI sends the message, and what it looks up to answer, to a
@@ -27,5 +27,5 @@ export function AiConsent({ visible, onAgree, onDecline }: { visible: boolean; o
 }
 
 const styles = StyleSheet.create({
-  body: { fontFamily: fonts.mono, fontSize: 12.5, lineHeight: 20, color: colors.ink },
+  body: { ...type.body, color: colors.ink },
 });

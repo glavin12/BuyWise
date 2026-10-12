@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Iterable
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -66,6 +67,14 @@ class CategoryRepository:
         return await self.session.scalar(
             select(Category).where(Category.id == category_id, Category.user_id == user_id)
         )
+
+    async def get_many(self, user_id: uuid.UUID, category_ids: Iterable[uuid.UUID]) -> list[Category]:
+        """The user's categories with these ids, archived ones too, in one query (`get`, for a batch)."""
+        ids = list(category_ids)
+        if not ids:
+            return []
+        result = await self.session.scalars(select(Category).where(Category.user_id == user_id, Category.id.in_(ids)))
+        return list(result)
 
     async def find_by_name(self, user_id: uuid.UUID, name: str, type: str) -> Category | None:
         return await self.session.scalar(

@@ -7,7 +7,7 @@ import { useOnline } from "@/lib/network";
 
 import { announce } from "./a11y";
 import { ToastHost } from "./toast";
-import { colors, fonts } from "./tokens";
+import { colors, type } from "./tokens";
 
 /** C1: persistent banner while the device has no connection. Clears itself on reconnect (C2). */
 function OfflineBanner() {
@@ -49,5 +49,5 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
     backgroundColor: colors.tomato,
   },
-  offlineText: { fontFamily: fonts.monoMedium, fontSize: 11, color: colors.ink },
+  offlineText: { ...type.chip, color: colors.ink },
 });

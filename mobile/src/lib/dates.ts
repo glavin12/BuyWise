@@ -59,6 +59,13 @@ export function parseMonthYear(month: unknown, year: unknown): MonthYear | null 
   return valid ? parsed : null;
 }
 
+/** A "YYYY-MM" route param as a month up to `now` (a URL is untrusted text); anything else, or a later month, is `now`. */
+export function monthUpTo(key: unknown, now: MonthYear): MonthYear {
+  const match = typeof key === "string" ? /^(\d{4})-(\d{2})$/.exec(key) : null;
+  const asked = match ? parseMonthYear(match[2], match[1]) : null;
+  return asked && asked.year * 12 + asked.month <= now.year * 12 + now.month ? asked : now;
+}
+
 /** "YYYY-MM-DD" shifted by whole days (local calendar arithmetic). */
 export function shiftDays(ymd: string, days: number): string {
   const date = parseDateOnly(ymd);

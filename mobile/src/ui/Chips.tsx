@@ -47,24 +47,9 @@ export function Chip(props: ChipProps) {
   return <ChipFrame {...props} />;
 }
 
-/**
- * A dropdown trigger: a chip with a trailing chevron. `knob` is the Home month selector:
- * full width, 44 tall, the chevron inside an ink circle at the right.
- */
-export function Pill({ knob, ...props }: Omit<ChipProps, "dot" | "selected"> & { onPress: () => void; knob?: boolean }) {
-  if (!knob) return <ChipFrame {...props} chevron />;
-  const Icon = props.icon;
-  return (
-    <PressableScale onPress={props.onPress} accessibilityLabel={props.label} style={styles.knobPill}>
-      {Icon && <Icon size={16} color={colors.ink} strokeWidth={2.2} />}
-      <RNText style={styles.knobLabel} numberOfLines={1}>
-        {props.label}
-      </RNText>
-      <View style={styles.knob}>
-        <ChevronDown size={15} color={colors.cream} strokeWidth={2.6} />
-      </View>
-    </PressableScale>
-  );
+/** A dropdown trigger: a chip with a trailing chevron. */
+export function Pill(props: Omit<ChipProps, "dot" | "selected"> & { onPress: () => void }) {
+  return <ChipFrame {...props} chevron />;
 }
 
 function ChipFrame({ label, variant = "cream", dot, icon: Icon, onPress, selected, accessibilityLabel, chevron }: ChipProps & { chevron?: boolean }) {
@@ -74,7 +59,7 @@ function ChipFrame({ label, variant = "cream", dot, icon: Icon, onPress, selecte
     <>
       {dot && <View style={[styles.dot, { backgroundColor: colors[dot] }]} />}
       {Icon && <Icon size={13} color={look.fg} strokeWidth={2.2} />}
-      <RNText style={[styles.label, small && styles.labelSmall, { color: look.fg }]} numberOfLines={1}>
+      <RNText style={[styles.label, small && styles.labelSmall, { color: look.fg }]} numberOfLines={2}>
         {label}
       </RNText>
       {chevron && <ChevronDown size={13} color={look.fg} strokeWidth={2.6} />}
@@ -197,8 +182,10 @@ export function RichText({
 }
 
 const styles = StyleSheet.create({
+  // A chip too wide for its row shrinks and its label takes a second line, instead of running off the screen.
   chip: {
     flexDirection: "row",
+    flexShrink: 1,
     alignItems: "center",
     alignSelf: "flex-start",
     gap: 6,
@@ -207,35 +194,16 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
   },
   chipSmall: { paddingVertical: 2, paddingHorizontal: 8 },
-  label: { ...type.chip },
-  labelSmall: { fontSize: 10 },
+  label: { ...type.chip, flexShrink: 1 },
+  labelSmall: { fontSize: type.meta.fontSize },
   dot: { width: 8, height: 8, borderRadius: radius.pill },
-  knobPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    height: 44,
-    paddingLeft: 16,
-    paddingRight: 6,
-    borderRadius: radius.pill,
-    backgroundColor: colors.cream,
-  },
-  knobLabel: { flex: 1, fontFamily: fonts.monoBold, fontSize: 12.5, color: colors.ink },
-  knob: {
-    width: 32,
-    height: 32,
-    borderRadius: radius.pill,
-    backgroundColor: colors.ink,
-    alignItems: "center",
-    justifyContent: "center",
-  },
   toggle: { flexDirection: "row", borderRadius: radius.pill },
   toggleInline: { alignSelf: "flex-start" },
   toggleItem: { borderRadius: radius.pill, alignItems: "center", justifyContent: "center" },
   toggleFill: { flex: 1 },
   toggleHug: { paddingHorizontal: 12 },
   inline: { borderRadius: radius.inlineChip, borderWidth: 1, paddingHorizontal: 6 },
-  inlineText: { fontFamily: fonts.monoMedium, fontSize: 12, lineHeight: 17 },
+  inlineText: { fontFamily: fonts.monoMedium, fontSize: type.body.fontSize, lineHeight: 18 }, // 20 tall with its border: fits a body line
   link: { textDecorationLine: "underline" },
   rich: { flexDirection: "row", flexWrap: "wrap", alignItems: "center" },
   richChip: { flexDirection: "row", alignItems: "center", height: type.body.lineHeight },

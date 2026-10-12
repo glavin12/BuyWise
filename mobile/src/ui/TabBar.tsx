@@ -12,7 +12,7 @@ import { FLAGS, readFlag, writeFlag } from "@/lib/flags";
 
 import { Illustration } from "./Illustration";
 import { PressableScale } from "./PressableScale";
-import { colors, extra, fonts, motion, radius, space, tabSurface } from "./tokens";
+import { colors, extra, fonts, motion, radius, space, tabSurface, type } from "./tokens";
 
 // The v3 tab bar (DESIGN.md §5): no container, border or rule. Icons float over a fade of
 // the screen colour. Centre = AI chat: tap opens Chat, hold (350 ms) opens the QuickAdd sheet.
@@ -300,7 +300,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  coachText: { fontFamily: fonts.mono, fontSize: 11, color: colors.ink },
+  coachText: { fontFamily: fonts.mono, fontSize: type.meta.fontSize, color: colors.ink },
   coachBold: { fontFamily: fonts.monoBold },
   coachTail: {
     position: "absolute",

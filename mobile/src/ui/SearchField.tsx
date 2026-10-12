@@ -1,26 +1,24 @@
 import { Search, X } from "lucide-react-native";
 import { StyleSheet, TextInput, View } from "react-native";
-import Svg, { Path } from "react-native-svg";
 
 import { PressableScale } from "./PressableScale";
-import { colors, fonts, radius } from "./tokens";
+import { colors, fonts, radius, type } from "./tokens";
 
 // The v3 search pill (design/reference-html/Transactions.html): card fill, mono placeholder,
-// a voice glyph on the right that becomes a clear button once something is typed.
+// and a clear button on the right once something is typed. The design's voice glyph is left out
+// until voice input exists.
 
 export function SearchField({
   value,
   onChangeText,
   placeholder,
   label,
-  onVoice,
 }: {
   value: string;
   onChangeText: (text: string) => void;
   placeholder: string;
   /** Screen-reader name of the field. */
   label: string;
-  onVoice: () => void;
 }) {
   return (
     <View style={styles.field}>
@@ -41,13 +39,7 @@ export function SearchField({
         <PressableScale onPress={() => onChangeText("")} accessibilityLabel="Clear search" hitSlop={12}>
           <X size={18} color={colors.muted} strokeWidth={2.1} />
         </PressableScale>
-      ) : (
-        <PressableScale onPress={onVoice} accessibilityLabel="Search by voice" hitSlop={12}>
-          <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
-            <Path d="M4 10v4M8 7v10M12 4v16M16 8v8M20 11v2" stroke={colors.muted} strokeWidth={2.1} strokeLinecap="round" />
-          </Svg>
-        </PressableScale>
-      )}
+      ) : null}
     </View>
   );
 }
@@ -62,5 +54,5 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     backgroundColor: colors.card,
   },
-  input: { flex: 1, minWidth: 0, padding: 0, fontFamily: fonts.mono, fontSize: 12.5, color: colors.text },
+  input: { flex: 1, minWidth: 0, padding: 0, fontFamily: fonts.mono, fontSize: type.body.fontSize, color: colors.text },
 });
