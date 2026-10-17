@@ -1,4 +1,3 @@
-import { ArrowLeft, CloudOff, Inbox, SearchX, type LucideIcon } from "lucide-react-native";
 import type { ReactNode } from "react";
 
 import { escapeRich } from "@/lib/richText";
@@ -6,6 +5,7 @@ import { escapeRich } from "@/lib/richText";
 import { IconTile, Panel, Title } from "./Blocks";
 import { CircleButton, PrimaryButton, SecondaryButton } from "./Buttons";
 import { RichText, type Hue } from "./Chips";
+import { ArrowLeft, CloudOff, Inbox, SearchX, type LucideIcon } from "./icons";
 import { Row, Stack } from "./Layout";
 import { goBack, Screen } from "./Screen";
 

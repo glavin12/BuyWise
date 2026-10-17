@@ -10,6 +10,7 @@ import {
 import { useState } from "react";
 
 import { api } from "./api";
+import { SAVED_FOR } from "./cachePolicy";
 import { monthKey, monthShift, todayLocal, type DateRange, type MonthYear } from "./dates";
 import { findInPages, planBudgetCopy } from "./ledger";
 import { suggestedCategory, type PickedCategory } from "./transactionForm";
@@ -20,8 +21,14 @@ import type { CategoryType, Goal, Transaction, TransactionType, TransactionsResp
 // key shapes below are the cache layout, and `invalidateAfter` is the only place
 // that knows which screens a write makes stale.
 
-const FIVE_MINUTES = 5 * 60_000;
 export const PAGE_SIZE = 20;
+
+/**
+ * Kept on the phone between launches (queryClient.ts `keepSaved`), and in memory as long, so Home, Quick Add and the
+ * pickers open with their last answers after a restart or offline. Only these: Home's balance card and recent tiles,
+ * and the category and payee lists.
+ */
+const saved = { meta: { saved: true }, gcTime: SAVED_FOR };
 
 // Shared by the Dashboard, Settings and the post-signup provisioning call.
 // Every caller goes through this one key, so React Query sends a single request
@@ -34,10 +41,12 @@ export const profileQuery = queryOptions({
 
 export type DashboardPeriod = "this_month" | "last_month";
 
-// The phone's date is part of the key, so the numbers refetch when the day (and maybe the month) turns.
+// The phone's month is part of the key: a new month never shows the last one's figures, while a copy saved on an
+// earlier day of this month still opens Home at once (then refetches). The request sends the phone's date.
 export const dashboardQuery = (period: DashboardPeriod, today: string = todayLocal()) =>
   queryOptions({
-    queryKey: ["dashboard", period, today],
+    ...saved,
+    queryKey: ["dashboard", period, today.slice(0, 7)],
     queryFn: () => api.getDashboard(period, today),
   });
 
@@ -53,6 +62,7 @@ export type TransactionFilters = {
 };
 
 export const recentTransactionsQuery = queryOptions({
+  ...saved,
   queryKey: ["transactions", "recent"],
   queryFn: () => api.listTransactions({ limit: 3 }),
 });
@@ -116,7 +126,6 @@ const lastTransactionForPayeeQuery = (payeeId: string) =>
   queryOptions({
     queryKey: ["transactions", "lastForPayee", payeeId],
     queryFn: () => api.listTransactions({ payee_id: payeeId, limit: 1 }),
-    staleTime: FIVE_MINUTES,
   });
 
 /**
@@ -140,16 +149,16 @@ export function useSuggestCategory() {
 
 export const categoriesQuery = (type: CategoryType) =>
   queryOptions({
+    ...saved,
     queryKey: ["categories", type],
     queryFn: () => api.listCategories(type),
-    staleTime: FIVE_MINUTES,
   });
 
 export const payeesQuery = (type: CategoryType) =>
   queryOptions({
+    ...saved,
     queryKey: ["payees", type],
     queryFn: () => api.listPayees(type),
-    staleTime: FIVE_MINUTES,
   });
 
 const TYPES: readonly CategoryType[] = ["expense", "income"];

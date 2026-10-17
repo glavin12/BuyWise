@@ -1,10 +1,10 @@
-import { MessageCircle } from "lucide-react-native";
 import { StyleSheet, Text as RNText, View } from "react-native";
 
 import { timeAgo } from "@/lib/format";
 import type { Conversation } from "@/lib/types";
 
 import { IconTile } from "./Blocks";
+import { MessageCircle } from "./icons";
 import { Stack } from "./Layout";
 import { PressableScale } from "./PressableScale";
 import { Skeleton } from "./Skeleton";

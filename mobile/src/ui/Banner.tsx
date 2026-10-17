@@ -1,9 +1,9 @@
-import { CircleAlert, Info, TriangleAlert } from "lucide-react-native";
 import { useEffect } from "react";
 import { StyleSheet, Text as RNText, View } from "react-native";
 
 import { announce } from "./a11y";
 import { IconTile } from "./Blocks";
+import { CircleAlert, Info, TriangleAlert } from "./icons";
 import { colors, radius, type } from "./tokens";
 
 // The icon tile carries the tone; the block carries its own fill, so it reads on charcoal and sage alike.

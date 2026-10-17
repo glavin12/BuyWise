@@ -1,9 +1,9 @@
-import { Check, type LucideIcon } from "lucide-react-native";
 import { useEffect, type ReactNode } from "react";
 import { StyleSheet, Text as RNText, View } from "react-native";
 import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withDelay, withSpring } from "react-native-reanimated";
 
 import type { Hue } from "./Chips";
+import { Check, type LucideIcon } from "./icons";
 import { PressableScale } from "./PressableScale";
 import { colors, extra, fonts, motion, radius, type } from "./tokens";
 

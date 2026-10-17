@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ArrowLeft, Pencil } from "lucide-react-native";
 import { useState, type ReactNode } from "react";
 
 import { isNotFound, userMessage } from "@/lib/api";
@@ -32,6 +31,7 @@ import {
   Stack,
   Title,
 } from "@/ui";
+import { ArrowLeft, Pencil } from "@/ui/icons";
 
 // Transaction detail, in Activity's design language (design/screens/03-activity.png) on a charcoal stack
 // screen with a back button: the category tile, the payee, the signed amount (income in mint), then the

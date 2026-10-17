@@ -1,20 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import {
-  ArrowLeft,
-  ChartColumn,
-  ChartPie,
-  ChevronDown,
-  ChevronUp,
-  History,
-  Lightbulb,
-  List,
-  PenLine,
-  Sparkles,
-  Target,
-  Utensils,
-  Wallet,
-  type LucideIcon,
-} from "lucide-react-native";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { FlatList, ScrollView, StyleSheet, Text as RNText, TextInput, View } from "react-native";
 import Animated, {
@@ -44,6 +28,22 @@ import { Note, Panel, Title } from "./Blocks";
 import { CircleButton } from "./Buttons";
 import { ChatInput } from "./ChatInput";
 import { Chip, RichText } from "./Chips";
+import {
+  ArrowLeft,
+  ChartColumn,
+  ChartPie,
+  ChevronDown,
+  ChevronUp,
+  History,
+  Lightbulb,
+  List,
+  PenLine,
+  Sparkles,
+  Target,
+  Utensils,
+  Wallet,
+  type LucideIcon,
+} from "./icons";
 import { Illustration } from "./Illustration";
 import { Row, Stack } from "./Layout";
 import { Markdown } from "./Markdown";

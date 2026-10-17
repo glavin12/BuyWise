@@ -1,8 +1,8 @@
-import { ChevronDown, type LucideIcon } from "lucide-react-native";
 import { StyleSheet, Text as RNText, View } from "react-native";
 
 import { parseRich, type ChipKind } from "@/lib/richText";
 
+import { ChevronDown, type LucideIcon } from "./icons";
 import { PressableScale } from "./PressableScale";
 import { colors, extra, fonts, radius, type } from "./tokens";
 

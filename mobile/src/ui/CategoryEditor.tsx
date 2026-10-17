@@ -1,4 +1,3 @@
-import { Check, PenLine, type LucideIcon } from "lucide-react-native";
 import { StyleSheet, View } from "react-native";
 
 import { HUES, HUE_NAMES, type Hue as CategoryHue } from "@/lib/categoryStyle";
@@ -11,6 +10,7 @@ import { PrimaryButton, SecondaryButton } from "./Buttons";
 import { CATEGORY_GLYPHS, CategoryTile, categoryTone } from "./CategoryTile";
 import { Toggle, type Hue } from "./Chips";
 import { FieldInput } from "./Field";
+import { Check, PenLine, type LucideIcon } from "./icons";
 import { Row, Stack } from "./Layout";
 import { PressableScale } from "./PressableScale";
 import { SheetScreen } from "./SheetScreen";

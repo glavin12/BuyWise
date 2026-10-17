@@ -1,6 +1,5 @@
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
-import { ArrowLeft } from "lucide-react-native";
 import { useState } from "react";
 
 import { userMessage } from "@/lib/api";
@@ -61,6 +60,7 @@ import {
   type Hue,
   type OptionGroup,
 } from "@/ui";
+import { ArrowLeft } from "@/ui/icons";
 
 // Reports (design/screens/08-reports.png, values from design/reference-html/Reports.html): back and title,
 // the month and currency pills, the tomato panel (total spent, average per day, six months of income vs

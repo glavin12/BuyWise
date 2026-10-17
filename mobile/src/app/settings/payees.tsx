@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
-import { ArrowLeft } from "lucide-react-native";
 import { useState } from "react";
 
 import { userMessage } from "@/lib/api";
@@ -26,6 +25,7 @@ import {
   Stack,
   Title,
 } from "@/ui";
+import { ArrowLeft } from "@/ui/icons";
 
 // Payees, in the Activity look: back and title, search, Expense / Income chips, one row per payee (a tile
 // with its initial, its name) and the marigold + for a new one. Tapping a row renames or deletes it.

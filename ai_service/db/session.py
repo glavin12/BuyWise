@@ -32,7 +32,15 @@ def get_database_url() -> str:
 def get_engine() -> AsyncEngine:
     global _engine
     if _engine is None:
-        _engine = create_async_engine(get_database_url(), pool_pre_ping=True)
+        # Home fires 5 requests at once, a full default pool (5): with 10 kept, a bigger burst does not reconnect.
+        # ponytail: 10 + 5 overflow keeps the old ceiling of 15 connections per process; with several workers,
+        # keep workers x 15 within the pooler's pool size (Supabase > Database settings).
+        _engine = create_async_engine(
+            get_database_url(),
+            pool_pre_ping=get_settings().DB_POOL_PRE_PING,
+            pool_size=10,
+            max_overflow=5,
+        )
     return _engine
 
 

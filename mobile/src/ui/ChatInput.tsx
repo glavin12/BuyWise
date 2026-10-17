@@ -1,9 +1,9 @@
-import { ArrowUp, Plus } from "lucide-react-native";
 import type { Ref } from "react";
 import { StyleSheet, TextInput, View } from "react-native";
 
 import { useOnline } from "@/lib/network";
 
+import { ArrowUp, Plus } from "./icons";
 import { PressableScale } from "./PressableScale";
 import { colors, fonts, radius, type } from "./tokens";
 

@@ -1,5 +1,4 @@
 import { StatusBar } from "expo-status-bar";
-import { Eye, EyeOff, type LucideIcon } from "lucide-react-native";
 import { useEffect, useRef, useState, type ReactNode, type Ref } from "react";
 import {
   Keyboard,
@@ -18,6 +17,7 @@ import { heroFit, MAX_WIDTH, OVERLAP, WORDMARK } from "@/lib/authLayout";
 import { useOnline } from "@/lib/network";
 
 import { RichText } from "./Chips";
+import { Eye, EyeOff, type LucideIcon } from "./icons";
 import { Illustration } from "./Illustration";
 import { LegalLinks } from "./LegalLinks";
 import { PressableScale } from "./PressableScale";

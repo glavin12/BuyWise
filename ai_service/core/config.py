@@ -28,6 +28,10 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = ""
     SUPABASE_DATABASE_URL: str = ""
+    # Ping each pooled connection before use, so one the pooler dropped is replaced instead of failing the
+    # request. It costs 3 round trips per request (asyncpg pings inside BEGIN/ROLLBACK): keep it on where the
+    # backend sits next to the database; turn it off for local work against a distant one.
+    DB_POOL_PRE_PING: bool = True
 
     # Supabase Auth (JWT verification). The Auth module verifies Supabase-issued
     # access tokens via the project's JWKS endpoint (RS256). No shared HS256

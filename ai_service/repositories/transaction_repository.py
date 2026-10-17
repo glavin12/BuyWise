@@ -8,7 +8,7 @@ from datetime import date
 from sqlalchemy import case, extract, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import joinedload
 
 from ai_service.models import BudgetEntry, Category, Payee, Transaction
 
@@ -59,7 +59,7 @@ class TransactionRepository:
     async def get_by_idempotency_key(self, user_id: uuid.UUID, idempotency_key: str) -> Transaction | None:
         return await self.session.scalar(
             select(Transaction)
-            .options(selectinload(Transaction.category), selectinload(Transaction.payee))
+            .options(joinedload(Transaction.category), joinedload(Transaction.payee))
             .where(Transaction.user_id == user_id, Transaction.idempotency_key == idempotency_key)
         )
 
@@ -67,8 +67,8 @@ class TransactionRepository:
         return await self.session.scalar(
             select(Transaction)
             .options(
-                selectinload(Transaction.category),
-                selectinload(Transaction.payee),
+                joinedload(Transaction.category),
+                joinedload(Transaction.payee),
             )
             .where(Transaction.user_id == user_id, Transaction.id == transaction_id)
         )
@@ -89,8 +89,8 @@ class TransactionRepository:
         stmt = (
             select(Transaction)
             .options(
-                selectinload(Transaction.category),
-                selectinload(Transaction.payee),
+                joinedload(Transaction.category),
+                joinedload(Transaction.payee),
             )
             .where(Transaction.user_id == user_id)
         )

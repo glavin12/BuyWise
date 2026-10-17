@@ -4,7 +4,7 @@ import uuid
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import joinedload
 
 from ai_service.models import BudgetEntry
 
@@ -47,7 +47,7 @@ class BudgetRepository:
     async def get_month(self, user_id: uuid.UUID, month: int, year: int) -> list[BudgetEntry]:
         result = await self.session.scalars(
             select(BudgetEntry)
-            .options(selectinload(BudgetEntry.category))
+            .options(joinedload(BudgetEntry.category))
             .where(
                 BudgetEntry.user_id == user_id,
                 BudgetEntry.month == month,
@@ -70,7 +70,7 @@ class BudgetRepository:
     async def get(self, user_id: uuid.UUID, budget_id: uuid.UUID) -> BudgetEntry | None:
         return await self.session.scalar(
             select(BudgetEntry)
-            .options(selectinload(BudgetEntry.category))
+            .options(joinedload(BudgetEntry.category))
             .where(BudgetEntry.user_id == user_id, BudgetEntry.id == budget_id)
         )
 

@@ -1,6 +1,6 @@
-import { Search, X } from "lucide-react-native";
 import { StyleSheet, TextInput, View } from "react-native";
 
+import { Search, X } from "./icons";
 import { PressableScale } from "./PressableScale";
 import { colors, fonts, radius, type } from "./tokens";
 

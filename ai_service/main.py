@@ -9,6 +9,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -74,6 +75,9 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset"],
 )
+# Bodies of 1 KB or more go out gzipped to clients that ask for it (React Native's fetch does): our JSON
+# shrinks by about 80%, which matters for a 500-message chat history. Smaller bodies gain nothing.
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 app.state.limiter = limiter
 

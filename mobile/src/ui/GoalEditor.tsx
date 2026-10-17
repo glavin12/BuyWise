@@ -1,4 +1,3 @@
-import { Check, Flag, PenLine, PiggyBank, Tag } from "lucide-react-native";
 import { useState } from "react";
 
 import { currencySymbol } from "@/lib/home";
@@ -14,6 +13,7 @@ import { PrimaryButton, SecondaryButton } from "./Buttons";
 import { Chip } from "./Chips";
 import { DateChip } from "./DateChip";
 import { FieldButton, FieldInput } from "./Field";
+import { Check, Flag, PenLine, PiggyBank, Tag } from "./icons";
 import { Row, Stack } from "./Layout";
 import { Overlaid, PickerList, type PickerItem } from "./PickerList";
 import { SheetScreen } from "./SheetScreen";

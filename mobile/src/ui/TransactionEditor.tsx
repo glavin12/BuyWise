@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import { Check, LayoutGrid, PenLine, Sparkle, TextAlignStart, User } from "lucide-react-native";
 import { useState, type Dispatch, type Ref, type SetStateAction } from "react";
 import type { TextInput } from "react-native";
 
@@ -28,6 +27,7 @@ import { CategoryChoice, DashedChoice } from "./CategoryTile";
 import { Chip, Toggle } from "./Chips";
 import { DateChip } from "./DateChip";
 import { FieldButton, FieldInput } from "./Field";
+import { Check, LayoutGrid, PenLine, Sparkle, TextAlignStart, User } from "./icons";
 import { Row, Stack } from "./Layout";
 import { Overlaid, PickerList, type PickerItem } from "./PickerList";
 import { SheetScreen } from "./SheetScreen";

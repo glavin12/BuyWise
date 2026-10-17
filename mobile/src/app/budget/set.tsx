@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Check } from "lucide-react-native";
 import { useState } from "react";
 
 import { isNotFound, userMessage } from "@/lib/api";
@@ -31,6 +30,7 @@ import {
   Title,
   useDiscardGuard,
 } from "@/ui";
+import { Check } from "@/ui/icons";
 
 // Opens from the Budget tab with ?categoryId=…&month=…&year=…: set a budget for
 // that category and month, or edit / delete the one that is there. A cream sheet in the QuickAdd look.

@@ -1,9 +1,9 @@
-import { Check } from "lucide-react-native";
 import type { ReactNode } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, Text as RNText, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Title } from "./Blocks";
+import { Check } from "./icons";
 import { colors, extra, fonts, radius, space, type } from "./tokens";
 
 // `Sheet` is a cream bottom sheet (DESIGN.md §3: radius 34, 46×5 handle). `OptionSheet` is what a

@@ -140,6 +140,10 @@ Goals support optional category linkage and manual progress. Reaching `target_am
 
 `POST /api/v1/dev/token` is available only under `ENVIRONMENT=development`; it relays a password grant to Supabase Auth and is not registered in other environments.
 
+## Compression
+
+Responses of 1 KB or more are gzip-compressed when the request sends `Accept-Encoding: gzip`, which React Native's `fetch` and browsers do (and they unpack it). Smaller responses are sent as is.
+
 ## Rate Limits
 
 Protected financial endpoints use the configured financial limit, default `60/minute`. Chat defaults to `20/minute`, conversations to `60/minute`, profile to `30/minute`, health to `60/minute`, and the dev helper to `10/minute`. `/health/live` is intentionally not rate limited.

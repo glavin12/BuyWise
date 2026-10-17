@@ -1,10 +1,10 @@
-import { ArrowUpRight, Plus, type LucideIcon } from "lucide-react-native";
 import { useRef, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text as RNText, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useOnline } from "@/lib/network";
 
+import { ArrowUpRight, Plus, type LucideIcon } from "./icons";
 import { PressableScale } from "./PressableScale";
 import { colors, extra, fonts, radius, space, type } from "./tokens";
 

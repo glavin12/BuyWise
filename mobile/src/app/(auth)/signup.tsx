@@ -1,11 +1,11 @@
 import { router } from "expo-router";
-import { ArrowLeft, Lock, Mail } from "lucide-react-native";
 import { useRef, useState } from "react";
 import type { TextInput } from "react-native";
 
 import { escapeRich } from "@/lib/richText";
 import { useAuth } from "@/providers/AuthProvider";
 import { AuthField, AuthLayout, Banner, PrimaryButton } from "@/ui";
+import { ArrowLeft, Lock, Mail } from "@/ui/icons";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 

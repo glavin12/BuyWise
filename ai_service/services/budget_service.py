@@ -106,6 +106,8 @@ class BudgetService:
             "unassigned": unassigned,
             "display_unassigned": minor_to_amount(unassigned),
             "current_balance": current,  # the live balance, for the dashboard (`budget_status`); the month route omits it
+            # Every expense this month: an expense always has a category, so its per-category sums add up to it.
+            "total_spent": sum(spent.values()),
         }
 
     async def budget_status(
@@ -121,12 +123,7 @@ class BudgetService:
         view = await self.month_view(user_id, window.month, window.year)
         rows = view["budgets"]
         total_budgeted = sum(row["budgeted_amount"] for row in rows)
-        total_spent = await self.transactions.sum_total(
-            user_id,
-            transaction_type="expense",
-            start=window.start,
-            end=window.end,
-        )
+        total_spent = view["total_spent"]
         status = {
             "period": period,
             "month": window.month_name,

@@ -1,11 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
-import { ArrowUpRight, Plus, Search } from "lucide-react-native";
 import { useState } from "react";
 
 import { userMessage } from "@/lib/api";
+import { shownFreshness } from "@/lib/cachePolicy";
 import { currentMonth, todayLocal } from "@/lib/dates";
-import { formatCurrency, formatMinor, formatMonthShort } from "@/lib/format";
+import { formatCurrency, formatMinor, formatMonthShort, timeAgo } from "@/lib/format";
 import {
   compactMoney,
   currencySymbol,
@@ -37,6 +37,7 @@ import {
   IconTile,
   Illustration,
   MiniTile,
+  Note,
   Panel,
   Pill,
   PressableScale,
@@ -51,6 +52,7 @@ import {
   Stack,
   Title,
 } from "@/ui";
+import { ArrowUpRight, Plus, Search } from "@/ui/icons";
 
 // Home (design/screens/02-home.png, values from design/reference-html/Dashboard.html, and the UX review of
 // 2026-10-04): greeting, balance card with this month's In / Out / Net and the goals, Safe to spend today, Spend
@@ -93,6 +95,9 @@ export default function HomeScreen() {
   const name = profile.data?.full_name?.trim().split(/\s+/)[0] || session?.user.email?.split("@")[0] || "there";
   const goals = data?.active_goals_count ?? 0;
   const monthShort = formatMonthShort(now.month, now.year, now.year);
+  // The balance and recent tiles may be old: a copy kept on the phone, or a refresh that failed.
+  const freshness = shownFreshness([dashboard, recent]);
+  const updated = freshness ? `updated ${timeAgo(new Date(freshness.updatedAt).toISOString())}` : "";
 
   return (
     <Screen surface="screen" tabBar enter onRefresh={refresh} refreshing={refreshing}>
@@ -102,8 +107,10 @@ export default function HomeScreen() {
           <PressableScale onPress={() => router.navigate("/profile")} accessibilityLabel={`Hi, ${name}! Open your profile`}>
             <Row gap="md">
               <Illustration name="avatar_user" width={42} />
-              <Stack grow>
+              <Stack grow gap="xs">
                 <RichText>{`Hi, ${escapeRich(name)}!`}</RichText>
+                {/* Fits beside the avatar, so the blocks below do not jump when it goes. */}
+                {freshness?.state === "updating" ? <Note>{`Updating · last ${updated}`}</Note> : null}
               </Stack>
             </Row>
           </PressableScale>
@@ -114,8 +121,8 @@ export default function HomeScreen() {
         </Row>
       </Row>
 
-      {/* C8: a background refresh failed but cached numbers exist, so keep showing them. */}
-      {data && dashboard.isError ? <Banner tone="warning" message="Couldn't refresh. Showing your last known numbers." /> : null}
+      {/* C8: a background refresh failed but cached numbers exist (maybe from the phone's copy), so keep showing them, with their age. */}
+      {freshness?.state === "failed" ? <Banner tone="warning" message={`Couldn't refresh. Showing your last known numbers, ${updated}.`} /> : null}
 
       {data ? (
         <Panel>

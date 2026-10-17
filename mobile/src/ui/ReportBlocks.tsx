@@ -1,10 +1,10 @@
-import { ChevronRight } from "lucide-react-native";
 import type { ReactNode } from "react";
 import { StyleSheet, Text as RNText, View } from "react-native";
 
 import type { Trend } from "@/lib/reports";
 
 import type { Hue } from "./Chips";
+import { ChevronRight } from "./icons";
 import { Illustration } from "./Illustration";
 import { DrawnFill } from "./motion";
 import { PressableScale } from "./PressableScale";

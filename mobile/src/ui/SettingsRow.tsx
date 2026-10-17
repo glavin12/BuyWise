@@ -1,7 +1,7 @@
-import { ChevronRight } from "lucide-react-native";
 import type { ReactNode } from "react";
 import { StyleSheet, Text as RNText } from "react-native";
 
+import { ChevronRight } from "./icons";
 import { PressableScale } from "./PressableScale";
 import { colors, radius, type } from "./tokens";
 

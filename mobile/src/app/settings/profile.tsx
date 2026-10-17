@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
-import { Check, Globe, User } from "lucide-react-native";
 import { useState } from "react";
 
 import { userMessage } from "@/lib/api";
@@ -35,6 +34,7 @@ import {
   Stack,
   useDiscardGuard,
 } from "@/ui";
+import { Check, Globe, User } from "@/ui/icons";
 
 // Edit profile, on the same cream sheet as QuickAdd: name, currency (chips), time zone (a field that opens
 // the list), and the join date. Opened by the Profile card's pencil and by the Region ticket.

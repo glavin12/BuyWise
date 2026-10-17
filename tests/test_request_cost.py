@@ -22,7 +22,7 @@ from ai_service.db.base import Base
 import ai_service.models  # noqa: F401
 from ai_service.db.session import get_async_session
 from ai_service.main import app
-from ai_service.repositories import CategoryRepository, TransactionRepository
+from ai_service.repositories import CategoryRepository, PayeeRepository, TransactionRepository
 from ai_service.services import agent_service
 from ai_service.services.budget_service import BudgetService
 from ai_service.services.profile_service import ProfileService
@@ -142,9 +142,34 @@ async def test_dashboard_reads_the_database_in_ten_statements_or_fewer(api_clien
         user_id, category_id=food, amount=250 * R, transaction_type="expense", transaction_date=date(2026, 10, 3)
     )
 
+    session.expunge_all()  # a request starts with an empty session, as in production
     with count_statements(engine) as statements:
         response = await client.get("/api/v1/dashboard", params={"today": "2026-10-22"})
 
     assert response.status_code == 200
     assert response.json()["total_spent"] == 250 * R
-    assert len(statements) <= 10  # it was 13: three balance sums, and the month's expenses summed twice
+    # 13 before 2026-10-04 (three balance sums, the month's expenses summed twice), then 10: the budgets' categories
+    # had a SELECT of their own, and the month's expenses were summed again after the month view had them by category.
+    assert len(statements) <= 8
+
+
+@pytest.mark.asyncio
+async def test_a_transactions_page_reads_its_categories_and_payees_with_its_rows(api_client, engine, session):
+    client, user_id = api_client
+    await ProfileService(session).create_profile(user_id)
+    food = (await CategoryRepository(session).find_by_name(user_id, "Food", "expense")).id
+    payee = (await PayeeRepository(session).list(user_id, type="expense"))[0]
+    payee_name = payee.name
+    for day in (1, 2, 3):
+        await TransactionService(session).add_transaction(
+            user_id, category_id=food, payee_id=payee.id, amount=100 * R, transaction_type="expense",
+            transaction_date=date(2026, 10, day),
+        )
+
+    session.expunge_all()  # a request starts with an empty session, as in production
+    with count_statements(engine) as statements:
+        response = await client.get("/api/v1/transactions", params={"limit": 20})
+
+    assert response.status_code == 200
+    assert {(row["category"], row["payee"]) for row in response.json()["transactions"]} == {("Food", payee_name)}
+    assert len(statements) == 2  # the page, with its categories and payees joined in, and the total

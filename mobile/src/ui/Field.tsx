@@ -1,6 +1,6 @@
-import { ChevronRight, X, type LucideIcon } from "lucide-react-native";
 import { StyleSheet, Text as RNText, TextInput, View, type TextInputProps } from "react-native";
 
+import { ChevronRight, X, type LucideIcon } from "./icons";
 import { PressableScale } from "./PressableScale";
 import { colors, extra, fonts, radius, type } from "./tokens";
 

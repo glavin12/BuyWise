@@ -1,0 +1,816 @@
+<title>BuyWise UX Review</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+/* Layout: one reading column (max 1080) on the app's own cream / charcoal; phone mockups sit beside their notes and stack under 780px. */
+:root {
+  --bg: #F3EEE2;
+  --surface: #E8E1D2;
+  --surface-2: #DCD3C1;
+  --fg: #161616;
+  --muted: #5E584C;
+  --line: #CFC5B1;
+  --link: #B3261E;
+  --display: "Barlow Semi Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  /* The app's own tokens (mobile/src/ui/tokens.ts). Mockups use only these, in both page themes. */
+  --a-ink: #161616; --a-screen: #242426; --a-card: #333335; --a-card2: #3E3E41; --a-line: #4A4A4E;
+  --a-text: #F3F1EA; --a-muted: #AAA8A0; --a-prose: #D4D2CA; --a-sage: #D9E4D5; --a-sage2: #C4D3C0;
+  --a-cream: #F3EEE2; --a-field: #E5DECF; --a-tomato: #F0604A; --a-tomato2: #F37863; --a-peri: #6E67EE;
+  --a-peri2: #8C86F3; --a-marigold: #F4C443; --a-mint: #BEE3CB; --a-mint2: #8FC9A6; --a-sky: #A9D8EE;
+  --a-lav: #D3CDF8; --a-forest: #3E6B55; --a-idle: #6F6D68; --a-bezel: #0E0E0F; --a-muted-cream: #645E52;
+  --a-track: rgba(22,22,22,0.14);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #1B1B1D; --surface: #28282A; --surface-2: #323235; --fg: #F3F1EA; --muted: #AAA8A0;
+    --line: #3B3B3F; --link: #F37863; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #1B1B1D; --surface: #28282A; --surface-2: #323235; --fg: #F3F1EA; --muted: #AAA8A0;
+  --line: #3B3B3F; --link: #F37863; color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--mono); font-size: 14.5px; line-height: 1.65; }
+.wrap { max-width: 1080px; margin: 0 auto; padding-inline: 20px; padding-block: 44px 96px; display: flex; flex-direction: column; gap: 72px; }
+section { display: flex; flex-direction: column; gap: 22px; min-width: 0; }
+h1, h2, h3 { font-family: var(--display); font-weight: 700; text-transform: uppercase; margin: 0; text-wrap: balance; }
+h1 { font-size: clamp(48px, 10vw, 96px); line-height: 0.88; letter-spacing: 0.005em; }
+h2 { font-size: clamp(30px, 5vw, 40px); line-height: 0.95; }
+h3 { font-size: 21px; line-height: 1.05; letter-spacing: 0.01em; }
+p { margin: 0; max-width: 68ch; }
+code { font-family: var(--mono); font-size: 0.86em; background: var(--surface); padding: 1px 5px; border-radius: 5px; overflow-wrap: anywhere; }
+.eyebrow { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+.lede { font-size: 16px; line-height: 1.7; max-width: 62ch; }
+.muted { color: var(--muted); }
+.small { font-size: 12.5px; line-height: 1.6; }
+ul.plain { margin: 0; padding-left: 1.1em; display: flex; flex-direction: column; gap: 6px; max-width: 68ch; }
+ul.plain li::marker { color: var(--muted); }
+
+header.top { display: flex; flex-direction: column; gap: 18px; }
+.swatches { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.swatches span { width: 30px; height: 30px; border-radius: 9px; border: 1px solid rgba(22,22,22,0.15); }
+
+/* Verdict */
+.verdict { display: grid; gap: 10px; }
+.vrow { display: grid; grid-template-columns: 210px 1fr; gap: 18px; align-items: start; background: var(--surface); border-radius: 20px; padding: 18px 20px; }
+.vrow h3 { display: flex; flex-direction: column; gap: 8px; }
+.vrow p { min-width: 0; }
+.state { display: inline-block; font-family: var(--mono); font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 3px 10px; border-radius: 999px; color: var(--a-ink); width: fit-content; }
+.s-good { background: var(--a-mint); }
+.s-bad { background: var(--a-tomato); }
+.s-mid { background: var(--a-marigold); }
+.s-low { background: var(--a-sky); }
+
+/* Tables */
+.tablebox { overflow-x: auto; border-radius: 18px; border: 1px solid var(--line); }
+table { border-collapse: collapse; width: 100%; min-width: 720px; font-size: 13px; line-height: 1.55; }
+th, td { text-align: left; vertical-align: top; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+th { font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); font-weight: 500; background: var(--surface); }
+tr:last-child td { border-bottom: 0; }
+td.k { font-weight: 500; width: 31%; }
+tr.group td { background: var(--surface-2); font-family: var(--display); font-weight: 700; font-size: 17px; text-transform: uppercase; letter-spacing: 0.02em; padding-block: 8px; }
+
+/* Issues */
+.issues { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.issue { background: var(--surface); border-radius: 20px; padding: 18px 20px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.issue .where { font-size: 11.5px; color: var(--muted); }
+.issue h3 { font-size: 19px; }
+
+/* Annotated screenshot */
+.shot { display: grid; grid-template-columns: 300px 1fr; gap: 28px; align-items: start; margin: 0; }
+.shot-img { position: relative; border-radius: 30px; overflow: hidden; border: 6px solid var(--a-bezel); max-width: 100%; }
+.shot-img img { display: block; width: 100%; height: auto; }
+.badge { position: absolute; transform: translate(-50%, -50%); width: 26px; height: 26px; border-radius: 50%; background: var(--a-marigold); color: var(--a-ink); border: 2px solid var(--a-ink); font: 700 13px/22px var(--mono); text-align: center; box-shadow: 0 2px 6px rgba(0,0,0,0.35); }
+ol.key { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 14px; counter-reset: k; }
+ol.key li { display: grid; grid-template-columns: 30px 1fr; gap: 10px; counter-increment: k; }
+ol.key li::before { content: counter(k); width: 26px; height: 26px; border-radius: 50%; background: var(--a-marigold); color: var(--a-ink); border: 2px solid var(--a-ink); font: 700 13px/22px var(--mono); text-align: center; }
+ol.key b { font-weight: 700; }
+
+/* Principles */
+.principles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.principle { border-top: 3px solid var(--fg); padding-top: 12px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.roles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.role { border-radius: 16px; padding: 14px; color: var(--a-ink); display: flex; flex-direction: column; gap: 4px; min-height: 96px; }
+.role b { font-family: var(--display); font-size: 19px; text-transform: uppercase; }
+.role span { font-size: 12px; line-height: 1.45; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* Mockup rows */
+.mock { display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 36px; align-items: start; }
+.mock .notes { display: flex; flex-direction: column; gap: 14px; min-width: 0; padding-top: 8px; }
+.mock .notes h3 { font-size: 28px; }
+.tag { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+
+/* ---------- The phone ---------- */
+.phone { width: 340px; max-width: 100%; background: var(--a-screen); color: var(--a-text); border: 8px solid var(--a-bezel); border-radius: 46px; padding: 10px 12px 0; font-family: var(--mono); font-size: 12.5px; line-height: 1.5; overflow: hidden; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 18px 40px rgba(0,0,0,0.22); }
+.phone.sage { background: var(--a-sage); color: var(--a-ink); }
+.ph-status { display: flex; justify-content: space-between; font-size: 11px; font-weight: 700; padding: 2px 8px 4px; }
+.ph-status i { width: 74px; height: 20px; border-radius: 999px; background: var(--a-bezel); display: block; }
+.ic { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2.1; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.r { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.r.b { justify-content: space-between; }
+.r.top { align-items: flex-start; }
+.col { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.m-title { font-family: var(--display); font-weight: 700; font-size: 30px; line-height: 0.9; text-transform: uppercase; }
+.m-ct { font-family: var(--display); font-weight: 700; font-size: 17px; line-height: 1; text-transform: uppercase; letter-spacing: 0.01em; }
+.m-lab { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--a-muted); }
+.m-meta { font-size: 11px; color: var(--a-muted); }
+.m-hero { font-family: var(--display); font-weight: 600; font-size: 38px; line-height: 1; }
+.m-hero small { font-size: 22px; color: var(--a-muted); }
+.m-big { font-family: var(--display); font-weight: 700; font-size: 42px; line-height: 1; }
+.m-amt { font-family: var(--display); font-weight: 600; font-size: 19px; line-height: 1; white-space: nowrap; }
+.m-name { font-family: var(--display); font-weight: 700; font-size: 16px; line-height: 1; text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mint-t { color: var(--a-mint); }
+.tom-t { color: var(--a-tomato2); }
+.mar-t { color: var(--a-marigold); }
+.card { background: var(--a-card); border-radius: 22px; padding: 13px; display: flex; flex-direction: column; gap: 9px; }
+.card.mar { background: var(--a-marigold); color: var(--a-ink); }
+.card.peri { background: var(--a-peri); color: var(--a-text); }
+.card.cream { background: var(--a-cream); color: var(--a-ink); }
+.card.flush { padding: 4px 13px; gap: 0; }
+.card.mar .m-lab, .card.cream .m-lab { color: var(--a-ink); }
+.pill { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 6px 11px; font-size: 11.5px; font-weight: 500; white-space: nowrap; background: var(--a-cream); color: var(--a-ink); }
+.pill.ink { background: var(--a-ink); color: var(--a-cream); }
+.pill.out { background: transparent; color: inherit; border: 1.4px solid currentColor; }
+.pill.dark { background: var(--a-card); color: var(--a-text); }
+.pill.peri2 { background: var(--a-peri2); color: var(--a-text); }
+.pill.tr { background: rgba(255,255,255,0.16); color: var(--a-text); }
+.pill.sm { padding: 4px 9px; font-size: 10.5px; }
+.pill .ic { width: 13px; height: 13px; }
+.circle { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; flex: none; background: var(--a-cream); color: var(--a-ink); }
+.circle.out { background: transparent; color: var(--a-text); border: 1.5px solid #8A8880; }
+.circle.sm { width: 32px; height: 32px; }
+.circle.sage { background: var(--a-sage2); }
+.tile { width: 34px; height: 34px; border-radius: 11px; display: grid; place-items: center; flex: none; color: var(--a-ink); font-family: var(--display); font-weight: 700; font-size: 19px; }
+.tile .ic { width: 17px; height: 17px; }
+.t-tom { background: var(--a-tomato); } .t-mint { background: var(--a-mint); } .t-sky { background: var(--a-sky); }
+.t-peri { background: var(--a-peri2); } .t-mar { background: var(--a-marigold); }
+.avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--a-tomato); border: 2px solid var(--a-ink); display: grid; place-items: center; font-family: var(--display); font-weight: 700; color: var(--a-ink); box-shadow: inset 0 -9px 0 var(--a-marigold); flex: none; }
+.coin { width: 26px; height: 26px; border-radius: 50%; background: var(--a-marigold); border: 2px solid var(--a-ink); display: grid; place-items: center; color: var(--a-ink); font: 700 12px/1 var(--display); flex: none; }
+.stats3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; border-top: 1px solid var(--a-line); padding-top: 10px; }
+.stats3 .m-amt { font-size: 18px; }
+.track { position: relative; height: 8px; border-radius: 999px; background: var(--a-track); }
+.track .fill { position: absolute; inset: 0 auto 0 0; border-radius: 999px; background: var(--a-ink); }
+.track .tick { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--a-ink); border-radius: 2px; }
+.dk .track { background: #1C1C1E; height: 6px; }
+.dk .track .tick { background: var(--a-text); }
+.row { display: flex; align-items: center; gap: 10px; padding: 11px 0; border-top: 1px solid var(--a-screen); min-width: 0; }
+.row:first-child { border-top: 0; }
+.row .col { flex: 1; }
+.right { text-align: right; flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+.bars { position: relative; display: grid; grid-template-columns: repeat(7, 1fr); gap: 7px; height: 128px; align-items: end; padding-top: 16px; }
+.bars .limit { position: absolute; left: 0; right: 0; border-top: 1.5px dashed rgba(255,255,255,0.75); }
+.bars .limit span { position: absolute; right: 0; top: -17px; font-size: 9.5px; color: #FFFFFF; background: var(--a-ink); padding: 1px 6px; border-radius: 6px; }
+.bar { border-radius: 9px 9px 4px 4px; background: var(--a-peri2); position: relative; }
+.bar.over { background: var(--a-tomato); }
+.bar.today { background: var(--a-cream); }
+.bar.future { background: transparent; border: 1.5px dashed rgba(255,255,255,0.55); height: 26%; }
+.bar em { position: absolute; top: -16px; left: 50%; transform: translateX(-50%); font-style: normal; font-size: 9.5px; color: #FFFFFF; white-space: nowrap; }
+.days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 7px; text-align: center; font-size: 10.5px; color: #DAD7FC; }
+.days b { color: #FFFFFF; }
+.chipline { display: flex; gap: 6px; overflow: hidden; }
+.dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+.field { background: var(--a-card); border-radius: 999px; padding: 11px 14px; display: flex; align-items: center; gap: 9px; color: var(--a-muted); font-size: 12px; }
+.scroller { display: flex; gap: 6px; overflow: hidden; }
+.dayh { display: flex; justify-content: space-between; align-items: center; font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; font-weight: 700; padding: 4px 2px 0; }
+.net { font-weight: 500; letter-spacing: 0; text-transform: none; font-size: 11px; padding: 1px 8px; border-radius: 6px; color: var(--a-ink); }
+.tx { background: var(--a-card); border-radius: 20px; padding: 11px; display: flex; align-items: center; gap: 10px; min-width: 0; }
+.tx .col { flex: 1; }
+.cat { display: inline-block; width: fit-content; background: var(--a-lav); color: var(--a-ink); font-size: 10.5px; padding: 1px 8px; border-radius: 999px; margin-top: 3px; }
+.swipe { position: relative; border-radius: 20px; overflow: hidden; background: var(--a-tomato); }
+.swipe .acts { position: absolute; inset: 0 0 0 auto; display: flex; }
+.swipe .acts span { width: 62px; display: grid; place-items: center; color: var(--a-ink); font-size: 10.5px; font-weight: 700; gap: 2px; align-content: center; }
+.swipe .acts .edit { background: var(--a-cream); }
+.swipe .tx { transform: translateX(-124px); border-radius: 20px 0 0 20px; }
+.bubble { background: var(--a-card); border-radius: 22px; padding: 12px 13px; display: flex; flex-direction: column; gap: 9px; color: #E4E2DA; }
+.me { align-self: flex-end; background: var(--a-mint); color: var(--a-ink); border-radius: 18px 18px 4px 18px; padding: 9px 13px; max-width: 80%; }
+.receipt { background: var(--a-card2); border-radius: 16px; padding: 4px 11px; }
+.receipt .row { border-top-color: var(--a-card); padding: 9px 0; }
+.ichip { background: #1C1C1E; border: 1px solid var(--a-line); border-radius: 6px; padding: 0 5px; color: var(--a-text); white-space: nowrap; }
+.sugg { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.compose { display: flex; gap: 8px; align-items: center; }
+.compose .field { flex: 1; }
+.tabbar { display: flex; justify-content: space-between; align-items: center; padding: 8px 6px 18px; margin-top: 2px; }
+.tabbar .ti { width: 34px; display: flex; flex-direction: column; align-items: center; gap: 4px; color: var(--a-idle); }
+.tabbar .ti svg { width: 23px; height: 23px; fill: currentColor; }
+.tabbar .ti.on { color: var(--a-text); }
+.tabbar .ti.on::after { content: ""; width: 5px; height: 5px; border-radius: 50%; background: var(--a-tomato); }
+.tabbar .ti:not(.on)::after { content: ""; width: 5px; height: 5px; }
+.centre { position: relative; width: 54px; height: 54px; border-radius: 50%; background: var(--a-cream); display: grid; place-items: center; color: var(--a-ink); }
+.centre.hot { background: var(--a-tomato); }
+.centre svg { width: 24px; height: 24px; fill: currentColor; }
+.centre b { position: absolute; top: -3px; right: -4px; width: 20px; height: 20px; border-radius: 50%; background: var(--a-marigold); border: 2px solid var(--a-screen); display: grid; place-items: center; font: 700 14px/1 var(--mono); color: var(--a-ink); }
+.ob-dots { display: flex; gap: 5px; }
+.ob-dots i { width: 22px; height: 5px; border-radius: 999px; background: var(--a-sage2); display: block; }
+.ob-dots i.on { background: var(--a-ink); }
+.amount-field { background: var(--a-cream); border-radius: 26px; padding: 22px 14px; display: flex; align-items: baseline; justify-content: center; gap: 4px; }
+.amount-field .sym { font-family: var(--display); font-weight: 700; font-size: 34px; color: #8C8473; }
+.amount-field .val { font-family: var(--display); font-weight: 700; font-size: 66px; line-height: 0.9; }
+.amount-field .caret { width: 3px; height: 56px; background: var(--a-tomato); align-self: center; border-radius: 2px; }
+.primary { background: var(--a-tomato); color: var(--a-ink); border-radius: 999px; height: 54px; display: flex; align-items: center; justify-content: space-between; padding: 0 6px 0 22px; font-family: var(--display); font-weight: 700; font-size: 19px; text-transform: uppercase; }
+.primary span.k { width: 42px; height: 42px; border-radius: 50%; background: var(--a-ink); color: var(--a-cream); display: grid; place-items: center; }
+.steps { display: flex; flex-direction: column; gap: 7px; background: var(--a-sage2); border-radius: 18px; padding: 12px 14px; font-size: 11.5px; }
+.steps div { display: flex; gap: 8px; align-items: center; }
+.steps .done { color: var(--a-forest); }
+.steps .ic { width: 14px; height: 14px; }
+.spacer { height: 4px; }
+
+@media (max-width: 780px) {
+  .mock, .shot { grid-template-columns: minmax(0, 1fr); justify-items: center; }
+  .mock .notes { justify-self: stretch; }
+  .shot ol.key { justify-self: stretch; }
+  .shot-img { width: 300px; }
+  .issues, .principles { grid-template-columns: minmax(0, 1fr); }
+  .vrow { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+}
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto; } }
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14M12 5v14"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M7 17 17 7M8 7h9v9"/></symbol>
+    <symbol id="i-chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="i-next" viewBox="0 0 24 24"><path d="M5 12h14M13 5l7 7-7 7"/></symbol>
+    <symbol id="i-back" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></symbol>
+    <symbol id="i-history" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></symbol>
+    <symbol id="i-bowl" viewBox="0 0 24 24"><path d="M3 11h18a9 9 0 0 1-18 0z"/><path d="M9 3c0 2 1.5 2 1.5 4M14 3c0 2 1.5 2 1.5 4"/></symbol>
+    <symbol id="i-cart" viewBox="0 0 24 24"><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2 3h3l2.6 12h11.2L21 7H6.2"/></symbol>
+    <symbol id="i-bus" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="14" rx="3"/><path d="M4 10h16M8 17v3M16 17v3"/></symbol>
+    <symbol id="i-phone" viewBox="0 0 24 24"><rect x="7" y="2" width="10" height="20" rx="2.5"/><path d="M11 18h2"/></symbol>
+    <symbol id="i-cash" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/></symbol>
+    <symbol id="i-house" viewBox="0 0 24 24"><path d="M3 11 12 3l9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+    <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3l2 6 6 2-6 2-2 6-2-6-6-2 6-2z"/></symbol>
+    <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-4"/></symbol>
+    <symbol id="i-pen" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/></symbol>
+    <symbol id="i-up" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></symbol>
+    <symbol id="t-home" viewBox="0 0 24 24"><path d="M2.5 11.2 12 3l9.5 8.2V20a1.5 1.5 0 0 1-1.5 1.5h-5v-6H9v6H4A1.5 1.5 0 0 1 2.5 20z"/></symbol>
+    <symbol id="t-bars" viewBox="0 0 24 24"><rect x="3" y="11" width="5" height="10" rx="2.5"/><rect x="9.5" y="4" width="5" height="17" rx="2.5"/><rect x="16" y="8" width="5" height="13" rx="2.5"/></symbol>
+    <symbol id="t-wallet" viewBox="0 0 24 24"><rect x="5" y="2.5" width="12" height="6" rx="2" transform="rotate(-8 11 5)"/><rect x="2.5" y="7" width="19" height="14" rx="3.5"/></symbol>
+    <symbol id="t-chat" viewBox="0 0 24 24"><path d="M12 3c5 0 9 3.4 9 7.6s-4 7.6-9 7.6c-1 0-2-.1-2.9-.4L4 20l1.3-4.2A7.2 7.2 0 0 1 3 10.6C3 6.4 7 3 12 3z"/></symbol>
+  </defs>
+</svg>
+
+<div class="wrap">
+
+<header class="top">
+  <span class="eyebrow">BuyWise mobile · design and UX review · 4 October 2026</span>
+  <h1>BuyWise UX Review</h1>
+  <p class="lede">The look is right. The problem is information design: what each screen chooses to show, how big it is, and which words it uses. Every change below keeps Barlow Semi Condensed, JetBrains Mono and the v3 colours. A few places get new jobs for those colours, and the type gets bigger.</p>
+  <div class="swatches" aria-label="The v3 palette, unchanged">
+    <span style="background:var(--a-screen)"></span><span style="background:var(--a-card)"></span><span style="background:var(--a-cream)"></span><span style="background:var(--a-sage)"></span><span style="background:var(--a-tomato)"></span><span style="background:var(--a-marigold)"></span><span style="background:var(--a-peri)"></span><span style="background:var(--a-mint)"></span><span style="background:var(--a-sky)"></span><span style="background:var(--a-lav)"></span>
+  </div>
+</header>
+
+<section aria-labelledby="verdict">
+  <span class="eyebrow">The short answer</span>
+  <h2 id="verdict">Three verdicts</h2>
+  <div class="verdict">
+    <div class="vrow">
+      <h3>Look and feel <span class="state s-good">Strong</span></h3>
+      <p>Charcoal surfaces, colour-block cards, condensed titles and the cartoon gullak give BuyWise a face no other budget app has. Nothing here needs replacing.</p>
+    </div>
+    <div class="vrow">
+      <h3>Clarity <span class="state s-bad">Weak</span></h3>
+      <p>The numbers people act on are small (12 px mono body, 10 px labels), sit inside sentences, or appear as percentages of a figure the screen never shows. The most common task, logging a spend, needs a hidden long-press.</p>
+    </div>
+    <div class="vrow">
+      <h3>Backend use <span class="state s-mid">Partial</span></h3>
+      <p>The app calls 34 of its 35 API wrappers, so the wiring is complete. What goes unused is what those calls return: days left in the month, the profile's income and savings facts, the payee and category filters, and the AI's ability to log, budget and fund goals on request.</p>
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="backend">
+  <span class="eyebrow">Capability audit</span>
+  <h2 id="backend">What the backend gives you that the app leaves on the table</h2>
+  <p>Checked against <code>mobile/src</code> and <code>ai_service</code> on 4 October 2026. Each row is something the API already does today, so most of the fixes are client work.</p>
+  <div class="tablebox">
+    <table>
+      <thead><tr><th>Backend capability</th><th>In the app today</th><th>Opportunity</th></tr></thead>
+      <tbody>
+        <tr><td class="k"><code>days_remaining_in_month</code> and <code>remaining_budget</code> on every <code>GET /dashboard</code></td><td>Typed in <code>types.ts</code>, never read</td><td>A "Safe to spend today" figure on Home: what's left in the budget divided by the days left, today included</td></tr>
+        <tr><td class="k">Profile fields <code>income_type</code>, <code>salary_day</code>, <code>savings_target_percent</code>, <code>investment_style</code>. The AI puts the first three into every chat's context</td><td>No screen sets them, so the AI always sees blanks</td><td>A four-step onboarding, and a "Money profile" ticket on Profile</td></tr>
+        <tr><td class="k"><code>starting_balance</code> transactions</td><td>Only the AI can create one; Quick Add offers Expense and Income</td><td>Starting balance as an onboarding step, so the first balance is real instead of ₹0 going negative</td></tr>
+        <tr><td class="k">Budget rollover: <code>carried_in</code>, <code>available</code>, <code>unassigned</code></td><td>Shown, in envelope jargon, across a three-column table</td><td>One "left" figure per envelope, a per-day allowance, overspent envelopes first</td></tr>
+        <tr><td class="k"><code>payee_id</code> filter on <code>GET /transactions</code></td><td>Unused</td><td>Tap a payee to see every payment to it, with a total</td></tr>
+        <tr><td class="k">Category filter and per-category analytics</td><td>Reports' category rows and Home's legend can't be opened</td><td>Every category row opens Activity filtered to that category and month (the filters already live in the URL)</td></tr>
+        <tr><td class="k">AI tools <code>add_transaction</code>, <code>set_category_budget</code>, <code>update_goal_progress</code>, <code>add_goal</code></td><td>Reachable only by typing the right request; the composer says "Ask something to start"</td><td>Quick-log from the chat box with an Undo card, and "Ask buddy" buttons where the question comes up</td></tr>
+        <tr><td class="k"><code>budget_alerts</code> flag</td><td>A working switch for alerts that nothing sends</td><td>Hide it until alerts exist</td></tr>
+        <tr><td class="k"><code>budget_plate</code> illustration</td><td>Imported in <code>Illustration.tsx</code>, drawn nowhere</td><td>The Budget empty state</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="small muted">Fine to leave unused: <code>cleared_status</code> (pending or cleared). It matters to people who reconcile against a bank statement, which BuyWise doesn't ask anyone to do.</p>
+</section>
+
+<section aria-labelledby="today">
+  <span class="eyebrow">Home today</span>
+  <h2 id="today">Where the eye gets lost</h2>
+  <figure class="shot">
+    <div class="shot-img">
+      <img src="data:image/webp;base64,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" alt="The BuyWise Home screen as designed in 02-home.png, which the built screen follows" width="360" height="779">
+      <span class="badge" style="left:93%;top:6.4%">1</span>
+      <span class="badge" style="left:7%;top:15.2%">2</span>
+      <span class="badge" style="left:5%;top:33.4%">3</span>
+      <span class="badge" style="left:5%;top:51.6%">4</span>
+      <span class="badge" style="left:5%;top:79%">5</span>
+      <span class="badge" style="left:62%;top:90.4%">6</span>
+    </div>
+    <ol class="key">
+      <li><span><b>A bell that does nothing.</b> It shows a "coming soon" toast. It takes the top-right slot, the best spot on the screen.</span></li>
+      <li><span><b>A dropdown that isn't one.</b> The full-width pill flips between this month and last. The big balance above the sentence is the live balance, so it stays the same when the month changes.</span></li>
+      <li><span><b>Three facts in one sentence.</b> Net for the month, budget state and goal count all sit in 12 px mono prose. To find a number you have to read the line.</span></li>
+      <li><span><b>Percentages of an unseen figure.</b> "58%" means 58% of (this month's budget ÷ days in the month). With no budget it means 58% of the week's biggest day. The screen never says which.</span></li>
+      <li><span><b>Three tiny tiles.</b> Payee and a compact amount, nothing about when or what. "See all" is the only way forward.</span></li>
+      <li><span><b>Logging is hidden.</b> Tap opens chat; adding a transaction needs a 350 ms hold. The hint that teaches this appears on Activity only, never on Home.</span></li>
+    </ol>
+  </figure>
+</section>
+
+<section aria-labelledby="issues">
+  <span class="eyebrow">All findings, most serious first</span>
+  <h2 id="issues">Where the app falls short</h2>
+  <div class="issues">
+    <article class="issue">
+      <span class="state s-bad">High</span>
+      <h3>Logging a spend is a hidden gesture</h3>
+      <p>The core action of an expense tracker is a long-press on the chat button. Home has no add button, and the coach mark lives on Activity. Empty states tell people to "hold the + button", which is a badge on the chat icon.</p>
+      <span class="where"><code>ui/TabBar.tsx</code> · <code>coachOn</code> in <code>(tabs)/_layout.tsx</code></span>
+    </article>
+    <article class="issue">
+      <span class="state s-bad">High</span>
+      <h3>New users start with a wrong balance</h3>
+      <p>There is no form for a starting balance, so the hero number is ₹0 and goes negative after the first expense. New profiles default to INR and Asia/Kolkata, and copy says "give every rupee a job", while the launch market is the US and EU.</p>
+      <span class="where"><code>ui/TransactionEditor.tsx</code> · <code>lib/budget.ts</code> <code>readyLine</code> · profile defaults</span>
+    </article>
+    <article class="issue">
+      <span class="state s-bad">High</span>
+      <h3>The type is too small to scan</h3>
+      <p>Body copy is 12 px, meta 10.5 px, labels 10 px, chips 11 px, and 39 style rules in <code>src/ui</code> sit between 9 and 11 px. Mono runs wide, so these lines also truncate: budget rows cut their status line to one line.</p>
+      <span class="where"><code>ui/tokens.ts</code> <code>type</code> · <code>ui/BudgetList.tsx</code></span>
+    </article>
+    <article class="issue">
+      <span class="state s-bad">High</span>
+      <h3>Key numbers hide inside sentences</h3>
+      <p>The balance card's <code>balanceSentence</code> carries the month's net, the budget state and the goals as inline chips. The inline-chip style reads well in chat; on a dashboard it turns scanning into reading.</p>
+      <span class="where"><code>lib/home.ts</code> · <code>(tabs)/index.tsx</code></span>
+    </article>
+    <article class="issue">
+      <span class="state s-mid">Medium</span>
+      <h3>Budget speaks envelope jargon</h3>
+      <p>Ready to assign, Assigned, Available, carried, opening and closing all appear on one screen, plus four equal-weight chips. The bar measures this month's spend against this month's budget while the pill shows available money including carry-over, so a full red bar can sit beside a green pill.</p>
+      <span class="where"><code>(tabs)/budget.tsx</code> · <code>ui/BudgetList.tsx</code></span>
+    </article>
+    <article class="issue">
+      <span class="state s-mid">Medium</span>
+      <h3>Six controls do nothing</h3>
+      <p>The bell, Auto-assign, voice search on Activity and Payees, the voice button in chat, and the budget-alerts switch. Each looks live and answers with "coming soon". People read that as broken.</p>
+      <span class="where"><code>(tabs)/index.tsx</code> · <code>(tabs)/budget.tsx</code> · <code>ui/ChatInput.tsx</code> · <code>(tabs)/profile.tsx</code></span>
+    </article>
+    <article class="issue">
+      <span class="state s-mid">Medium</span>
+      <h3>Buddy lives in one tab</h3>
+      <p>The app is AI-first, but the AI shows up only inside Chat. Home has no insight, a budget row has no "why is this over?", and the composer never says you can log by typing "chai 20 cash". The tool results that would prove it worked show only on the newest reply.</p>
+      <span class="where"><code>ui/ChatThread.tsx</code> · <code>ui/ChatInput.tsx</code></span>
+    </article>
+    <article class="issue">
+      <span class="state s-mid">Medium</span>
+      <h3>Goals and Reports have no front door</h3>
+      <p>Goals opens from a chip inside the balance sentence or the last button on Budget. Reports opens from the small ↗ on the balance card. Neither is where people look for it.</p>
+      <span class="where"><code>(tabs)/index.tsx</code> · <code>(tabs)/budget.tsx</code></span>
+    </article>
+    <article class="issue">
+      <span class="state s-low">Low</span>
+      <h3>Search covers only loaded rows</h3>
+      <p>Activity filters the pages already fetched, 20 at a time, and says "found in the 40 loaded so far". The API has no text filter, so a search for an old payee can miss.</p>
+      <span class="where"><code>(tabs)/transactions.tsx</code> · <code>GET /transactions</code></span>
+    </article>
+    <article class="issue">
+      <span class="state s-low">Low</span>
+      <h3>Numbers aren't doors</h3>
+      <p>Reports' category rows, payment-method bars, Home's Spend Pulse legend and a transaction's payee can't be opened. Each could lead to the filtered Activity list the URL already supports.</p>
+      <span class="where"><code>app/reports.tsx</code> · <code>ui/ReportBlocks.tsx</code></span>
+    </article>
+    <article class="issue">
+      <span class="state s-low">Low</span>
+      <h3>Two "all" controls on Activity</h3>
+      <p>The category pill beside the title reads "all", and the type chips below start with "All". They filter different things with the same word.</p>
+      <span class="where"><code>(tabs)/transactions.tsx</code></span>
+    </article>
+    <article class="issue">
+      <span class="state s-low">Low</span>
+      <h3>Goal money floats free of the balance</h3>
+      <p>Contributing ₹5,000 to a goal changes the goal's number only. Ready to assign and the balance stay the same, so people wonder where the money went. This one needs your call (see the questions at the end).</p>
+      <span class="where"><code>goals/[id]/contribute.tsx</code></span>
+    </article>
+  </div>
+</section>
+
+<section aria-labelledby="direction">
+  <span class="eyebrow">Design direction</span>
+  <h2 id="direction">Same style, clearer screens</h2>
+  <div class="principles">
+    <div class="principle"><h3>Numbers in Barlow, words in mono</h3><p class="small">Any figure a person acts on gets its own Barlow line with a small label above it. Sentences become a quiet line underneath. Inline chips stay in chat, where they work.</p></div>
+    <div class="principle"><h3>One question per screen</h3><p class="small">Home: can I spend today? Activity: where did it go? Budget: which envelope needs me? Goals: am I on track? Reports: how did the month go?</p></div>
+    <div class="principle"><h3>One tap to log</h3><p class="small">A visible "+ Log" pill on Home and Activity, and a chat box that logs plain sentences. The hold gesture stays as a shortcut for people who learn it.</p></div>
+    <div class="principle"><h3>Plain words first</h3><p class="small">"Left to budget", "Budgeted", "Left". Envelope terms can live in a help sheet for people who come from YNAB.</p></div>
+    <div class="principle"><h3>Every number opens something</h3><p class="small">A category, payee, day or envelope figure opens the list behind it. The URL filters on Activity already make this cheap.</p></div>
+    <div class="principle"><h3>Ship only what works</h3><p class="small">Remove a control until its feature exists. An empty slot costs nothing; a dead button costs trust in a money app.</p></div>
+  </div>
+
+  <h3 style="margin-top:10px">Colour roles</h3>
+  <p class="small">The palette stays. Each colour gets one job, so it means the same thing on every screen. Category tiles keep their hues; state (over, close, fine) is carried by text colour and pills, so a tomato Food tile never reads as "overspent".</p>
+  <div class="roles">
+    <div class="role" style="background:var(--a-tomato)"><b>Tomato</b><span>Act now: primary buttons, overspent, negative</span></div>
+    <div class="role" style="background:var(--a-marigold)"><b>Marigold</b><span>Money waiting for you: safe to spend, left to budget, near the limit</span></div>
+    <div class="role" style="background:var(--a-mint)"><b>Mint</b><span>Money in or money left: income, positive available</span></div>
+    <div class="role" style="background:var(--a-peri)"><b style="color:var(--a-text)">Peri</b><span style="color:var(--a-text)">Time: this week, the pulse, trends</span></div>
+    <div class="role" style="background:var(--a-sky)"><b>Sky</b><span>Information and tips, never a warning</span></div>
+  </div>
+
+  <h3 style="margin-top:10px">Type scale</h3>
+  <p class="small">Fonts unchanged. Sizes move up so the smallest everyday text is 12 px. Change it once in <code>tokens.ts</code> and every screen follows.</p>
+  <div class="tablebox">
+    <table style="min-width:520px">
+      <thead><tr><th>Token</th><th>Today</th><th>Proposed</th><th>Used for</th></tr></thead>
+      <tbody class="num">
+        <tr><td class="k"><code>body</code> (mono)</td><td>12 / 21</td><td>14 / 22</td><td>Sentences, notes, chat replies</td></tr>
+        <tr><td class="k"><code>meta</code> (mono)</td><td>10.5 / 15</td><td>12 / 17</td><td>"UPI · 9:40 pm", budget status lines</td></tr>
+        <tr><td class="k"><code>label</code> (mono caps)</td><td>10, tracking 1</td><td>11, tracking 1.2</td><td>Section labels, column heads</td></tr>
+        <tr><td class="k"><code>chip</code> (mono)</td><td>11</td><td>12.5</td><td>Filter chips, pills</td></tr>
+        <tr><td class="k"><code>rowAmount</code> (Barlow)</td><td>21</td><td>21</td><td>Already readable, keep</td></tr>
+        <tr><td class="k"><code>heroAmount</code> (Barlow)</td><td>42</td><td>44</td><td>Balance, safe to spend</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section aria-labelledby="screens">
+  <span class="eyebrow">Proposed screens · drawn at 87% of a real phone</span>
+  <h2 id="screens">The redesigned screens</h2>
+
+  <!-- HOME -->
+  <div class="mock">
+    <div class="phone" role="img" aria-label="Proposed Home: balance with in, out and net; a marigold safe-to-spend card; this week's spending bars against a daily limit; a needs-attention list; recent transactions; tab bar">
+      <div class="ph-status"><span>9:41</span><i></i><span>●●</span></div>
+      <div class="r b">
+        <div class="r"><span class="avatar">B</span><span>Hi, Bhagy!</span></div>
+        <div class="r" style="gap:6px"><span class="pill"><svg class="ic"><use href="#i-plus"/></svg>Log</span><span class="circle out sm"><svg class="ic"><use href="#i-search"/></svg></span></div>
+      </div>
+      <div class="card">
+        <div class="r b"><div class="r"><span class="tile t-mar">₹</span><span class="m-ct">Total balance</span></div><span class="circle sm"><svg class="ic"><use href="#i-arrow"/></svg></span></div>
+        <div class="m-hero num">₹1,24,860<small>.00</small></div>
+        <div class="stats3">
+          <div class="col"><span class="m-lab">In · Oct</span><span class="m-amt mint-t num">₹50,000</span></div>
+          <div class="col"><span class="m-lab">Out</span><span class="m-amt num">₹32,140</span></div>
+          <div class="col"><span class="m-lab">Net</span><span class="m-amt mint-t num">+₹17,860</span></div>
+        </div>
+      </div>
+      <div class="card mar">
+        <div class="r b"><span class="m-lab">Safe to spend today</span><span class="pill ink sm">9 days left</span></div>
+        <div class="m-big num">₹1,488</div>
+        <div class="track"><div class="fill" style="width:68%"></div><div class="tick" style="left:71%"></div></div>
+        <div class="r b" style="font-size:11px"><span>68% of budget used</span><span>71% of Oct gone</span></div>
+        <span style="font-size:11.5px">On pace. ₹14,880 left for 10 days.</span>
+      </div>
+      <div class="card peri">
+        <div class="r b"><span class="m-ct">This week</span><span class="pill peri2 sm num">₹4,900 spent <svg class="ic"><use href="#i-chev"/></svg></span></div>
+        <div class="bars">
+          <div class="limit" style="bottom:68%"><span>₹1,488 a day</span></div>
+          <div class="bar" style="height:44.5%"><em>980</em></div>
+          <div class="bar over" style="height:89%"><em>1,960</em></div>
+          <div class="bar" style="height:33%"><em>720</em></div>
+          <div class="bar today" style="height:56%"><em>1,240</em></div>
+          <div class="bar future"></div><div class="bar future"></div><div class="bar future"></div>
+        </div>
+        <div class="days"><span>Mon</span><span>Tue</span><span>Wed</span><b>Thu</b><span>Fri</span><span>Sat</span><span>Sun</span></div>
+        <div class="chipline"><span class="pill sm"><span class="dot" style="background:var(--a-tomato)"></span>All</span><span class="pill tr sm"><span class="dot" style="background:var(--a-marigold)"></span>Food</span><span class="pill tr sm"><span class="dot" style="background:var(--a-mint)"></span>Travel</span><span class="pill tr sm"><span class="dot" style="background:var(--a-sky)"></span>Bills</span></div>
+      </div>
+      <span class="m-lab" style="padding:4px 2px 0">Needs attention</span>
+      <div class="card flush">
+        <div class="row"><span class="tile t-mint"><svg class="ic"><use href="#i-cart"/></svg></span><div class="col"><span class="m-name">Groceries</span><span class="m-meta tom-t">Over by ₹1,200</span></div><span class="pill sm">Cover</span></div>
+        <div class="row"><span class="tile t-tom"><svg class="ic"><use href="#i-bowl"/></svg></span><div class="col"><span class="m-name">Food &amp; dining</span><span class="m-meta mar-t">79% used · 9 days left</span></div><div class="right"><span class="m-amt num">₹1,700</span><span class="m-meta">left</span></div></div>
+        <div class="row"><span class="coin">₹</span><div class="col"><span style="font-size:11.5px;color:var(--a-prose)">At this pace Food ends near ₹7,900, just under budget.</span></div><span class="pill out sm" style="color:var(--a-text)">Ask</span></div>
+      </div>
+      <div class="r b" style="padding:2px 2px 0"><span class="m-lab">Recent</span><span class="m-meta" style="color:var(--a-text)">See all →</span></div>
+      <div class="tx"><span class="tile t-tom"><svg class="ic"><use href="#i-bowl"/></svg></span><div class="col"><span class="m-name">Swiggy</span><span class="m-meta">Food · UPI · 9:40 pm</span></div><span class="m-amt num">−₹340</span></div>
+      <div class="tx"><span class="tile t-sky"><svg class="ic"><use href="#i-phone"/></svg></span><div class="col"><span class="m-name">Airtel</span><span class="m-meta">Bills · Card · today</span></div><span class="m-amt num">−₹299</span></div>
+      <div class="tabbar">
+        <span class="ti on"><svg><use href="#t-home"/></svg></span>
+        <span class="ti"><svg><use href="#t-bars"/></svg></span>
+        <span class="centre"><svg><use href="#t-chat"/></svg><b>+</b></span>
+        <span class="ti"><svg><use href="#t-wallet"/></svg></span>
+        <span class="ti"><span class="avatar" style="width:26px;height:26px;font-size:12px">B</span></span>
+      </div>
+    </div>
+    <div class="notes">
+      <span class="tag">Home answers: can I spend today?</span>
+      <h3>Home</h3>
+      <ul class="plain">
+        <li><b>"+ Log" replaces the bell.</b> One tap opens Quick Add. The hold on the centre button stays as a shortcut.</li>
+        <li><b>The balance card loses its sentence.</b> In, Out and Net sit in a three-column row of Barlow numbers. The month toggle goes: Home is about now, and Reports already compares months.</li>
+        <li><b>New: Safe to spend today.</b> <code>remaining_budget ÷ (days_remaining_in_month + 1)</code>, both already on the dashboard response. The bar puts "budget used" against "month gone", so pace reads at a glance.</li>
+        <li><b>Spend Pulse shows rupees.</b> Bars of each day's spend against a dashed daily limit, with the figure on top. Over-limit days turn tomato. The legend filter stays.</li>
+        <li><b>New: Needs attention.</b> Overspent and nearly-spent envelopes from the month's budgets, with "Cover" inline, plus one buddy line. Start with fixed rules on the phone; an AI-written line can come later.</li>
+        <li><b>Recent becomes full rows</b>: payee, category, method, time. Same <code>TxRow</code> as Activity, two or three of them.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- BUDGET -->
+  <div class="mock">
+    <div class="phone" role="img" aria-label="Proposed Budget: a marigold left-to-budget card, a month flow from start to now, then envelopes sorted by attention with one left figure each">
+      <div class="ph-status"><span>9:41</span><i></i><span>●●</span></div>
+      <div class="r b"><span class="m-title">Budget</span><span class="pill">Oct 2026 <svg class="ic"><use href="#i-chev"/></svg></span></div>
+      <div class="card mar">
+        <span class="m-lab">Left to budget</span>
+        <div class="m-big num">₹4,860</div>
+        <span style="font-size:11.5px">Money you have that isn't in an envelope yet.</span>
+        <div class="r" style="gap:6px"><span class="pill ink">Budget it <svg class="ic"><use href="#i-next"/></svg></span><span class="pill out">Copy Sep</span></div>
+      </div>
+      <div class="card" style="gap:6px">
+        <span class="m-lab">October so far</span>
+        <div class="r b num" style="gap:4px;align-items:flex-end">
+          <div class="col"><span class="m-meta">Started</span><span class="m-amt" style="font-size:16px">₹74,860</span></div>
+          <div class="col"><span class="m-meta">In</span><span class="m-amt mint-t" style="font-size:16px">+₹50,000</span></div>
+          <div class="col"><span class="m-meta">Out</span><span class="m-amt" style="font-size:16px">−₹32,140</span></div>
+          <div class="col"><span class="m-meta">Now</span><span class="m-amt" style="font-size:16px">₹92,720</span></div>
+        </div>
+      </div>
+      <div class="r b" style="padding:4px 2px 0"><span class="m-lab">Envelopes</span><span class="m-meta">needs you first</span></div>
+      <div class="card flush dk">
+        <div class="row" style="flex-wrap:wrap">
+          <span class="tile t-mint"><svg class="ic"><use href="#i-cart"/></svg></span>
+          <div class="col"><span class="m-name">Groceries</span><span class="m-meta">₹7,200 of ₹6,000 spent</span></div>
+          <div class="right"><span class="m-amt tom-t num">−₹1,200</span><span class="m-meta tom-t">over</span></div>
+          <div style="flex-basis:100%;display:flex;align-items:center;gap:8px"><div class="track" style="flex:1"><div class="fill" style="width:100%;background:var(--a-tomato)"></div></div><span class="pill sm">Cover ₹1,200</span></div>
+        </div>
+        <div class="row" style="flex-wrap:wrap">
+          <span class="tile t-tom"><svg class="ic"><use href="#i-bowl"/></svg></span>
+          <div class="col"><span class="m-name">Food &amp; dining</span><span class="m-meta">₹170 a day for 10 days</span></div>
+          <div class="right"><span class="m-amt mar-t num">₹1,700</span><span class="m-meta">left</span></div>
+          <div class="track" style="flex-basis:100%"><div class="fill" style="width:79%;background:var(--a-marigold)"></div><div class="tick" style="left:71%"></div></div>
+        </div>
+        <div class="row" style="flex-wrap:wrap">
+          <span class="tile t-mint"><svg class="ic"><use href="#i-bus"/></svg></span>
+          <div class="col"><span class="m-name">Transport</span><span class="m-meta">incl. +₹500 from Sep</span></div>
+          <div class="right"><span class="m-amt mint-t num">₹2,300</span><span class="m-meta">left</span></div>
+          <div class="track" style="flex-basis:100%"><div class="fill" style="width:42%;background:var(--a-mint)"></div><div class="tick" style="left:71%"></div></div>
+        </div>
+        <div class="row" style="flex-wrap:wrap">
+          <span class="tile t-peri"><svg class="ic"><use href="#i-house"/></svg></span>
+          <div class="col"><span class="m-name">Rent</span><span class="m-meta">₹18,000 paid</span></div>
+          <div class="right"><span class="m-amt num" style="color:var(--a-muted)">Done</span><span class="m-meta"><svg class="ic" style="width:12px;height:12px"><use href="#i-check"/></svg></span></div>
+          <div class="track" style="flex-basis:100%"><div class="fill" style="width:100%;background:#8A8880"></div></div>
+        </div>
+      </div>
+      <div class="card" style="flex-direction:row;align-items:center;justify-content:space-between"><span style="font-size:11.5px">6 categories have no budget</span><span class="pill sm">Set up <svg class="ic"><use href="#i-next"/></svg></span></div>
+      <span class="pill out" style="align-self:flex-start;color:var(--a-mint)"><svg class="ic"><use href="#i-spark"/></svg>Ask buddy to plan the rest of October</span>
+      <div class="tabbar">
+        <span class="ti"><svg><use href="#t-home"/></svg></span>
+        <span class="ti"><svg><use href="#t-bars"/></svg></span>
+        <span class="centre"><svg><use href="#t-chat"/></svg><b>+</b></span>
+        <span class="ti on"><svg><use href="#t-wallet"/></svg></span>
+        <span class="ti"><span class="avatar" style="width:26px;height:26px;font-size:12px">B</span></span>
+      </div>
+    </div>
+    <div class="notes">
+      <span class="tag">Budget answers: which envelope needs me?</span>
+      <h3>Budget</h3>
+      <ul class="plain">
+        <li><b>Plain words.</b> "Left to budget" for <code>unassigned</code>, "left" for <code>available</code>. The rollover still works the same; carry-over shows as "incl. +₹500 from Sep" only when there is some.</li>
+        <li><b>One number per envelope.</b> The right column is what's left (or over), in Barlow and coloured by state. The separate Assigned column goes; the status line says "₹7,200 of ₹6,000 spent".</li>
+        <li><b>The bar matches the number.</b> It fills by spend against everything available to the envelope, so a full tomato bar always sits next to a tomato figure. A thin tick marks how much of the month has gone.</li>
+        <li><b>Attention order.</b> Overspent first, then nearly spent, then the rest, then finished envelopes. "Cover ₹1,200" sits on the row instead of inside Set budget.</li>
+        <li><b>Four chips become one flow.</b> Started, In, Out, Now read left to right as a sum, so opening and closing balance stop needing explanation.</li>
+        <li><b>Auto-assign becomes buddy.</b> "Ask buddy to plan the rest of October" opens chat with that prompt. <code>set_category_budget</code> already exists, so the AI can draft the budget today.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ACTIVITY -->
+  <div class="mock">
+    <div class="phone" role="img" aria-label="Proposed Activity: title with a Log pill, search, one filter row, a month summary, day groups with swipe actions on a row">
+      <div class="ph-status"><span>9:41</span><i></i><span>●●</span></div>
+      <div class="r b"><span class="m-title">Activity</span><span class="pill"><svg class="ic"><use href="#i-plus"/></svg>Log</span></div>
+      <div class="field"><svg class="ic"><use href="#i-search"/></svg>Search every payee or note</div>
+      <div class="scroller">
+        <span class="pill">All</span><span class="pill dark">Spent</span><span class="pill dark">Earned</span><span class="pill out" style="color:var(--a-text)">Category <svg class="ic"><use href="#i-chev"/></svg></span><span class="pill out" style="color:var(--a-text)">Oct <svg class="ic"><use href="#i-chev"/></svg></span>
+      </div>
+      <div class="card" style="gap:6px">
+        <div class="r b num" style="align-items:flex-end">
+          <div class="col"><span class="m-lab">Spent</span><span class="m-amt">₹32,140</span></div>
+          <div class="col"><span class="m-lab">Earned</span><span class="m-amt mint-t">₹50,000</span></div>
+          <div class="col" style="align-items:flex-end"><span class="m-lab">Items</span><span class="m-amt">47</span></div>
+        </div>
+      </div>
+      <div class="dayh"><span>Today</span><span class="net" style="background:var(--a-tomato)">−₹639</span></div>
+      <div class="tx"><span class="tile t-tom"><svg class="ic"><use href="#i-bowl"/></svg></span><div class="col"><span class="m-name">Swiggy</span><span class="m-meta">Dinner order · UPI · 9:40 pm</span><span class="cat">Food &amp; Dining</span></div><span class="m-amt num">−₹340</span></div>
+      <div class="swipe">
+        <div class="acts"><span class="edit"><svg class="ic"><use href="#i-pen"/></svg>Edit</span><span><svg class="ic"><use href="#i-trash"/></svg>Delete</span></div>
+        <div class="tx"><span class="tile t-sky"><svg class="ic"><use href="#i-phone"/></svg></span><div class="col"><span class="m-name">Airtel</span><span class="m-meta">Prepaid · Card</span><span class="cat">Bills</span></div><span class="m-amt num">−₹299</span></div>
+      </div>
+      <div class="dayh"><span>Yesterday</span><span class="net" style="background:var(--a-mint)">+₹11,150</span></div>
+      <div class="tx"><span class="tile t-mint"><svg class="ic"><use href="#i-cash"/></svg></span><div class="col"><span class="m-name">Freelance payout</span><span class="m-meta">Client invoice · Bank</span><span class="cat">Salary</span></div><span class="m-amt mint-t num">+₹12,000</span></div>
+      <div class="tabbar">
+        <span class="ti"><svg><use href="#t-home"/></svg></span>
+        <span class="ti on"><svg><use href="#t-bars"/></svg></span>
+        <span class="centre"><svg><use href="#t-chat"/></svg><b>+</b></span>
+        <span class="ti"><svg><use href="#t-wallet"/></svg></span>
+        <span class="ti"><span class="avatar" style="width:26px;height:26px;font-size:12px">B</span></span>
+      </div>
+    </div>
+    <div class="notes">
+      <span class="tag">Activity answers: where did it go?</span>
+      <h3>Activity</h3>
+      <ul class="plain">
+        <li><b>One filter row.</b> Type chips, then Category and Month pills together. The "all" pill by the title goes, and "+ Log" takes its place.</li>
+        <li><b>A month summary.</b> Spent, Earned and count for whatever the filters show. <code>analytics/monthly</code> covers the unfiltered month; a category filter can use <code>analytics/categories</code>.</li>
+        <li><b>Swipe for Edit and Delete.</b> Today both need opening the detail screen first.</li>
+        <li><b>Search everything.</b> Needs one backend change: a <code>q</code> parameter on <code>GET /transactions</code> matching payee, note and category. Until then, say "searching the loaded rows" in the field itself.</li>
+        <li><b>Payee names open the payee.</b> A small screen built on the existing <code>payee_id</code> filter: total this month, count, and every payment.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- CHAT -->
+  <div class="mock">
+    <div class="phone" role="img" aria-label="Proposed chat: a typed sentence logs two expenses, shown as a receipt card with Undo and Edit, followed by contextual suggestions and a composer that explains quick logging">
+      <div class="ph-status"><span>9:41</span><i></i><span>●●</span></div>
+      <div class="r b top"><div class="r top"><span class="circle"><svg class="ic"><use href="#i-back"/></svg></span><span class="m-title" style="font-size:28px">Money<br>buddy</span></div><span class="circle"><svg class="ic"><use href="#i-history"/></svg></span></div>
+      <div class="spacer"></div>
+      <span class="me">chai 20 cash, uber 240</span>
+      <div class="bubble">
+        <div class="r"><span class="coin">₹</span><span class="m-meta">buddy · 9:42 pm</span></div>
+        <span>Logged 2 expenses.</span>
+        <div class="receipt">
+          <div class="row"><span class="tile t-tom" style="width:28px;height:28px;border-radius:9px"><svg class="ic" style="width:14px;height:14px"><use href="#i-bowl"/></svg></span><div class="col"><span class="m-name" style="font-size:14px">Chai</span><span class="m-meta">Food · Cash · today</span></div><span class="m-amt num" style="font-size:16px">−₹20</span></div>
+          <div class="row"><span class="tile t-mint" style="width:28px;height:28px;border-radius:9px"><svg class="ic" style="width:14px;height:14px"><use href="#i-bus"/></svg></span><div class="col"><span class="m-name" style="font-size:14px">Uber</span><span class="m-meta">Transport · UPI · today</span></div><span class="m-amt num" style="font-size:16px">−₹240</span></div>
+        </div>
+        <div class="r" style="gap:6px"><span class="pill out sm" style="color:var(--a-text)"><svg class="ic"><use href="#i-undo"/></svg>Undo</span><span class="pill out sm" style="color:var(--a-text)"><svg class="ic"><use href="#i-pen"/></svg>Edit</span></div>
+        <span>Transport has <span class="ichip">₹2,060</span> left for 10 days.</span>
+      </div>
+      <div class="sugg">
+        <span class="pill" style="background:var(--a-mint)"><svg class="ic"><use href="#i-spark"/></svg>Why is Groceries over?</span>
+        <span class="pill" style="background:var(--a-forest);color:var(--a-text)">Plan the rest of October</span>
+      </div>
+      <div class="compose">
+        <span class="circle" style="background:var(--a-card);color:var(--a-text)"><svg class="ic"><use href="#i-plus"/></svg></span>
+        <div class="field">Ask, or log: "lunch 180 card"</div>
+      </div>
+      <div class="tabbar">
+        <span class="ti"><svg><use href="#t-home"/></svg></span>
+        <span class="ti"><svg><use href="#t-bars"/></svg></span>
+        <span class="centre hot"><svg><use href="#t-chat"/></svg><b>+</b></span>
+        <span class="ti"><svg><use href="#t-wallet"/></svg></span>
+        <span class="ti"><span class="avatar" style="width:26px;height:26px;font-size:12px">B</span></span>
+      </div>
+    </div>
+    <div class="notes">
+      <span class="tag">Chat answers: anything, including "log this"</span>
+      <h3>AI chat</h3>
+      <ul class="plain">
+        <li><b>The composer teaches quick-log.</b> "Ask, or log: lunch 180 card". <code>add_transaction</code> already handles it; nobody knows to try.</li>
+        <li><b>Actions come back as receipts.</b> When a reply's tools wrote something, draw what was written as rows with Undo and Edit. The tool output already carries the new transaction's id, so Undo is a plain delete.</li>
+        <li><b>Suggestions follow the data.</b> "Why is Groceries over?" when an envelope is over; "Plan the rest of October" when money is left to budget. The same rules feed Home's Needs attention card.</li>
+        <li><b>Buddy appears elsewhere.</b> Home's attention card, Budget's plan button and a "Why?" on an overspent row all open chat with the question filled in.</li>
+        <li><b>The voice button goes</b> until voice input exists; the send button takes the slot once there is text.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ONBOARDING -->
+  <div class="mock">
+    <div class="phone sage" role="img" aria-label="Proposed onboarding step 2 of 4 on sage: how much money do you have right now, with a large amount field, a currency chip from the phone's region, and a continue button">
+      <div class="ph-status"><span>9:41</span><i></i><span>●●</span></div>
+      <div class="r b"><div class="ob-dots"><i class="on"></i><i class="on"></i><i></i><i></i></div><span style="font-size:11.5px">Skip</span></div>
+      <span class="m-title" style="font-size:34px;margin-top:6px">How much do you have right now?</span>
+      <span style="font-size:12.5px;color:var(--a-muted-cream)">Add up your bank accounts and cash. Your balance starts here, and you can change it later.</span>
+      <div class="amount-field"><span class="sym">$</span><span class="val num">2,450</span><span class="caret"></span></div>
+      <div class="r b"><span class="pill ink sm">USD · from your phone's region</span><span style="font-size:11.5px;text-decoration:underline">Change</span></div>
+      <div class="steps">
+        <div class="done"><svg class="ic"><use href="#i-check"/></svg>Currency and time zone</div>
+        <div><b>→</b>&nbsp;Starting balance</div>
+        <div style="color:var(--a-muted-cream)">How you get paid, and when</div>
+        <div style="color:var(--a-muted-cream)">How much you'd like to save</div>
+      </div>
+      <div class="primary">Continue <span class="k"><svg class="ic"><use href="#i-next"/></svg></span></div>
+      <div style="height:18px"></div>
+    </div>
+    <div class="notes">
+      <span class="tag">New · first run</span>
+      <h3>Onboarding</h3>
+      <ul class="plain">
+        <li><b>Four short steps on sage</b>, in the Login and Goals look, using the Quick Add amount field and the tomato button.</li>
+        <li><b>Currency and time zone from the phone.</b> A US phone gets USD and its zone; the profile's INR and Asia/Kolkata defaults stop leaking into a US launch. Copy that says "rupee" moves to the currency's own name.</li>
+        <li><b>Starting balance.</b> Saved as a <code>starting_balance</code> transaction, which the API accepts today.</li>
+        <li><b>How you get paid, and how much to save.</b> Writes <code>income_type</code>, <code>salary_day</code> and <code>savings_target_percent</code>, which the AI already reads in every chat. Marks <code>onboarding_complete</code>.</li>
+        <li><b>End on a choice:</b> "Set up my budget with buddy" or "Look around first". Every step can be skipped and edited later from a "Money profile" ticket on Profile.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="others">
+  <span class="eyebrow">Smaller fixes</span>
+  <h2 id="others">The other screens</h2>
+  <div class="issues">
+    <article class="issue">
+      <h3>Goals</h3>
+      <ul class="plain small">
+        <li>Add a pace chip beside "₹8,700 / month": "On track" in mint or "₹2,100 behind" in marigold, from <code>monthly_needed_to_hit_target</code> and the target date.</li>
+        <li>Give Goals a front door: a goals strip under Needs attention on Home, showing the top goal's dial as a small ring.</li>
+        <li>Show what the last contribution was and when, so the dial feels alive between visits.</li>
+      </ul>
+    </article>
+    <article class="issue">
+      <h3>Reports</h3>
+      <ul class="plain small">
+        <li>Every category row and payment bar opens Activity filtered to it, for the chosen month.</li>
+        <li>Add "budget vs actual" to each category row: a small tick where its budget sits.</li>
+        <li>The currency pill opens Profile because the API doesn't convert. Make it a plain label until conversion exists.</li>
+      </ul>
+    </article>
+    <article class="issue">
+      <h3>Quick Add</h3>
+      <ul class="plain small">
+        <li>Already the strongest screen. Keep it.</li>
+        <li>Add "Starting balance" as a third choice only while the user has none, for people who skipped onboarding.</li>
+        <li>After saving, the toast could carry the category's new state: "Food: ₹1,360 left".</li>
+      </ul>
+    </article>
+    <article class="issue">
+      <h3>Profile</h3>
+      <ul class="plain small">
+        <li>Replace the Budget alerts ticket with a "Money profile" ticket (income, payday, savings target), which changes what the AI knows.</li>
+        <li>Bring alerts back when the backend sends them.</li>
+        <li>Delete account is right where it is: below Sign out, dark, two confirms.</li>
+      </ul>
+    </article>
+  </div>
+</section>
+
+<section aria-labelledby="order">
+  <span class="eyebrow">Order of work</span>
+  <h2 id="order">What to build first</h2>
+  <p>Most of the value needs no backend change. Sizes: S is up to a day, M two to four days, L a week or more.</p>
+  <div class="tablebox">
+    <table>
+      <thead><tr><th>Change</th><th>Size</th><th>Backend change?</th><th>Fixes</th></tr></thead>
+      <tbody>
+        <tr class="group"><td colspan="4">Now</td></tr>
+        <tr><td class="k">New type scale in <code>tokens.ts</code>, then a pass for wrapping</td><td>S</td><td>No</td><td>Small text, truncation</td></tr>
+        <tr><td class="k">Visible "+ Log" on Home and Activity; coach mark on Home</td><td>S</td><td>No</td><td>Hidden logging</td></tr>
+        <tr><td class="k">Remove the six dead controls</td><td>S</td><td>No</td><td>Broken-looking buttons</td></tr>
+        <tr><td class="k">Home balance card: In, Out, Net row; drop the month toggle</td><td>S</td><td>No</td><td>Numbers in sentences, misleading pill</td></tr>
+        <tr><td class="k">Safe to spend today card</td><td>S</td><td>No (fields exist)</td><td>Home has no clear "now" answer</td></tr>
+        <tr><td class="k">Budget rows: one "left" figure, attention order, inline Cover, plain words</td><td>M</td><td>No</td><td>Jargon, bar and pill disagree</td></tr>
+        <tr><td class="k">Tap-through from Reports and Home legend to filtered Activity</td><td>S</td><td>No</td><td>Dead-end numbers</td></tr>
+        <tr class="group"><td colspan="4">Next</td></tr>
+        <tr><td class="k">Onboarding: device currency, starting balance, income, savings target</td><td>M</td><td>No (fields exist)</td><td>Wrong first balance, empty AI context, INR in a US launch</td></tr>
+        <tr><td class="k">Chat quick-log placeholder and receipt cards with Undo and Edit</td><td>M</td><td>No</td><td>AI that nobody knows can log</td></tr>
+        <tr><td class="k">Needs attention card and data-driven chat suggestions (rules on the phone)</td><td>M</td><td>No</td><td>Buddy lives in one tab</td></tr>
+        <tr><td class="k">Spend Pulse as rupee bars with a daily limit</td><td>M</td><td>No</td><td>Unreadable percentages</td></tr>
+        <tr><td class="k">Swipe actions on Activity; payee screen</td><td>M</td><td>No</td><td>Slow edits, unused payee filter</td></tr>
+        <tr class="group"><td colspan="4">Later</td></tr>
+        <tr><td class="k">Server search: <code>q</code> on <code>GET /transactions</code></td><td>S + S</td><td>Yes</td><td>Search misses old rows</td></tr>
+        <tr><td class="k">Budget alerts and push notifications</td><td>L</td><td>Yes</td><td>The alerts switch, the bell</td></tr>
+        <tr><td class="k">Voice input for chat and search</td><td>L</td><td>Maybe</td><td>The voice buttons</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section aria-labelledby="questions">
+  <span class="eyebrow">Your call</span>
+  <h2 id="questions">Four decisions before building</h2>
+  <div class="issues">
+    <article class="issue">
+      <h3>The centre button</h3>
+      <p class="small">My recommendation: keep tap for chat and hold for Quick Add, and add the visible "+ Log" pills plus chat quick-log. The alternative is tap for Quick Add and hold for chat, which puts logging first but moves the AI one step back.</p>
+    </article>
+    <article class="issue">
+      <h3>Envelope words</h3>
+      <p class="small">Rename "Ready to assign / Assigned / Available" to "Left to budget / Budgeted / Left"? The plain words suit a US and EU audience that mostly hasn't used YNAB.</p>
+    </article>
+    <article class="issue">
+      <h3>Default currency</h3>
+      <p class="small">New profiles take the phone's region (USD for a US phone), or stay on INR with a picker? The first matches the launch plan.</p>
+    </article>
+    <article class="issue">
+      <h3>Goal money</h3>
+      <p class="small">Should a goal contribution take money out of "Left to budget", the way an envelope does? That makes goals and budget one system, and needs a backend change to how <code>unassigned</code> is worked out.</p>
+    </article>
+  </div>
+</section>
+
+</div>

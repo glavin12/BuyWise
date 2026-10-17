@@ -4,7 +4,7 @@ import uuid
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import joinedload
 
 from ai_service.models import Goal
 
@@ -14,7 +14,7 @@ class GoalRepository:
         self.session = session
 
     async def list(self, user_id: uuid.UUID, status: str | None = None) -> list[Goal]:
-        stmt = select(Goal).options(selectinload(Goal.category)).where(Goal.user_id == user_id)
+        stmt = select(Goal).options(joinedload(Goal.category)).where(Goal.user_id == user_id)
         if status is not None:
             stmt = stmt.where(Goal.status == status)
         result = await self.session.scalars(stmt.order_by(Goal.created_at.asc(), Goal.id.asc()))
@@ -23,7 +23,7 @@ class GoalRepository:
     async def get(self, user_id: uuid.UUID, goal_id: uuid.UUID) -> Goal | None:
         return await self.session.scalar(
             select(Goal)
-            .options(selectinload(Goal.category))
+            .options(joinedload(Goal.category))
             .where(Goal.id == goal_id, Goal.user_id == user_id)
         )
 

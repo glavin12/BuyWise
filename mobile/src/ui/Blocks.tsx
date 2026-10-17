@@ -1,4 +1,3 @@
-import type { LucideIcon } from "lucide-react-native";
 import { useEffect, type ReactNode } from "react";
 import { StyleSheet, Text as RNText, View, type StyleProp, type ViewStyle } from "react-native";
 
@@ -6,6 +5,7 @@ import { daysLeft, safeLine, type SafeToSpend } from "@/lib/home";
 
 import { announce } from "./a11y";
 import { Chip, InlineChip, type Hue } from "./Chips";
+import type { LucideIcon } from "./icons";
 import { DrawnFill, useCountUp } from "./motion";
 import { PressableScale } from "./PressableScale";
 import { colors, extra, fonts, radius, type } from "./tokens";

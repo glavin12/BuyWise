@@ -1,10 +1,10 @@
 import { router } from "expo-router";
-import { Lock, Mail } from "lucide-react-native";
 import { useRef, useState } from "react";
 import type { TextInput } from "react-native";
 
 import { useAuth } from "@/providers/AuthProvider";
 import { AuthField, AuthLayout, Banner, PrimaryButton } from "@/ui";
+import { Lock, Mail } from "@/ui/icons";
 
 // Log in (design/screens/01-login.png): the shared signed-out frame, two fields and the button.
 export default function LoginScreen() {

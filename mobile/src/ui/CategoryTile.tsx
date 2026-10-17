@@ -1,3 +1,9 @@
+import { StyleSheet, Text as RNText, View } from "react-native";
+
+import { categoryHue, type Hue as CategoryHue } from "@/lib/categoryStyle";
+
+import { IconTile } from "./Blocks";
+import type { Hue } from "./Chips";
 import {
   BadgePercent,
   Check,
@@ -38,14 +44,7 @@ import {
   Wifi,
   Zap,
   type LucideIcon,
-} from "lucide-react-native";
-
-import { StyleSheet, Text as RNText, View } from "react-native";
-
-import { categoryHue, type Hue as CategoryHue } from "@/lib/categoryStyle";
-
-import { IconTile } from "./Blocks";
-import type { Hue } from "./Chips";
+} from "./icons";
 import { PressableScale } from "./PressableScale";
 import { colors, extra, fonts, radius } from "./tokens";
 

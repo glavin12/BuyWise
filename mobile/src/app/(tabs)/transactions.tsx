@@ -1,6 +1,5 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Plus } from "lucide-react-native";
 import { useState } from "react";
 
 import { userMessage } from "@/lib/api";
@@ -36,6 +35,7 @@ import {
   TxRow,
   type OptionGroup,
 } from "@/ui";
+import { Plus } from "@/ui/icons";
 
 // Activity (design/screens/03-activity.png, values from design/reference-html/Transactions.html):
 // title + "Log" pill (opens Quick Add), search, type chips, then the category and month pills, count,

@@ -1,5 +1,3 @@
-import { Check, User } from "lucide-react-native";
-
 import { TYPE_LABEL } from "@/lib/labels";
 import { PAYEE_NAME_MAX, type PayeeDraft, type PayeeErrors } from "@/lib/settings";
 
@@ -8,6 +6,7 @@ import { Note } from "./Blocks";
 import { PrimaryButton, SecondaryButton } from "./Buttons";
 import { Toggle } from "./Chips";
 import { FieldInput } from "./Field";
+import { Check, User } from "./icons";
 import { Stack } from "./Layout";
 import { SheetScreen } from "./SheetScreen";
 

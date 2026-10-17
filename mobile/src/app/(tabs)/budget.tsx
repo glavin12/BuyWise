@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
-import { Copy, Plus, RotateCw } from "lucide-react-native";
 import { useState } from "react";
 
 import { userMessage } from "@/lib/api";
@@ -35,6 +34,7 @@ import {
   Title,
   type OptionGroup,
 } from "@/ui";
+import { Copy, Plus, RotateCw } from "@/ui/icons";
 
 // Budget (the owner's list mockup, 2026-09-29, with the UX review's changes of 2026-10-04): title and month
 // pill, the marigold "left to budget" card with "Copy <last month>", the month as Started → In → Out → Now

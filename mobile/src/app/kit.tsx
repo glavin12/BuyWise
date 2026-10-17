@@ -1,5 +1,4 @@
 import { Redirect } from "expo-router";
-import { ArrowLeft, Bell, Calendar, Check, Copy, Fuel, History, LayoutGrid, Pencil, Plane, Plus, Search, ShoppingBag, Smartphone, Sparkles, User, Utensils } from "lucide-react-native";
 import { useState } from "react";
 
 import { todayLocal } from "@/lib/dates";
@@ -35,6 +34,7 @@ import {
   Stack,
   Title,
 } from "@/ui";
+import { ArrowLeft, Bell, Calendar, Check, Copy, Fuel, History, LayoutGrid, Pencil, Plane, Plus, Search, ShoppingBag, Smartphone, Sparkles, User, Utensils } from "@/ui/icons";
 
 const money = (minor: number) => wholeIfRound(formatMinor(minor, "INR"));
 

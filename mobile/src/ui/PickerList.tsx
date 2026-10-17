@@ -1,4 +1,3 @@
-import { Search } from "lucide-react-native";
 import { useEffect, useState, type ReactNode } from "react";
 import { BackHandler, FlatList, StyleSheet, Text as RNText, View } from "react-native";
 
@@ -10,6 +9,7 @@ import { IconTile, Note } from "./Blocks";
 import { SecondaryButton } from "./Buttons";
 import { CategoryTile, categoryTone } from "./CategoryTile";
 import { FieldInput } from "./Field";
+import { Search } from "./icons";
 import { PressableScale } from "./PressableScale";
 import { SheetScreen } from "./SheetScreen";
 import { Skeleton } from "./Skeleton";

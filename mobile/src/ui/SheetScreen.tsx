@@ -1,8 +1,8 @@
-import { SearchX, X } from "lucide-react-native";
 import type { ReactNode } from "react";
 
 import { Title } from "./Blocks";
 import { CircleButton } from "./Buttons";
+import { SearchX, X } from "./icons";
 import { Row, Stack } from "./Layout";
 import { SheetHandle } from "./OptionSheet";
 import { goBack, Screen } from "./Screen";

@@ -1,7 +1,7 @@
-import { LogOut } from "lucide-react-native";
 import { ActivityIndicator, StyleSheet, Text as RNText } from "react-native";
 
 import { useGuardedPress } from "./Buttons";
+import { LogOut } from "./icons";
 import { PressableScale } from "./PressableScale";
 import { colors, fonts, radius } from "./tokens";
 

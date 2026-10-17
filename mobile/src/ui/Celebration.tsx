@@ -1,4 +1,3 @@
-import { Check } from "lucide-react-native";
 import { useEffect, type ReactNode } from "react";
 import { StyleSheet, Text as RNText, useWindowDimensions, View } from "react-native";
 import Animated, {
@@ -14,6 +13,7 @@ import Animated, {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { PrimaryButton } from "./Buttons";
+import { Check } from "./icons";
 import { Illustration } from "./Illustration";
 import { colors, motion, type } from "./tokens";
 

@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
-import { Globe, LayoutGrid, Pencil, User } from "lucide-react-native";
 import { useState } from "react";
 
 import { userMessage } from "@/lib/api";
@@ -30,6 +29,7 @@ import {
   TicketStack,
   Title,
 } from "@/ui";
+import { Globe, LayoutGrid, Pencil, User } from "@/ui/icons";
 
 // Profile (design/screens/09-profile.png, values from design/reference-html/Settings.html): the profile card,
 // three tilted tickets (Categories, Payees, Region) and Sign out. Each ticket opens its list or form. The

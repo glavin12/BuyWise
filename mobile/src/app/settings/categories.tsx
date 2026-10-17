@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
-import { ArrowLeft } from "lucide-react-native";
 import { useState } from "react";
 
 import { userMessage } from "@/lib/api";
@@ -8,6 +7,7 @@ import { categoriesQuery } from "@/lib/queries";
 import type { CategoryType } from "@/lib/types";
 import { useRefetchStaleOnFocus } from "@/lib/useRefetchStaleOnFocus";
 import { Banner, CategoryTile, Chip, CircleButton, EmptyState, ErrorState, Fab, goBack, Row, Screen, SettingsRow, Skeleton, Stack, Title } from "@/ui";
+import { ArrowLeft } from "@/ui/icons";
 
 // Categories, in the Activity look: back and title, Expense / Income chips, one row per category (its
 // tile in its colour and icon, its name) and the marigold + for a new one. Tapping a row edits it.

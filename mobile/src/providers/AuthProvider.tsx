@@ -5,6 +5,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { MSG } from "@/lib/errors";
 import { wipeStaleSessionOnFreshInstall } from "@/lib/freshInstall";
 import { profileQuery } from "@/lib/queries";
+import { forgetSaved, keepSaved, restoreSaved } from "@/lib/queryClient";
 import { supabase } from "@/lib/supabase";
 import { TIMED_OUT, withTimeout } from "@/lib/timeout";
 
@@ -49,7 +50,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .finally(() => {
         userInitiatedSignOut.current = false;
       })
-      .then(() => supabase.auth.getSession());
+      .then(() => supabase.auth.getSession())
+      .then(async (result) => {
+        // The answers kept on the phone for this user go back in before any screen mounts and asks for them.
+        if (result.data.session) await restoreSaved(result.data.session.user.id);
+        return result;
+      });
 
     // F1: a stalled refresh must not keep the splash up for ever. After STARTUP_MS the login screen shows with
     // "can't reach BuyWise". The stored session is untouched, so the read below (or the listener, once the
@@ -79,8 +85,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(next);
       if (next) setNotice(null); // a late sign-in clears "can't reach BuyWise"
       if (event === "SIGNED_OUT") {
-        // D12: two people sharing a phone must never see each other's cached data.
+        // D12: two people sharing a phone must never see each other's cached data, in memory or on disk.
         queryClient.clear();
+        forgetSaved();
         setNotice(userInitiatedSignOut.current ? null : SESSION_EXPIRED);
         userInitiatedSignOut.current = false;
       }
@@ -91,6 +98,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       subscription.subscription.unsubscribe();
     };
   }, [queryClient]);
+
+  // Saves the answers kept on the phone while someone is signed in. Signing out deletes the file (above) and stops this.
+  const userId = session?.user.id;
+  useEffect(() => (userId ? keepSaved(userId) : undefined), [userId]);
 
   const signIn = useCallback<AuthContextValue["signIn"]>(async (email, password) => {
     setNotice(null);

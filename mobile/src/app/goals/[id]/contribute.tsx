@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Plus, Sparkle } from "lucide-react-native";
 import { useState } from "react";
 
 import { userMessage } from "@/lib/api";
@@ -30,6 +29,7 @@ import {
   Title,
   useDiscardGuard,
 } from "@/ui";
+import { Plus, Sparkle } from "@/ui/icons";
 
 // Contribute: a cream sheet over the Goals screen. Reaching the target shows the celebration.
 

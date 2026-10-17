@@ -1,4 +1,3 @@
-import { WifiOff } from "lucide-react-native";
 import { useEffect, type ReactNode } from "react";
 import { StyleSheet, Text as RNText, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -6,6 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOnline } from "@/lib/network";
 
 import { announce } from "./a11y";
+import { WifiOff } from "./icons";
 import { ToastHost } from "./toast";
 import { colors, type } from "./tokens";
 

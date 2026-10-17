@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
-import { ArrowLeft, MessagesSquare } from "lucide-react-native";
 import { useState } from "react";
 
 import { isNotFound, userMessage } from "@/lib/api";
@@ -28,6 +27,7 @@ import {
   Stack,
   Title,
 } from "@/ui";
+import { ArrowLeft, MessagesSquare } from "@/ui/icons";
 
 // History, in Activity's style: back and "HISTORY", then the chats grouped Today / This week / Older
 // with relative times. Tap opens one, long-press deletes it (after a confirm).

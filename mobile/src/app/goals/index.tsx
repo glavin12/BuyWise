@@ -1,20 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import {
-  ArrowLeft,
-  Calendar,
-  CreditCard,
-  Flag,
-  GraduationCap,
-  Pencil,
-  Plane,
-  Plus,
-  ShieldCheck,
-  ShoppingBag,
-  TreePalm,
-  TrendingUp,
-  type LucideIcon,
-} from "lucide-react-native";
 import { useState } from "react";
 
 import { userMessage } from "@/lib/api";
@@ -45,6 +30,21 @@ import {
   Toggle,
   type Hue,
 } from "@/ui";
+import {
+  ArrowLeft,
+  Calendar,
+  CreditCard,
+  Flag,
+  GraduationCap,
+  Pencil,
+  Plane,
+  Plus,
+  ShieldCheck,
+  ShoppingBag,
+  TreePalm,
+  TrendingUp,
+  type LucideIcon,
+} from "@/ui/icons";
 
 // Goals (design/screens/06-goals.png, values from design/reference-html/Goals.html): back, title and
 // Active / Achieved, the dial for one goal (the highest priority at first; tapping a tile below puts
