@@ -303,7 +303,14 @@ export function invalidateAfter(queryClient: QueryClient, change: Change): Promi
   switch (change.kind) {
     case "transaction":
       // A transaction moves balances, budgets' spent/remaining and every report.
-      return Promise.all([invalidate(["transactions"]), invalidate(["dashboard"]), invalidate(["budgets"]), invalidate(["analytics"])]);
+      // Mark all affected data stale here; the focused screen refreshes its own
+      // queries on return from the add/edit sheet. Refetching every mounted tab
+      // at once fans one write out into many background requests.
+      return Promise.all(
+        ["transactions", "dashboard", "budgets", "analytics", "payees"].map((key) =>
+          queryClient.invalidateQueries({ queryKey: [key], refetchType: "none" })
+        )
+      );
     case "budget":
       // Every month's list (only the one on screen refetches), and the Dashboard's remaining / unassigned.
       return Promise.all([invalidate(["budgets"]), invalidate(["dashboard"])]);

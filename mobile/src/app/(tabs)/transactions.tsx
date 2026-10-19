@@ -75,7 +75,7 @@ export default function TransactionsTab() {
   const list = useInfiniteQuery({ ...transactionsListQuery(filters), enabled: validRange });
   const profile = useQuery(profileQuery);
   const categoriesForType = useQuery({ ...categoriesQuery(type === "income" ? "income" : "expense"), enabled: type !== "all" });
-  useRefetchStaleOnFocus();
+  useRefetchStaleOnFocus([["transactions", "list"], ["analytics"]]);
 
   const currency = profile.data?.currency ?? "INR";
   const rows = flattenPages(list.data?.pages ?? []);

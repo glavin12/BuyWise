@@ -87,8 +87,8 @@ class TransactionService:
             currency = profile.currency if profile else "INR"
         transaction = await self.transactions.create(
             user_id,
-            category_id=category.id if category else None,
-            payee_id=payee.id if payee else None,
+            category=category,
+            payee=payee,
             amount=amount,
             currency=currency,
             transaction_type=transaction_type,
@@ -99,8 +99,7 @@ class TransactionService:
             cleared_status=cleared_status,
         )
         await self.session.commit()
-        result = await self.transactions.get(user_id, transaction.id)
-        return self._transaction_to_dict(result or transaction)
+        return self._transaction_to_dict(transaction)
 
     async def get_transaction(self, user_id: uuid.UUID, transaction_id: uuid.UUID) -> dict:
         transaction = await self.transactions.get(user_id, transaction_id)

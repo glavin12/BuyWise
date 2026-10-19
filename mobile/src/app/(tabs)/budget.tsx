@@ -148,7 +148,7 @@ export default function BudgetTab() {
   const profile = useQuery(profileQuery);
   const planCopy = usePlanBudgetCopy();
   const copy = useCopyBudgets();
-  useRefetchStaleOnFocus();
+  useRefetchStaleOnFocus([["budgets"]]);
 
   const currency = profile.data?.currency ?? "INR";
   const monthLabel = formatMonth(period.month, period.year);

@@ -35,7 +35,6 @@ class TransactionRepository:
         transaction = Transaction(user_id=user_id, **fields)
         self.session.add(transaction)
         await self.session.flush()
-        await self.session.refresh(transaction)
         return transaction
 
     async def get(self, user_id: uuid.UUID, transaction_id: uuid.UUID) -> Transaction | None:

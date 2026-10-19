@@ -98,7 +98,7 @@ export default function DashboardScreen() {
   const budgetMonth = period === "this_month" ? now : monthShift(now.month, now.year, -1);
   const budgets = useQuery(monthBudgetsQuery(budgetMonth));
   const goals = useQuery(goalsQuery("active"));
-  useRefetchStaleOnFocus();
+  useRefetchStaleOnFocus([["dashboard"], ["transactions", "recent"], ["budgets"]]);
 
   const refresh = async () => {
     if (refreshing) return; // G4: ignore a second pull while one is running

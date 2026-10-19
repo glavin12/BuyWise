@@ -93,7 +93,7 @@ export default function ReportsScreen() {
   const comparison = useQuery(comparisonQuery(previousMonth, period));
   const paymentMethods = useQuery(paymentMethodQuery(period));
   const profile = useQuery(profileQuery);
-  useRefetchStaleOnFocus();
+  useRefetchStaleOnFocus([["analytics"]]);
 
   const currency = profile.data?.currency ?? "INR";
   const monthLabelText = formatMonth(period.month, period.year);

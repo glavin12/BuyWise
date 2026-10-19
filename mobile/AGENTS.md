@@ -53,7 +53,7 @@ No `eas.json`. No `android.package` or `ios.bundleIdentifier` in `app.json`. Lig
 
 ### Baseline
 
-2026-09-27: `npm test` 116 passing; `npx tsc --noEmit` and `npx expo lint` clean.
+2026-09-27: baseline `npm test` 116 passing; `npx tsc --noEmit` and `npx expo lint` clean. Transaction invalidation now defers refetch until the affected tab is focused, reducing write-triggered background requests; current changes not checked.
 
 ## Stack
 
