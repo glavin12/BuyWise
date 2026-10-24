@@ -140,6 +140,10 @@ Goals support optional category linkage and manual progress. Reaching `target_am
 
 `POST /api/v1/dev/token` is available only under `ENVIRONMENT=development`; it relays a password grant to Supabase Auth and is not registered in other environments.
 
+### Test user
+
+A confirmed Supabase user exists for manual and timing tests, so they never touch a real account: `buywise-latency-test-1792864817@example.com` (id `f1c54000-22ba-4ebc-9119-25ab5fd3dd3a`, created 2026-10-24 through the Admin API). Its profile is provisioned with the default categories and payees, and it has budgets on 4 expense categories for October 2026. The password is never committed: it is in the owner's local `.env` as `TEST_USER_EMAIL` and `TEST_USER_PASSWORD`. Send those to `POST /api/v1/dev/token` (or Supabase's password grant) for an access token. If the password is lost, set a new one in the Supabase dashboard (Authentication > Users). Keep real data out of it.
+
 ## Compression
 
 Responses of 1 KB or more are gzip-compressed when the request sends `Accept-Encoding: gzip`, which React Native's `fetch` and browsers do (and they unpack it). Smaller responses are sent as is.
