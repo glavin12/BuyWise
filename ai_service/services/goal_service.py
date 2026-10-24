@@ -78,11 +78,16 @@ class GoalService:
         if "target_amount" in fields and fields["target_amount"] <= 0:
             raise ValueError("target_amount must be positive")
         _validate_goal_fields(fields.get("goal_type"), fields.get("priority"))
-        if "category_id" in fields and fields["category_id"] is not None:
-            category = await self.categories.get(user_id, fields["category_id"])
-            if category is None or not category.is_active:
-                raise ValueError("category not found")
-        goal = await self.goals.update(user_id, goal_id, **fields)
+        changes = dict(fields)
+        if "category_id" in changes:
+            category = None
+            if changes["category_id"] is not None:
+                category = await self.categories.get(user_id, changes["category_id"])
+                if category is None or not category.is_active:
+                    raise ValueError("category not found")
+            del changes["category_id"]
+            changes["category"] = category
+        goal = await self.goals.update(user_id, goal_id, **changes)
         if goal is None:
             raise GoalNotFoundError("Goal not found")
         await self.session.commit()

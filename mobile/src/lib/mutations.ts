@@ -38,8 +38,9 @@ import type {
 
 // Every write the app makes. Screens never call `api` themselves; they call
 // these, which also own cache updates and invalidation. Buttons that trigger a
-// mutation are disabled while it is pending, and there is no server-side
-// idempotency for transactions, so that guard is what stops a double tap.
+// mutation are disabled while it is pending, which stops a double tap; a new
+// transaction also carries an `idempotency_key` (add-transaction), so a retry
+// after a timeout cannot log it twice. Other creates have no key.
 
 type Lists = [readonly unknown[], InfiniteData<TransactionsResponse> | undefined][];
 

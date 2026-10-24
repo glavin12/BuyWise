@@ -27,7 +27,7 @@ Stores conversation messages with `conversation_id`, `user_id`, enum `role` (`us
 
 ### `categories`
 
-Categories are user-owned. Columns are `id`, `user_id`, `name`, `type` (`expense` or `income`), optional `icon` and `color`, `is_active`, and timestamps. `(user_id, name, type)` is unique. Profile creation seeds 36 defaults per user (29 expense, 7 income; `DEFAULT_CATEGORIES`); there are no global `is_system` categories.
+Categories are user-owned. Columns are `id`, `user_id`, `name`, `type` (`expense` or `income`), optional `icon` and `color`, `is_active`, and timestamps. `(user_id, name, type)` is unique, archived rows included, so creating a category with an archived one's name reactivates that row. Profile creation seeds 36 defaults per user (29 expense, 7 income; `DEFAULT_CATEGORIES`); there are no global `is_system` categories.
 
 ### `payees`
 
@@ -56,7 +56,7 @@ The ledger source of truth:
 
 Every row except a `starting_balance` requires a category (`transactions_category_required_check`), and `payment_method` is limited to the five values above (`transactions_payment_method_check`). Split child rows (`parent_transaction_id` set) are excluded from the balance and from analytical aggregates; split creation is not exposed yet.
 
-A partial unique index `ix_transactions_user_idempotency_key` on `(user_id, idempotency_key)`, limited to rows where the key is non-null, makes `POST /transactions` exactly-once per user: a conflicting insert is caught in a savepoint and the first row is returned (migration `004`).
+A partial unique index `ix_transactions_user_idempotency_key` on `(user_id, idempotency_key)`, limited to rows where the key is non-null, makes `POST /transactions` exactly-once per user: the insert is `ON CONFLICT (user_id, idempotency_key) WHERE idempotency_key IS NOT NULL DO NOTHING ... RETURNING`, and when it inserts nothing the first row is returned (migration `004`).
 
 Indexes cover `user_id`, `category_id`, `payee_id`, `transaction_date`, `(user_id, transaction_date)`, `(user_id, transaction_type)`, and `parent_transaction_id`.
 

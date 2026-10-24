@@ -128,11 +128,14 @@ class PayeeRepository:
             )
 
     async def seed_defaults(self, user_id: uuid.UUID) -> list[Payee]:
+        """Add the predefined payees the user does not have yet, in one INSERT."""
         existing = await self.list(user_id)
         existing_keys = {(item.normalized_name, item.type) for item in existing}
-        created: list[Payee] = []
-        for name, payee_type in PREDEFINED_PAYEES:
-            if (name.strip().lower(), payee_type) in existing_keys:
-                continue
-            created.append(await self.create(user_id, name=name, type=payee_type))
+        created = [
+            Payee(user_id=user_id, name=name, normalized_name=name.strip().lower(), type=payee_type)
+            for name, payee_type in PREDEFINED_PAYEES
+            if (name.strip().lower(), payee_type) not in existing_keys
+        ]
+        self.session.add_all(created)
+        await self.session.flush()
         return created

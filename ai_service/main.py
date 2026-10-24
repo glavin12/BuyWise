@@ -13,12 +13,13 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, TimeoutError as PoolTimeoutError
 
 from ai_service.auth import AuthError
 from ai_service.core.config import get_settings
+from ai_service.core.observability import RequestLogMiddleware
 from ai_service.core.rate_limit import limiter
-from ai_service.db.session import dispose_engine
+from ai_service.db.session import DatabaseUnavailableError, dispose_engine
 from ai_service.routers import (
     analytics,
     budgets,
@@ -78,6 +79,8 @@ app.add_middleware(
 # Bodies of 1 KB or more go out gzipped to clients that ask for it (React Native's fetch does): our JSON
 # shrinks by about 80%, which matters for a 500-message chat history. Smaller bodies gain nothing.
 app.add_middleware(GZipMiddleware, minimum_size=1000)
+# Added last, so outermost: its time and status are what the client got, CORS and gzip included.
+app.add_middleware(RequestLogMiddleware)
 
 app.state.limiter = limiter
 
@@ -105,6 +108,22 @@ async def integrity_error_handler(request: Request, exc: IntegrityError) -> JSON
     return JSONResponse(
         status_code=409,
         content={"detail": "This conflicts with an existing record."},
+    )
+
+
+@app.exception_handler(DatabaseUnavailableError)
+@app.exception_handler(PoolTimeoutError)  # no free pooled connection within the pool's wait
+@app.exception_handler(OSError)  # a database timeout (TimeoutError), refused connection, or lookup that failed
+async def database_unavailable_handler(request: Request, exc: Exception) -> JSONResponse:
+    """The database did not answer in time or the connection dropped: say so with a 503, not a bare 500. The
+    pool has already discarded the dead connections, so a retry normally succeeds. The driver message is never
+    echoed: it carries hosts and SQL.
+    """
+    logger.warning("Database unavailable on %s %s: %s", request.method, request.url.path, type(exc).__name__)
+    return JSONResponse(
+        status_code=503,
+        content={"detail": "The service is temporarily unavailable. Please try again."},
+        headers={"Retry-After": "2"},
     )
 
 

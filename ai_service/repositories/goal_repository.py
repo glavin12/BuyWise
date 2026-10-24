@@ -34,6 +34,12 @@ class GoalRepository:
         return goal
 
     async def update(self, user_id: uuid.UUID, goal_id: uuid.UUID, **fields) -> Goal | None:
+        """Apply ``fields`` to the goal and flush them.
+
+        To change the goal's category pass ``category`` (the object, or None to clear) instead of
+        ``category_id``: the goal was loaded with its old category, and only assigning the relationship
+        makes it name the new one.
+        """
         goal = await self.get(user_id, goal_id)
         if goal is None:
             return None

@@ -28,9 +28,10 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = ""
     SUPABASE_DATABASE_URL: str = ""
-    # Ping each pooled connection before use, so one the pooler dropped is replaced instead of failing the
-    # request. It costs 3 round trips per request (asyncpg pings inside BEGIN/ROLLBACK): keep it on where the
-    # backend sits next to the database; turn it off for local work against a distant one.
+    # Ping each pooled connection before use (one SELECT 1, at most 3 s: db/session.py), so one the pooler
+    # dropped, or one left half-dead by a network change, is replaced instead of failing the request. It
+    # costs one round trip per checkout; keep it on, and turn it off only for local work against a distant
+    # database if that round trip matters.
     DB_POOL_PRE_PING: bool = True
 
     # Supabase Auth (JWT verification). The Auth module verifies Supabase-issued
@@ -41,7 +42,18 @@ class Settings(BaseSettings):
     SUPABASE_JWT_ISSUER: str = ""  # default derived from SUPABASE_URL at access time if blank
     SUPABASE_JWT_AUDIENCE: str = "authenticated"
     SUPABASE_JWT_ALGORITHMS: str = "ES256,RS256"  # asymmetric algs only; PyJWKClient selects key by kid
-    JWKS_CACHE_TTL_SECONDS: int = 300  # keep <= Supabase's 10-min edge cache
+    JWKS_CACHE_TTL_SECONDS: int = 300  # keep <= Supabase's 10-min edge cache; a revoked key stops working within this time
+    # If refreshing the keys fails (Supabase unreachable), keep trusting the last good ones this much longer
+    # than the TTL, so a network blip does not sign everyone out. Past that, tokens are rejected.
+    JWKS_STALE_IF_ERROR_SECONDS: int = 3600
+    # The keys are fetched at most once per this many seconds, whether the reason is a token with an unknown
+    # key id (forged or just rotated in) or a failed earlier try. Stops forged tokens from causing fetches.
+    JWKS_MIN_REFETCH_SECONDS: int = 60
+    # The fetch runs in a request thread; the mobile app gives up on a request after 15 s.
+    JWKS_FETCH_TIMEOUT_SECONDS: float = 5
+    # How far the server clock may differ from the clock that issued a token (iat, nbf, exp), in seconds.
+    # Without it a clock a second or two behind rejects every fresh token as "not yet valid".
+    JWT_LEEWAY_SECONDS: int = 60
     # SECRET. Only for DELETE /api/v1/profile, which deletes the user's Supabase Auth login through the Admin
     # API. The legacy service_role key or a new sb_secret_... key. Set it on the backend host only: never in
     # mobile/ or frontend/, never committed, never logged. Blank => account deletion answers 503 and deletes nothing.

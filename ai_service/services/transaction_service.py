@@ -13,7 +13,7 @@ from ai_service.repositories import (
     TransactionRepository,
 )
 from ai_service.schemas.financial import TransactionResponse
-from ai_service.utils.financial import resolve_period
+from ai_service.utils.financial import MAX_MINOR_AMOUNT, resolve_period
 
 
 class CategoryNotFoundError(LookupError):
@@ -100,9 +100,10 @@ class TransactionService:
             cleared_status=cleared_status,
             idempotency_key=idempotency_key,
         )
+        # create() returns the row complete (category and payee too), so nothing is read after the commit.
+        result = self._transaction_to_dict(transaction)
         await self.session.commit()
-        result = await self.transactions.get(user_id, transaction.id)
-        return self._transaction_to_dict(result or transaction)
+        return result
 
     async def get_transaction(self, user_id: uuid.UUID, transaction_id: uuid.UUID) -> dict:
         transaction = await self.transactions.get(user_id, transaction_id)
@@ -118,32 +119,43 @@ class TransactionService:
             raise TransactionNotFoundError("Transaction not found")
         if "amount" in fields:
             self._validate_amount(fields["amount"])
-        if "category_id" in fields and fields["category_id"] is not None:
-            category = await self.categories.get(user_id, fields["category_id"])
-            if category is None or not category.is_active:
-                raise CategoryNotFoundError("Category not found")
-        if "payee_id" in fields and fields["payee_id"] is not None:
-            if await self.payees.get(user_id, fields["payee_id"]) is None:
-                raise PayeeReferenceError("Payee not found")
+        # What the transaction will have once the edit is applied. `current` came with its category and
+        # payee, so only a changed one is looked up, and each is looked up once.
+        category, payee = current.category, current.payee
+        if "category_id" in fields:
+            category = None
+            if fields["category_id"] is not None:
+                category = await self.categories.get(user_id, fields["category_id"])
+                if category is None or not category.is_active:
+                    raise CategoryNotFoundError("Category not found")
+        if "payee_id" in fields:
+            payee = None
+            if fields["payee_id"] is not None:
+                payee = await self.payees.get(user_id, fields["payee_id"])
+                if payee is None:
+                    raise PayeeReferenceError("Payee not found")
         merged_type = fields.get("transaction_type", current.transaction_type)
-        merged_category = fields.get("category_id", current.category_id)
-        merged_payee = fields.get("payee_id", current.payee_id)
         if merged_type in {"expense", "income"}:
-            if merged_category is None:
+            if category is None:
                 raise CategoryNotFoundError("A category is required for expense and income transactions")
             # Same type rules as create. Only when one of these three changed:
             # an unrelated edit must not be blocked by a row that predates them.
             if fields.keys() & {"transaction_type", "category_id", "payee_id"}:
-                category = await self.categories.get(user_id, merged_category)
-                if category is not None and category.type != merged_type:
+                if category.type != merged_type:
                     raise CategoryNotFoundError("Category type does not match transaction type")
-                if merged_payee is not None:
-                    payee = await self.payees.get(user_id, merged_payee)
-                    if payee is not None and payee.type != merged_type:
-                        raise PayeeReferenceError("Payee type does not match transaction type")
-        transaction = await self.transactions.update(user_id, transaction_id, **fields)
+                if payee is not None and payee.type != merged_type:
+                    raise PayeeReferenceError("Payee type does not match transaction type")
+        changes = dict(fields)
+        if "category_id" in changes:
+            changes["category"] = category
+            del changes["category_id"]
+        if "payee_id" in changes:
+            changes["payee"] = payee
+            del changes["payee_id"]
+        transaction = await self.transactions.update(current, **changes)
+        result = self._transaction_to_dict(transaction)
         await self.session.commit()
-        return self._transaction_to_dict(transaction)
+        return result
 
     async def delete_transaction(self, user_id: uuid.UUID, transaction_id: uuid.UUID) -> bool:
         deleted = await self.transactions.delete(user_id, transaction_id)
@@ -191,6 +203,8 @@ class TransactionService:
     def _validate_amount(amount: int) -> None:
         if not isinstance(amount, int) or isinstance(amount, bool) or amount < 0:
             raise ValueError("amount must be a non-negative integer in minor units")
+        if amount > MAX_MINOR_AMOUNT:
+            raise ValueError("amount is too large")
 
     @staticmethod
     def _transaction_to_dict(transaction: Transaction) -> dict:

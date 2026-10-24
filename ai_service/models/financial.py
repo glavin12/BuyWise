@@ -83,7 +83,11 @@ class Category(Base):
         CheckConstraint("length(name) > 0", name="categories_name_not_empty_check"),
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()"))
+    # insert_sentinel: the server default would otherwise keep SQLAlchemy from batching many rows into one INSERT
+    # (it cannot match the returned rows to the objects), which the default categories and payees rely on.
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()"), insert_sentinel=True
+    )
     user_id: Mapped[uuid.UUID] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("profiles.id", ondelete="CASCADE"), nullable=False, index=True
     )
@@ -111,9 +115,14 @@ class Payee(Base):
         ),
         CheckConstraint("length(name) > 0", name="payees_name_not_empty_check"),
         CheckConstraint("type IN ('expense', 'income')", name="payees_type_check"),
+        Index("ix_payees_user_type", "user_id", "type"),
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()"))
+    # insert_sentinel: the server default would otherwise keep SQLAlchemy from batching many rows into one INSERT
+    # (it cannot match the returned rows to the objects), which the default categories and payees rely on.
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()"), insert_sentinel=True
+    )
     user_id: Mapped[uuid.UUID] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("profiles.id", ondelete="CASCADE"), nullable=False, index=True
     )
@@ -152,6 +161,10 @@ class Transaction(Base):
             "(transaction_type = 'starting_balance') OR (category_id IS NOT NULL)",
             name="transactions_category_required_check",
         ),
+        Index("ix_transactions_transaction_date", "transaction_date"),
+        Index("ix_transactions_user_date", "user_id", "transaction_date"),
+        Index("ix_transactions_user_type", "user_id", "transaction_type"),
+        Index("ix_transactions_parent_transaction_id", "parent_transaction_id"),
         # Exactly-once creates: a client retry with the same key (after a timeout) must not log the
         # expense twice. Unique per user, and only for rows that carry a key.
         Index(
@@ -208,11 +221,15 @@ class BudgetEntry(Base):
         CheckConstraint("month >= 1 AND month <= 12", name="budget_entries_month_check"),
         CheckConstraint("year >= 2020 AND year <= 2100", name="budget_entries_year_check"),
         CheckConstraint("budgeted_amount >= 0", name="budget_entries_amount_check"),
+        UniqueConstraint("user_id", "category_id", "month", "year", name="uq_budget_entries_user_category_month"),
+        # The migrations have no index on user_id alone: ix_budget_entries_user_month starts with it.
+        Index("ix_budget_entries_user_month", "user_id", "month", "year"),
+        Index("ix_budget_entries_category_id", "category_id"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()"))
     user_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid(as_uuid=True), ForeignKey("profiles.id", ondelete="CASCADE"), nullable=False, index=True
+        Uuid(as_uuid=True), ForeignKey("profiles.id", ondelete="CASCADE"), nullable=False
     )
     category_id: Mapped[uuid.UUID] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("categories.id", ondelete="CASCADE"), nullable=False
@@ -240,6 +257,8 @@ class Goal(Base):
             name="goals_goal_type_check",
         ),
         CheckConstraint("status IN ('active', 'completed', 'archived')", name="goals_status_check"),
+        Index("ix_goals_user_status", "user_id", "status"),
+        Index("ix_goals_category_id", "category_id"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()"))

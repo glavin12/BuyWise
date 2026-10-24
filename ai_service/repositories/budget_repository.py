@@ -3,6 +3,8 @@ from __future__ import annotations
 import uuid
 
 from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import insert as postgresql_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -21,28 +23,23 @@ class BudgetRepository:
         year: int,
         budgeted_amount: int,
     ) -> BudgetEntry:
-        entry = await self.session.scalar(
-            select(BudgetEntry).where(
-                BudgetEntry.user_id == user_id,
-                BudgetEntry.category_id == category_id,
-                BudgetEntry.month == month,
-                BudgetEntry.year == year,
-            )
+        """Create the budget for this category and month, or replace its amount: one statement, so two saves that
+        race both succeed (a read first, then an insert, made the loser fail on the unique constraint).
+
+        ``category`` is not loaded; the caller already has the category row and names it.
+        """
+        insert = sqlite_insert if self.session.get_bind().dialect.name == "sqlite" else postgresql_insert
+        statement = insert(BudgetEntry).values(
+            user_id=user_id, category_id=category_id, month=month, year=year, budgeted_amount=budgeted_amount
         )
-        if entry is None:
-            entry = BudgetEntry(
-                user_id=user_id,
-                category_id=category_id,
-                month=month,
-                year=year,
-                budgeted_amount=budgeted_amount,
-            )
-            self.session.add(entry)
-        else:
-            entry.budgeted_amount = budgeted_amount
-        await self.session.flush()
-        await self.session.refresh(entry, attribute_names=["category"])
-        return entry
+        statement = statement.on_conflict_do_update(
+            index_elements=[BudgetEntry.user_id, BudgetEntry.category_id, BudgetEntry.month, BudgetEntry.year],
+            # ON CONFLICT bypasses the column's onupdate, so the timestamp is set here.
+            set_={"budgeted_amount": statement.excluded.budgeted_amount, "updated_at": func.now()},
+        ).returning(BudgetEntry)
+        # populate_existing: the session may already hold this row from an earlier read; it must show the new amount.
+        result = await self.session.execute(statement, execution_options={"populate_existing": True})
+        return result.scalar_one()
 
     async def get_month(self, user_id: uuid.UUID, month: int, year: int) -> list[BudgetEntry]:
         result = await self.session.scalars(

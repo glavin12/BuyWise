@@ -8,6 +8,8 @@ from zoneinfo import available_timezones
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from ai_service.schemas.financial import not_null
+
 
 @cache
 def _timezones() -> frozenset[str]:
@@ -49,6 +51,9 @@ class ProfileUpdate(BaseModel):
     savings_target_percent: int | None = Field(None, ge=0, le=100)
     investment_style: Literal["conservative", "moderate", "aggressive"] | None = None
     budget_alerts: bool | None = None
+
+    # The name, income type, salary day, savings target and investment style accept null: it clears them.
+    _required = not_null("currency", "timezone", "onboarding_complete", "budget_alerts")
 
     @field_validator("timezone")
     @classmethod

@@ -7,6 +7,10 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
+# The largest amount, in minor units, any API or tool accepts: 10 trillion in major units. The columns are
+# BIGINT (about 9.2e18), and a bigger value would reach the driver and come back as a 500.
+MAX_MINOR_AMOUNT = 10**15
+
 
 @dataclass(frozen=True)
 class MonthRange:
@@ -73,6 +77,9 @@ def amount_to_minor(value: int | float | str | Decimal) -> int:
         raise ValueError("amount must be a valid number") from exc
     if not decimal_value.is_finite() or decimal_value < 0:
         raise ValueError("amount must be a non-negative finite number")
+    # Before the multiplication: a value like 1e1000000 overflows the decimal context there.
+    if decimal_value > Decimal(MAX_MINOR_AMOUNT) / 100:
+        raise ValueError("amount is too large")
     return int((decimal_value * 100).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
 
 

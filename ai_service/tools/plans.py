@@ -1,6 +1,6 @@
 from langchain_core.tools import tool
 
-from ai_service.core.context import get_current_user_id, get_db_session
+from ai_service.core.context import get_current_user_id, get_db_session, get_today
 from ai_service.repositories import CategoryRepository
 from ai_service.services.budget_service import BudgetService
 from ai_service.utils.financial import amount_to_minor, current_month_range
@@ -15,7 +15,7 @@ async def get_budget_status(period: str = "this_month") -> dict:
     (carried_in + remaining). `carried` lists categories that carry money but have no budget this
     month. unassigned is the closing balance minus all envelope money, not yet given a job."""
     return await BudgetService(get_db_session()).budget_status(
-        get_current_user_id(), period=period
+        get_current_user_id(), period=period, today=get_today()
     )
 
 
@@ -30,7 +30,7 @@ async def set_category_budget(
     overspending carry into later months."""
     user_id = get_current_user_id()
     session = get_db_session()
-    window = current_month_range()
+    window = current_month_range(get_today())
     category_row = await CategoryRepository(session).find_by_name(user_id, category, "expense")
     if category_row is None:
         return {"status": "error", "message": f"Expense category '{category}' not found."}

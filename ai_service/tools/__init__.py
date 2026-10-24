@@ -9,6 +9,11 @@ The agent's SYSTEM_PROMPT (services/agent_service.py) teaches the model which
 tool to call for which user question.
 """
 
+import functools
+
+from langchain_core.tools import BaseTool
+
+from ai_service.core.context import tool_lock
 from ai_service.tools.calculator import calculator
 from ai_service.tools.categories import get_categories
 from ai_service.tools.dashboard import get_dashboard
@@ -33,3 +38,22 @@ all_tools = [
     get_categories,
     calculator,
 ]
+
+
+def _one_at_a_time(tool: BaseTool) -> BaseTool:
+    """Run the tool under the turn's ``tool_lock``: a step's tool calls share one DB session."""
+    run = getattr(tool, "coroutine", None)
+    if run is None:  # a sync tool (calculator) touches no session
+        return tool
+
+    @functools.wraps(run)
+    async def serialized(*args, **kwargs):
+        async with tool_lock():
+            return await run(*args, **kwargs)
+
+    tool.coroutine = serialized
+    return tool
+
+
+for _tool in all_tools:
+    _one_at_a_time(_tool)

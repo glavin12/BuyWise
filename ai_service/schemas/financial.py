@@ -6,7 +6,7 @@ from uuid import UUID
 
 from pydantic import AliasPath, BaseModel, ConfigDict, Field, computed_field, field_validator
 
-from ai_service.utils.financial import minor_to_amount
+from ai_service.utils.financial import MAX_MINOR_AMOUNT, minor_to_amount
 
 
 CategoryType = Literal["expense", "income"]
@@ -30,6 +30,22 @@ GoalPriority = Literal["low", "medium", "high"]
 _HEX_COLOR = r"^#[0-9A-Fa-f]{6}$"
 
 
+def not_null(*fields: str):
+    """Validator for an update model: an explicit ``null`` on these fields is a 422.
+
+    Their columns are NOT NULL, so null has nothing to mean (it used to reach the database and come back
+    as a 409 or a 500). A field left out of the body stays unset and is untouched; fields whose column is
+    nullable do not use this, and null on them clears the value.
+    """
+
+    def check(cls, value):
+        if value is None:
+            raise ValueError("must not be null")
+        return value
+
+    return field_validator(*fields)(check)
+
+
 class CategoryCreate(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     type: CategoryType
@@ -44,6 +60,8 @@ class CategoryUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=100)
     icon: str | None = Field(default=None, max_length=32)
     color: str | None = Field(default=None, pattern=_HEX_COLOR)
+
+    _name_is_required = not_null("name")
 
 
 class CategoryResponse(BaseModel):
@@ -88,7 +106,7 @@ class TransactionCreate(BaseModel):
     category_id: UUID | None = None
     payee_id: UUID | None = None
     payee_name: str | None = Field(default=None, max_length=255)
-    amount: int = Field(ge=0)
+    amount: int = Field(ge=0, le=MAX_MINOR_AMOUNT)
     currency: str | None = Field(default=None, min_length=3, max_length=10)
     transaction_type: TransactionType
     payment_method: PaymentMethod | None = None
@@ -113,7 +131,7 @@ class TransactionCreate(BaseModel):
 class TransactionUpdate(BaseModel):
     category_id: UUID | None = None
     payee_id: UUID | None = None
-    amount: int | None = Field(default=None, ge=0)
+    amount: int | None = Field(default=None, ge=0, le=MAX_MINOR_AMOUNT)
     currency: str | None = Field(default=None, min_length=3, max_length=10)
     transaction_type: TransactionType | None = None
     payment_method: PaymentMethod | None = None
@@ -121,6 +139,9 @@ class TransactionUpdate(BaseModel):
     description: str | None = Field(default=None, max_length=500)
     notes: str | None = Field(default=None, max_length=2000)
     cleared_status: ClearedStatus | None = None
+
+    # The category and payee, the payment method, description and notes accept null: it clears them.
+    _required = not_null("amount", "currency", "transaction_type", "transaction_date", "cleared_status")
 
 
 class TransactionResponse(BaseModel):
@@ -165,11 +186,11 @@ class BudgetCreate(BaseModel):
     category_id: UUID
     month: int = Field(ge=1, le=12)
     year: int = Field(ge=2020, le=2100)
-    budgeted_amount: int = Field(ge=0)
+    budgeted_amount: int = Field(ge=0, le=MAX_MINOR_AMOUNT)
 
 
 class BudgetUpdate(BaseModel):
-    budgeted_amount: int = Field(ge=0)
+    budgeted_amount: int = Field(ge=0, le=MAX_MINOR_AMOUNT)
 
 
 class BudgetResponse(BaseModel):
@@ -223,8 +244,8 @@ class GoalCreate(BaseModel):
     title: str = Field(min_length=1, max_length=255)
     category_id: UUID | None = None
     description: str | None = Field(default=None, max_length=1000)
-    target_amount: int = Field(gt=0)
-    current_amount: int = Field(default=0, ge=0)
+    target_amount: int = Field(gt=0, le=MAX_MINOR_AMOUNT)
+    current_amount: int = Field(default=0, ge=0, le=MAX_MINOR_AMOUNT)
     goal_type: GoalType | None = None
     priority: GoalPriority | None = None
     target_date: date | None = None
@@ -234,12 +255,15 @@ class GoalUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=255)
     category_id: UUID | None = None
     description: str | None = Field(default=None, max_length=1000)
-    target_amount: int | None = Field(default=None, gt=0)
-    current_amount: int | None = Field(default=None, ge=0)
+    target_amount: int | None = Field(default=None, gt=0, le=MAX_MINOR_AMOUNT)
+    current_amount: int | None = Field(default=None, ge=0, le=MAX_MINOR_AMOUNT)
     goal_type: GoalType | None = None
     priority: GoalPriority | None = None
     target_date: date | None = None
     status: Literal["active", "completed", "archived"] | None = None
+
+    # The category, description, type, priority and target date accept null: it clears them.
+    _required = not_null("title", "target_amount", "current_amount", "status")
 
 
 class GoalResponse(BaseModel):

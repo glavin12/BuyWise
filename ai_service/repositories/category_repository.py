@@ -76,15 +76,20 @@ class CategoryRepository:
         result = await self.session.scalars(select(Category).where(Category.user_id == user_id, Category.id.in_(ids)))
         return list(result)
 
-    async def find_by_name(self, user_id: uuid.UUID, name: str, type: str) -> Category | None:
-        return await self.session.scalar(
-            select(Category).where(
-                Category.user_id == user_id,
-                Category.is_active.is_(True),
-                func.lower(Category.name) == name.strip().lower(),
-                Category.type == type,
-            )
+    async def find_by_name(
+        self, user_id: uuid.UUID, name: str, type: str, *, include_archived: bool = False
+    ) -> Category | None:
+        """The category with this name (ignoring case and surrounding spaces); an active one comes first."""
+        stmt = select(Category).where(
+            Category.user_id == user_id,
+            func.lower(Category.name) == name.strip().lower(),
+            Category.type == type,
         )
+        if include_archived:
+            stmt = stmt.order_by(Category.is_active.desc(), Category.updated_at.desc())
+        else:
+            stmt = stmt.where(Category.is_active.is_(True))
+        return await self.session.scalar(stmt.limit(1))
 
     async def create(
         self,
@@ -128,20 +133,27 @@ class CategoryRepository:
         await self.session.flush()
         return True
 
+    async def reactivate(self, category: Category, *, icon: str | None = None, color: str | None = None) -> Category:
+        """Bring an archived category back, with the icon and colour that were sent (the others stay as they were)."""
+        category.is_active = True
+        if icon is not None:
+            category.icon = icon
+        if color is not None:
+            category.color = color
+        await self.session.flush()
+        # Reload updated_at, which the UPDATE changed on the server (a lazy load later raises MissingGreenlet).
+        await self.session.refresh(category)
+        return category
+
     async def seed_defaults(self, user_id: uuid.UUID) -> list[Category]:
+        """Add the default categories the user does not have yet, archived ones included, in one INSERT."""
         existing = await self.list(user_id, active_only=False)
         existing_keys = {(item.name.lower(), item.type) for item in existing}
-        created: list[Category] = []
-        for name, category_type, icon, color in DEFAULT_CATEGORIES:
-            if (name.lower(), category_type) in existing_keys:
-                continue
-            created.append(
-                await self.create(
-                    user_id,
-                    name=name,
-                    type=category_type,
-                    icon=icon,
-                    color=color,
-                )
-            )
+        created = [
+            Category(user_id=user_id, name=name, type=category_type, icon=icon, color=color)
+            for name, category_type, icon, color in DEFAULT_CATEGORIES
+            if (name.lower(), category_type) not in existing_keys
+        ]
+        self.session.add_all(created)
+        await self.session.flush()
         return created

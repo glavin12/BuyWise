@@ -30,10 +30,15 @@ class CategoryService:
 
     async def create_category(self, user_id: uuid.UUID, **fields) -> dict:
         self._validate(fields)
-        existing = await self.categories.find_by_name(user_id, fields["name"], fields["type"])
-        if existing is not None:
+        existing = await self.categories.find_by_name(user_id, fields["name"], fields["type"], include_archived=True)
+        if existing is not None and existing.is_active:
             return self._to_dict(existing)
-        category = await self.categories.create(user_id, **fields)
+        if existing is not None:
+            # Deleting only archives, and the unique name constraint still covers the archived row: bring it back
+            # (history and all) instead of inserting a duplicate that the database would refuse.
+            category = await self.categories.reactivate(existing, icon=fields.get("icon"), color=fields.get("color"))
+        else:
+            category = await self.categories.create(user_id, **fields)
         await self.session.commit()
         return self._to_dict(category)
 

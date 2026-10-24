@@ -60,7 +60,7 @@ class ChatService:
             raise ConversationNotFoundError("Conversation not found")
 
         if user_message is None:
-            _, created = await self.conversations.save_user_message(
+            user_message, created = await self.conversations.save_user_message(
                 conversation_id=conversation_id,
                 user_id=user_id,
                 content=message,
@@ -89,7 +89,12 @@ class ChatService:
         all_messages = context_messages + recent
 
         try:
-            with request_context(user_id, self.session):
+            # The turn is named by its user message, which a retry of a failed send re-runs, so
+            # the tools' writes get the same idempotency keys and are not saved twice. The tools use
+            # the same date the model was told, so "today" and "this month" agree between them.
+            with request_context(
+                user_id, self.session, turn_id=str(user_message.id), today=ctx.today
+            ):
                 result = await invoke_agent(all_messages)
             final_ai, tool_exchanges, tool_calls, reasoning = extract_agent_output(
                 result, input_count=len(all_messages)

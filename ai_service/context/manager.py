@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ai_service.context.base_context import ContextLoader
 from ai_service.context.loaders import ProfileLoader, TimeLoader
 from ai_service.context.models import FinancialContext
+from ai_service.services.profile_service import ProfileService
 
 logger = logging.getLogger(__name__)
 
@@ -23,10 +24,19 @@ class ContextManager:
     async def build_context(
         self, user_id: uuid.UUID, conversation_id: uuid.UUID
     ) -> FinancialContext:
+        # Read once for every loader: the profile line and the user's timezone (the date) come from it.
+        loaders = self._loaders
+        profile = None
+        try:
+            profile = await ProfileService(self.session).get_profile(user_id)
+        except Exception:
+            logger.exception("Failed to read the profile for the context")
+            # No profile line rather than one that calls the user new; the date uses the default zone.
+            loaders = [loader for loader in loaders if not isinstance(loader, ProfileLoader)]
         modules = []
-        for loader in self._loaders:
+        for loader in loaders:
             try:
-                mod = await loader.load(user_id, self.session)
+                mod = await loader.load(user_id, self.session, profile)
                 logger.debug(
                     "Loaded context module: name=%s content=%s", mod.name, mod.content
                 )

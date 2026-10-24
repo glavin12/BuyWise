@@ -57,8 +57,9 @@ The Context Manager sits **between ChatService and the agent**. It produces a `F
 ChatService.send_message()
   │
   ├─ context_mgr.build_context(user_id, conversation_id)
-  │    ├─ ProfileLoader.load()       → ProfileService → ProfileRepository → DB
-  │    └─ TimeLoader.load()          → datetime.now(UTC)
+  │    ├─ ProfileService.get_profile()  → one profile read, shared by every loader
+  │    ├─ ProfileLoader.load(profile)
+  │    └─ TimeLoader.load(profile)      → the user's local date, from profile.timezone
   │    └─ FinancialContext(...)
   │
   ├─ ctx.to_langchain_messages()
@@ -85,7 +86,7 @@ ai_service/context/
     loaders/
         __init__.py
         profile_loader.py    Reads Profile via ProfileService
-        time_loader.py       Produces current UTC date
+        time_loader.py       Produces the user's local date and timezone
 ```
 
 ---
@@ -129,11 +130,11 @@ Reserved for persistent between-turn context tracking. Not wired yet — V1 rebu
 ```python
 class ContextLoader(ABC):
     @abstractmethod
-    async def load(self, user_id: UUID, session: AsyncSession) -> ContextModule: ...
+    async def load(self, user_id: UUID, session: AsyncSession, profile: Profile | None) -> ContextModule: ...
 ```
 
 Each loader is self-contained:
-- Receives `user_id` and `session` explicitly — does NOT rely on `request_context()` contextvars.
+- Receives `user_id`, `session` and the profile `ContextManager` read once (or `None`) explicitly — does NOT rely on `request_context()` contextvars.
 - Creates whatever service it needs internally (e.g. `ProfileService(session)`).
 - Returns a `ContextModule` with a unique `name` and a compact `content` string.
 
@@ -148,7 +149,7 @@ Base context is rendered as a single compact `SystemMessage` with bullet formatt
 ```
 [CONTEXT]
 - User: Bhagy | Currency: INR | Timezone: Asia/kolkata | Income: salaried (salary day: 1) | Savings target: 100%
-- Current date: 2026-08-07 (UTC)
+- Current date: 2026-08-07 (Asia/Kolkata)
 ```
 
 This `SystemMessage` is prepended to the conversation history, **after** the static `SYSTEM_PROMPT` (which is still injected by `create_react_agent(prompt=SYSTEM_PROMPT)`). The LLM receives both, in order:
@@ -163,7 +164,7 @@ This `SystemMessage` is prepended to the conversation history, **after** the sta
 | Loader | Source | Fallback |
 |--------|--------|----------|
 | `ProfileLoader` | `ProfileService.get_profile(user_id)` → DB | `"New user — profile not yet configured."` |
-| `TimeLoader` | `datetime.now(timezone.utc)` | Never fails (no DB) |
+| `TimeLoader` | today in `profile.timezone`; its `ContextModule.today` becomes `FinancialContext.today`, which `ChatService` passes to the tools | Asia/Kolkata for a missing or unknown zone, UTC without tz data (no DB) |
 
 ---
 
@@ -189,7 +190,7 @@ Example for Phase 2 memory:
 ```python
 # loaders/memory_loader.py
 class MemoryLoader(ContextLoader):
-    async def load(self, user_id, session) -> ContextModule:
+    async def load(self, user_id, session, profile) -> ContextModule:
         svc = MemoryService(session)
         facts = await svc.get_facts(user_id)
         if not facts:

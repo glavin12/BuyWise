@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import uuid
+from datetime import date
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai_service.repositories import TransactionRepository
@@ -89,8 +91,11 @@ class AnalyticsService:
             },
         }
 
-    async def spending_breakdown(self, user_id: uuid.UUID, *, period: str = "this_month") -> dict:
-        window = resolve_period(period)
+    async def spending_breakdown(
+        self, user_id: uuid.UUID, *, period: str = "this_month", today: date | None = None
+    ) -> dict:
+        """``today`` is the caller's local date, which decides what "this month" is (default: the UTC date)."""
+        window = resolve_period(period, today)
         rows = await self.transactions.sum_by_category(
             user_id, transaction_type="expense", start=window.start, end=window.end
         )
@@ -98,7 +103,8 @@ class AnalyticsService:
         top_payees = await self.transactions.top_payees(
             user_id, start=window.start, end=window.end
         )
-        elapsed = days_elapsed_in_month()
+        # A finished month is averaged over all its days, the running one over the days so far.
+        elapsed = days_elapsed_in_month(today) if period == "this_month" else window.days_in_month
         return {
             "period": period,
             "month": window.month_name,
@@ -122,8 +128,10 @@ class AnalyticsService:
             ],
         }
 
-    async def income_summary(self, user_id: uuid.UUID, *, period: str = "this_month") -> dict:
-        window = resolve_period(period)
+    async def income_summary(
+        self, user_id: uuid.UUID, *, period: str = "this_month", today: date | None = None
+    ) -> dict:
+        window = resolve_period(period, today)
         rows = await self.transactions.sum_by_category(
             user_id, transaction_type="income", start=window.start, end=window.end
         )

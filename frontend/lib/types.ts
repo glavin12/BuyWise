@@ -141,7 +141,7 @@ export interface TransactionUpdate {
   category_id?: string | null;
   payee_id?: string | null;
   amount?: number;
-  currency?: string | null;
+  currency?: string;
   transaction_type?: TransactionType;
   payment_method?: PaymentMethod | null;
   transaction_date?: string;

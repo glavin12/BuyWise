@@ -40,8 +40,9 @@ def get_current_user(
     """Resolve the authenticated user from the request's Bearer JWT.
 
     Deliberately a plain ``def``: FastAPI runs it in its threadpool, so the
-    blocking JWKS fetch inside ``verify_access_token`` (a sync PyJWKClient
-    urllib call on cache miss) cannot stall the event loop for every user.
+    blocking JWKS fetch inside ``verify_access_token`` (a sync urllib call
+    when the cached keys are refreshed) cannot stall the event loop for every
+    user.
 
     Flow:
       1. Extract the Bearer token from the Authorization header.

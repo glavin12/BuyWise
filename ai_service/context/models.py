@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
+from datetime import date
 
 from langchain_core.messages import SystemMessage
 
@@ -10,6 +11,7 @@ from langchain_core.messages import SystemMessage
 class ContextModule:
     name: str
     content: str
+    today: date | None = None  # only the time module sets it: the user's local date, for the tools
 
 
 @dataclass(frozen=True)
@@ -17,6 +19,11 @@ class FinancialContext:
     profile: ContextModule | None = None
     current_time: ContextModule | None = None
     loaded_modules: frozenset[str] = field(default_factory=frozenset)
+
+    @property
+    def today(self) -> date | None:
+        """The user's local date, as the model was told it (``None`` if the time module failed)."""
+        return self.current_time.today if self.current_time else None
 
     def to_system_message_content(self) -> str:
         lines = ["[CONTEXT]"]

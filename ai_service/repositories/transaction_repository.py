@@ -5,12 +5,16 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date
 
-from sqlalchemy import case, extract, func, select
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy import case, extract, func, inspect, select
+from sqlalchemy.dialects import postgresql, sqlite
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
+from sqlalchemy.orm.attributes import set_committed_value
 
 from ai_service.models import BudgetEntry, Category, Payee, Transaction
+
+# Production is PostgreSQL; the tests run on SQLite. Both can skip an insert whose key is taken.
+_INSERT = {"postgresql": postgresql.insert, "sqlite": sqlite.insert}
 
 
 @dataclass
@@ -34,26 +38,31 @@ class TransactionRepository:
         self.session = session
 
     async def create(self, user_id: uuid.UUID, **fields) -> Transaction:
-        """Insert a transaction.
+        """Insert a transaction and return it with its category and payee loaded, in one statement.
 
         With an ``idempotency_key``, a repeat of a key this user already used (a client retry after a
-        timeout, even one racing the first request) is caught by the unique index and the first row
-        is returned instead. The insert runs in a savepoint so that conflict does not fail the whole
-        transaction, as in ``MessageRepository.create``.
+        timeout, even one racing the first request) inserts nothing and the first row is returned
+        instead. ``ON CONFLICT DO NOTHING`` on the key's unique index skips the insert without failing
+        the transaction, so no savepoint is needed, and any other integrity error still surfaces.
         """
         key = fields.get("idempotency_key")
-        transaction = Transaction(user_id=user_id, **fields)
-        try:
-            async with self.session.begin_nested():
-                self.session.add(transaction)
-                await self.session.flush()
-        except IntegrityError:
-            # Only a repeated key is recoverable; any other integrity error must surface.
-            existing = await self.get_by_idempotency_key(user_id, key) if key else None
-            if existing is None:
-                raise
-            return existing
-        await self.session.refresh(transaction)
+        insert = _INSERT[self.session.get_bind().dialect.name](Transaction).values(user_id=user_id, **fields)
+        if key:
+            insert = insert.on_conflict_do_nothing(
+                index_elements=["user_id", "idempotency_key"], index_where=Transaction.idempotency_key.is_not(None)
+            )
+        # RETURNING brings back every column, the ones the database fills in (created_at, updated_at) included.
+        transaction = await self.session.scalar(insert.returning(Transaction))
+        if transaction is None:
+            transaction = await self.get_by_idempotency_key(user_id, key)
+            if transaction is None:  # the first row was deleted between the two statements; a retry saves
+                raise RuntimeError("idempotency key taken, but its transaction is gone")
+            return transaction
+        # The caller has just read these to validate them, so this is a lookup in the session's identity map.
+        category = await self.session.get(Category, transaction.category_id) if transaction.category_id else None
+        payee = await self.session.get(Payee, transaction.payee_id) if transaction.payee_id else None
+        set_committed_value(transaction, "category", category)
+        set_committed_value(transaction, "payee", payee)
         return transaction
 
     async def get_by_idempotency_key(self, user_id: uuid.UUID, idempotency_key: str) -> Transaction | None:
@@ -132,15 +141,21 @@ class TransactionRepository:
                 stmt = stmt.where(getattr(Transaction, field) == value)
         return int(await self.session.scalar(stmt) or 0)
 
-    async def update(self, user_id: uuid.UUID, transaction_id: uuid.UUID, **fields) -> Transaction | None:
-        transaction = await self.get(user_id, transaction_id)
-        if transaction is None:
-            return None
+    async def update(self, transaction: Transaction, **fields) -> Transaction:
+        """Apply ``fields`` to a transaction `get` returned and flush them.
+
+        Pass ``category`` and ``payee`` (the objects, or None to clear) instead of ``category_id`` and
+        ``payee_id``: the transaction was loaded with its old category and payee, and only assigning the
+        relationship makes it name the new ones.
+        """
         for field, value in fields.items():
             setattr(transaction, field, value)
         await self.session.flush()
-        await self.session.refresh(transaction)
-        return await self.get(user_id, transaction_id)
+        if "updated_at" in inspect(transaction).unloaded:
+            # The UPDATE stamped it on the database side, and reading it later would be a lazy load, which
+            # async code cannot do. An edit that changed nothing sends no UPDATE and leaves it loaded.
+            await self.session.refresh(transaction, ["updated_at"])
+        return transaction
 
     async def delete(self, user_id: uuid.UUID, transaction_id: uuid.UUID) -> bool:
         transaction = await self.get(user_id, transaction_id)

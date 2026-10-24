@@ -18,10 +18,23 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 
+def include_object(obj, name, type_, reflected, compare_to):
+    """Leave out the foreign keys into Supabase's ``auth`` schema.
+
+    ``profiles.id`` and ``conversations.user_id`` reference ``auth.users.id`` in the database. The models cannot
+    declare that (the SQLite tests have no ``auth`` schema), so without this every ``alembic check`` or
+    ``--autogenerate`` would propose dropping both keys.
+    """
+    if type_ == "foreign_key_constraint" and reflected:
+        return obj.referred_table.schema != "auth"
+    return True
+
+
 def run_migrations_offline() -> None:
     context.configure(
         url=get_database_url(),
         target_metadata=target_metadata,
+        include_object=include_object,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
     )
@@ -45,6 +58,7 @@ async def run_migrations_online() -> None:
             lambda sync_connection: context.configure(
                 connection=sync_connection,
                 target_metadata=target_metadata,
+                include_object=include_object,
             )
         )
 

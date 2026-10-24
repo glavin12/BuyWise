@@ -6,13 +6,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai_service.context.base_context import ContextLoader
 from ai_service.context.models import ContextModule
-from ai_service.services.profile_service import ProfileService
+from ai_service.models import Profile
 
 
 class ProfileLoader(ContextLoader):
-    async def load(self, user_id: uuid.UUID, session: AsyncSession) -> ContextModule:
-        svc = ProfileService(session)
-        profile = await svc.get_profile(user_id)
+    async def load(
+        self, user_id: uuid.UUID, session: AsyncSession, profile: Profile | None
+    ) -> ContextModule:
         if profile is None:
             return ContextModule(
                 name="profile",

@@ -1,6 +1,6 @@
 from langchain_core.tools import tool
 
-from ai_service.core.context import get_current_user_id, get_db_session
+from ai_service.core.context import get_current_user_id, get_db_session, get_today
 from ai_service.services.dashboard_service import DashboardService
 
 
@@ -16,4 +16,4 @@ async def get_dashboard(period: str = "this_month") -> dict:
     user_id = get_current_user_id()
     session = get_db_session()
     service = DashboardService(session)
-    return await service.get_dashboard(user_id, period=period)
+    return await service.get_dashboard(user_id, period=period, today=get_today())

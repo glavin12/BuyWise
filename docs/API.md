@@ -10,7 +10,7 @@ All routes except `/health` and `/health/live` require:
 Authorization: Bearer <supabase_access_token>
 ```
 
-The backend validates the token against Supabase JWKS, issuer, audience, and expiry. The verified `sub` claim becomes `CurrentUser.id`. No endpoint accepts `user_id` in a body, path, or query parameter.
+The backend validates the token against Supabase JWKS, issuer, audience, and expiry, allowing 60 s of clock difference (`JWT_LEEWAY_SECONDS`). The verified `sub` claim becomes `CurrentUser.id`. No endpoint accepts `user_id` in a body, path, or query parameter.
 
 Errors use FastAPI's `{"detail": "..."}` shape. Authentication errors are HTTP 401 with `WWW-Authenticate: Bearer`.
 
@@ -18,8 +18,9 @@ Errors use FastAPI's `{"detail": "..."}` shape. Authentication errors are HTTP 4
 |---|---|
 | 400 | a business rule failed (unknown category, category/payee type differs from the transaction type, ...) |
 | 409 | a database constraint conflict, for example renaming a payee or category to a name that exists: `{"detail": "This conflicts with an existing record."}`; on `POST /api/v1/chat`, `{"detail": "Still processing this message"}` |
-| 422 | the body or query failed validation (see the limits below) |
+| 422 | the body or query failed validation (see the limits below), including an explicit `null` on a field that cannot be empty |
 | 429 | rate limit exceeded |
+| 503 | the database did not answer in time or dropped the connection: `{"detail": "The service is temporarily unavailable. Please try again."}` with `Retry-After: 2`; a retry normally succeeds (a `POST /transactions` retry should reuse its `idempotency_key`) |
 
 ## Input Limits
 
@@ -35,6 +36,8 @@ Errors use FastAPI's `{"detail": "..."}` shape. Authentication errors are HTTP 4
 | category `icon` | at most 32 characters (a keyword such as `public-transit`, or an emoji) |
 | chat `message` / `idempotency_key` | at most 4000 / 128 characters |
 | transaction `idempotency_key` | at most 128 characters (a blank one counts as none) |
+| every amount (transaction `amount`, `budgeted_amount`, goal `target_amount` / `current_amount`) | at most 10^15 minor units |
+| `PATCH` fields that cannot be empty (transaction `amount`, `currency`, `transaction_type`, `transaction_date`, `cleared_status`; goal `title`, `target_amount`, `current_amount`, `status`; category `name`; profile `currency`, `timezone`, `onboarding_complete`, `budget_alerts`) | omit them or send a value; `null` is a 422. Fields that can be empty (`description`, `notes`, `payee_id`, a goal's `category_id` or `target_date`, ...) accept `null` to clear them |
 
 A category's `type` is fixed at creation: `PATCH /api/v1/categories/{id}` ignores it.
 
@@ -136,7 +139,7 @@ Goals support optional category linkage and manual progress. Reaching `target_am
 
 ## Chat And Development Token
 
-`POST /api/v1/chat` sends a message. With an `idempotency_key` the send is exactly-once per user: a completed send is replayed, a retry that arrives while the first is still running gets `409 Still processing this message` (the agent and its write tools run once), and a send that failed can be retried with the same key. Without an `idempotency_key` the server generates one, so every send is new. "Still running" is inferred from an unanswered user message, so a turn whose process died leaves its key answering 409; clients should send a fresh key per send. One agent turn is limited to 60 seconds. Its AI tools use the same category, transaction, budget, analytics, and goal services as the HTTP API.
+`POST /api/v1/chat` sends a message. With an `idempotency_key` the send is exactly-once per user: a completed send is replayed, a retry that arrives while the first is still running gets `409 Still processing this message` (the agent and its write tools run once), and a send that failed can be retried with the same key. The retry re-runs the agent on the same message, and an expense the failed run already logged through `add_transaction` is returned, not logged again. Without an `idempotency_key` the server generates one, so every send is new. "Still running" is inferred from an unanswered user message, so a turn whose process died leaves its key answering 409; clients should send a fresh key per send. One agent turn is limited to 60 seconds. Its AI tools use the same category, transaction, budget, analytics, and goal services as the HTTP API.
 
 `POST /api/v1/dev/token` is available only under `ENVIRONMENT=development`; it relays a password grant to Supabase Auth and is not registered in other environments.
 

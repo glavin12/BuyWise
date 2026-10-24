@@ -1,15 +1,15 @@
-from datetime import date
+from datetime import date, timedelta
 
 from langchain_core.tools import tool
 
-from ai_service.core.context import get_current_user_id, get_db_session
+from ai_service.core.context import get_current_user_id, get_db_session, get_today, next_write_key
 from ai_service.repositories import CategoryRepository
 from ai_service.services.transaction_service import (
     CategoryNotFoundError,
     PayeeReferenceError,
     TransactionService,
 )
-from ai_service.utils.financial import amount_to_minor
+from ai_service.utils.financial import amount_to_minor, resolve_period
 
 
 @tool
@@ -30,10 +30,15 @@ async def get_recent_transactions(
         if category_row is None:
             return {"status": "error", "message": f"Category '{category}' not found."}
         category_id = category_row.id
+    # The service works a period out from the server's date. The user's month is given as dates,
+    # which it uses before its own.
+    window = resolve_period(period, get_today()) if period is not None else None
     return await TransactionService(session).list_transactions(
         user_id,
         limit=max(1, min(limit, 100)),
         period=period,
+        date_from=window.start if window else None,
+        date_to=window.end - timedelta(days=1) if window else None,
         category_id=category_id,
         transaction_type=transaction_type,
     )
@@ -59,8 +64,10 @@ async def add_transaction(
     """
     user_id = get_current_user_id()
     session = get_db_session()
+    # Taken per call, valid or not, so a re-run of this turn numbers its calls the same way.
+    idempotency_key = next_write_key("transaction")
     try:
-        parsed_date = date.fromisoformat(transaction_date) if transaction_date else date.today()
+        parsed_date = date.fromisoformat(transaction_date) if transaction_date else get_today()
         return await TransactionService(session).add_transaction(
             user_id,
             amount=amount_to_minor(amount),
@@ -72,6 +79,7 @@ async def add_transaction(
             notes=notes,
             transaction_date=parsed_date,
             cleared_status=cleared_status,
+            idempotency_key=idempotency_key,
         )
     except (ValueError, CategoryNotFoundError, PayeeReferenceError) as exc:
         return {"status": "error", "message": str(exc)}

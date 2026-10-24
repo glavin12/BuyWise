@@ -4,6 +4,7 @@ import uuid
 from datetime import date
 
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.attributes import set_committed_value
 
 from ai_service.repositories import BudgetRepository, CategoryRepository, TransactionRepository
 from ai_service.utils.financial import minor_to_amount, month_range, resolve_period
@@ -39,6 +40,7 @@ class BudgetService:
         if category is None or not category.is_active or category.type != "expense":
             raise ValueError("expense category not found")
         entry = await self.budgets.set(user_id, category_id, month, year, budgeted_amount)
+        set_committed_value(entry, "category", category)  # named from the row read above, not by another query
         await self.session.commit()
         return self._entry_to_dict(entry)
 

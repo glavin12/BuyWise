@@ -36,14 +36,17 @@ from ai_service.core.config import Settings
 from ai_service.core.context import request_context
 from ai_service.core.rate_limit import _get_rate_limit_key, limiter
 from ai_service.main import app
-from ai_service.models import Category, Conversation, Message, MessageRole, Profile
+from ai_service.models import Category, Conversation, Message, MessageRole, Profile, Transaction
 from ai_service.repositories import CategoryRepository, PayeeRepository, TransactionRepository
 from ai_service.repositories.messages import MessageCreate, MessageRepository
 from ai_service.services.goal_service import GoalService
 from ai_service.services.profile_service import ProfileService
 from ai_service.services.transaction_service import TransactionService
 from ai_service.tools.calculator import calculator
+from ai_service.tools.dashboard import get_dashboard
 from ai_service.tools.goals import add_goal
+from ai_service.tools.spending import get_spending_breakdown
+from ai_service.tools.transactions import add_transaction
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CONFLICT = {"detail": "This conflicts with an existing record."}
@@ -274,6 +277,71 @@ async def test_failed_send_can_be_retried_with_the_same_key(api_client, session,
         select(func.count()).select_from(Conversation).where(Conversation.user_id == user_id)
     )
     assert conversations == 1
+
+
+async def _transaction_count(session, user_id) -> int:
+    return await session.scalar(select(func.count()).select_from(Transaction).where(Transaction.user_id == user_id))
+
+
+async def test_retrying_a_failed_send_does_not_log_its_expense_twice(api_client, session, monkeypatch):
+    """The tool commits the expense, then the turn fails (e.g. the next model call times out). The
+    retry re-runs the agent on the same message: its expense must come back, not be added again."""
+    client, user_id = await _profile(api_client, session)
+    runs = 0
+
+    async def agent(messages):
+        nonlocal runs
+        runs += 1
+        saved = await add_transaction.ainvoke({"amount": 250, "category": "Food", "description": "lunch"})
+        assert "id" in saved
+        if runs == 1:
+            raise TimeoutError("model call timed out after the write")
+        return {"messages": [*messages, AIMessage(content="Logged ₹250 for lunch.")]}
+
+    monkeypatch.setattr(chat_service, "invoke_agent", agent)
+    body = {"message": "log lunch 250", "idempotency_key": "k-write-retry"}
+
+    failed = await client.post("/api/v1/chat", json=body)
+    retried = await client.post("/api/v1/chat", json=body)
+
+    assert "encountered an error" in failed.json()["response"]
+    assert retried.json()["response"] == "Logged ₹250 for lunch."
+    assert runs == 2
+    assert await _transaction_count(session, user_id) == 1
+
+
+async def test_two_identical_expenses_in_one_message_are_both_saved(api_client, session, monkeypatch):
+    client, user_id = await _profile(api_client, session)
+
+    async def agent(messages):
+        for _ in range(2):
+            await add_transaction.ainvoke({"amount": 80, "category": "Coffee"})
+        return {"messages": [*messages, AIMessage(content="Logged two coffees.")]}
+
+    monkeypatch.setattr(chat_service, "invoke_agent", agent)
+    await client.post("/api/v1/chat", json={"message": "two coffees, 80 each"})
+
+    assert await _transaction_count(session, user_id) == 2
+
+
+async def test_a_steps_tool_calls_share_the_session_one_at_a_time(session):
+    """LangGraph runs one step's tool calls concurrently; on one session a write's commit racing a
+    read raised InvalidRequestError ("concurrent operations are not permitted") and failed the turn."""
+    user_id = uuid.uuid4()
+    await ProfileService(session).create_profile(user_id)
+    await session.commit()
+
+    with request_context(user_id, session, turn_id=str(uuid.uuid4())):
+        results = await asyncio.gather(
+            add_transaction.ainvoke({"amount": 50, "category": "Food"}),
+            get_dashboard.ainvoke({}),
+            add_transaction.ainvoke({"amount": 70, "category": "Coffee"}),
+            get_spending_breakdown.ainvoke({}),
+            return_exceptions=True,
+        )
+
+    assert [type(result) for result in results] == [dict] * 4
+    assert await _transaction_count(session, user_id) == 2
 
 
 # --- S6: bounded AI cost -------------------------------------------------------------
