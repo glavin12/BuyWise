@@ -85,6 +85,8 @@ AI-facing display amounts are converted to minor units before service calls. Too
 
 Unless `DB_POOL_PRE_PING=false`, every checkout pings the connection first, so one the pooler dropped is replaced instead of failing the request. With asyncpg the ping is three round trips (BEGIN, `;`, ROLLBACK). That costs milliseconds next to the database and about a second per request against a distant one. So production keeps it on, and local work far from the database turns it off.
 
+The ping cannot catch a connection that went half-dead (opened on an earlier network, before a Wi-Fi change or sleep): it gets no error, only retransmits, so the ping hangs too. So every connection is replaced after 5 minutes (`pool_recycle=300`), and asyncpg's `command_timeout=10` fails a statement that waits longer, under the clients' 15 s request timeout. On 2026-10-24 a server that had run for 8 hours took 2 to 3 s per `POST /budgets`, with one request hanging, while a fresh process took 0.45 s.
+
 Responses of 1 KB or more are gzip-compressed for clients that send `Accept-Encoding: gzip` (`GZipMiddleware` in `main.py`).
 
 ## Testing Seams
