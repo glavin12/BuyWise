@@ -18,6 +18,7 @@ import {
   CategoryTile,
   Chip,
   DayHeader,
+  IconTile,
   Note,
   OptionSheet,
   Panel,
@@ -35,7 +36,7 @@ import {
   TxRow,
   type OptionGroup,
 } from "@/ui";
-import { Plus } from "@/ui/icons";
+import { LayoutGrid, Plus } from "@/ui/icons";
 
 // Activity (design/screens/03-activity.png, values from design/reference-html/Transactions.html):
 // title + "Log" pill (opens Quick Add), search, type chips, then the category and month pills, count,
@@ -95,9 +96,41 @@ export default function ActivityTab() {
     router.setParams({ type: next, ...(picked && next !== "all" && picked.type !== next ? { category: undefined } : {}) });
 
   const categoryGroups: OptionGroup[] = [
-    { options: [{ value: ALL_CATEGORIES, label: "All categories" }] },
-    ...(type !== "income" ? [{ title: "Expenses", options: expense.map((c) => ({ value: c.id, label: c.name })) }] : []),
-    ...(type !== "expense" ? [{ title: "Income", options: income.map((c) => ({ value: c.id, label: c.name })) }] : []),
+    {
+      options: [
+        {
+          value: ALL_CATEGORIES,
+          label: "All categories",
+          tile: <IconTile icon={LayoutGrid} color="sage" size={44} />,
+        },
+      ],
+    },
+    ...(type !== "income"
+      ? [
+          {
+            title: "Expenses",
+            options: expense.map((c) => ({
+              value: c.id,
+              label: c.name,
+              icon: c.icon,
+              color: c.color,
+            })),
+          },
+        ]
+      : []),
+    ...(type !== "expense"
+      ? [
+          {
+            title: "Income",
+            options: income.map((c) => ({
+              value: c.id,
+              label: c.name,
+              icon: c.icon,
+              color: c.color,
+            })),
+          },
+        ]
+      : []),
   ];
 
   const openCategories = () => {
@@ -231,6 +264,8 @@ export default function ActivityTab() {
         title="Category"
         groups={categoryGroups}
         value={categoryId ?? ALL_CATEGORIES}
+        searchable
+        searchPlaceholder="Search categories"
         onSelect={(id) => {
           setCategoryId(id === ALL_CATEGORIES ? null : id);
           setSheet(null);

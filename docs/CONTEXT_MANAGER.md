@@ -121,7 +121,7 @@ class FinancialContext:
 
 ### `ContextSession` (mutable dataclass, future use)
 
-Reserved for persistent between-turn context tracking. Not wired yet — V1 rebuilds context fresh per request. When persistence lands (future phase), `loaded_modules` and cached tool results will live here across HTTP requests.
+Reserved for possible between-turn context tracking. Not wired yet — V1 rebuilds context fresh per request and does not persist tool results.
 
 ---
 

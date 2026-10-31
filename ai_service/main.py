@@ -64,17 +64,15 @@ app = FastAPI(
     openapi_url="/openapi.json" if _docs else None,
 )
 
-# CORS: frontend uses Authorization: Bearer, not cookies, so credentials are
-# not needed. Wildcard origin + credentials violates the W3C Fetch spec and is
-# rejected by browsers, so leave credentials off — this stays valid in prod.
-# ponytail: wildcard origin, replace with explicit list if we ever add cookie auth.
+# CORS: bearer authentication needs no cookies. Deployments can restrict the
+# web origin through CORS_ALLOW_ORIGINS without changing mobile access.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.CORS_ALLOW_ORIGINS,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset"],
+    expose_headers=["X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset", "Retry-After"],
 )
 # Bodies of 1 KB or more go out gzipped to clients that ask for it (React Native's fetch does): our JSON
 # shrinks by about 80%, which matters for a 500-message chat history. Smaller bodies gain nothing.

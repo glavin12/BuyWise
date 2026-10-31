@@ -1,4 +1,5 @@
 import "react-native-url-polyfill/auto";
+import "./pkceCrypto";
 
 import { createClient } from "@supabase/supabase-js";
 import * as SecureStore from "expo-secure-store";
@@ -59,6 +60,7 @@ export const supabase = createClient(url, anonKey, {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false,
+    flowType: "pkce",
   },
   // F1: React Native's Android HTTP client has no timeout, so a stalled auth request would never settle.
   global: { fetch: (input, init) => fetchWithTimeout(fetch, input, init, AUTH_TIMEOUT_MS) },

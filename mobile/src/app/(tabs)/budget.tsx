@@ -92,7 +92,16 @@ export default function BudgetTab() {
 
   const months = Array.from({ length: MONTHS_AHEAD + 1 + MONTHS_BACK }, (_, i) => monthShift(now.month, now.year, MONTHS_AHEAD - i));
   const monthGroups: OptionGroup[] = [{ options: months.map((m) => ({ value: monthKey(m.month, m.year), label: formatMonth(m.month, m.year) })) }];
-  const moreGroups: OptionGroup[] = [{ options: rest.map((c) => ({ value: c.id, label: c.name })) }];
+  const moreGroups: OptionGroup[] = [
+    {
+      options: rest.map((c) => ({
+        value: c.id,
+        label: c.name,
+        icon: c.icon,
+        color: c.color,
+      })),
+    },
+  ];
 
   /** `cover`: the sheet opens with the amount that covers the overspend already typed in. */
   const openSet = (categoryId: string, cover?: boolean) =>
@@ -271,6 +280,8 @@ export default function BudgetTab() {
         title="Set a budget"
         groups={moreGroups}
         value=""
+        searchable
+        searchPlaceholder="Search categories"
         onSelect={(id) => {
           setSheet(null);
           openSet(id);

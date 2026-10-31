@@ -4,7 +4,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 
-from sqlalchemy import select, update
+from sqlalchemy import JSON, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -132,6 +132,8 @@ class MessageRepository:
                 Message.conversation_id == conversation_id,
                 Message.user_id == user_id,
                 Message.deleted_at.is_(None),
+                Message.role.in_([MessageRole.USER, MessageRole.ASSISTANT]),
+                or_(Message.tool_calls.is_(None), Message.tool_calls == JSON.NULL),
             )
             .order_by(Message.created_at.desc(), Message.id.desc())
             .limit(limit)

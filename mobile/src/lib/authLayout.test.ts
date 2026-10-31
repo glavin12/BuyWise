@@ -25,3 +25,8 @@ test("a short phone crops the hero's sky down to the minimum, then scrolls", () 
 test("a wide screen gets a 480 column and a hero scaled to it", () => {
   assert.deepEqual(heroFit(768, 1024, 24, 20), { width: 480, lead: 26, height: 458 });
 });
+
+test("social sign-in gives up hero space while keeping its minimum crop", () => {
+  assert.deepEqual(heroFit(390, 844, 44, 20, 92), { width: 390, lead: 0, height: 306 });
+  assert.equal(heroFit(375, 667, 20, 20, 92).height, Math.round((262 * 375) / 390));
+});

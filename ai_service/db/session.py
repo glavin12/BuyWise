@@ -1,5 +1,6 @@
 import asyncio
 import contextlib
+import ssl
 import time
 from collections.abc import AsyncGenerator
 
@@ -121,6 +122,7 @@ def build_engine(
     ping_timeout: float = PING_TIMEOUT,
     pool_size: int = POOL_SIZE,
     max_overflow: int = MAX_OVERFLOW,
+    ssl_verify: bool = False,
 ) -> AsyncEngine:
     """The engine for ``url``: ``get_engine`` uses the defaults, the fault-injection tests shorter timeouts."""
     # Home fires 5 requests at once, a full default pool (5): with 10 kept, a bigger burst does not reconnect.
@@ -132,13 +134,16 @@ def build_engine(
     # retransmits. pool_recycle replaces every connection within 5 minutes, command_timeout makes a statement on
     # a dead one fail in 10 s (under the app's 15 s) instead of hanging, and _guard_pool makes that failure, or a
     # failed ping, discard all the dead connections together. SQLAlchemy's own pool_pre_ping is left off for it.
+    connect_args = {"command_timeout": command_timeout, "timeout": connect_timeout}
+    if ssl_verify:
+        connect_args["ssl"] = ssl.create_default_context()
     engine = create_async_engine(
         url,
         pool_size=pool_size,
         max_overflow=max_overflow,
         pool_recycle=POOL_RECYCLE,
         pool_timeout=pool_timeout,
-        connect_args={"command_timeout": command_timeout, "timeout": connect_timeout},
+        connect_args=connect_args,
     )
     _guard_pool(engine, pre_ping=pre_ping, ping_timeout=ping_timeout)
     instrument_engine(engine)
@@ -148,7 +153,12 @@ def build_engine(
 def get_engine() -> AsyncEngine:
     global _engine
     if _engine is None:
-        _engine = build_engine(get_database_url(), pre_ping=get_settings().DB_POOL_PRE_PING)
+        settings = get_settings()
+        _engine = build_engine(
+            get_database_url(), pre_ping=settings.DB_POOL_PRE_PING,
+            pool_size=settings.DB_POOL_SIZE, max_overflow=settings.DB_MAX_OVERFLOW,
+            ssl_verify=settings.DB_SSL_VERIFY,
+        )
     return _engine
 
 

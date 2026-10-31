@@ -47,7 +47,7 @@ Repositories never trust an owner ID from an LLM or request body. Services valid
 - There are no accounts and no transfers. Each user has one balance: `starting_balance + income - expense`.
 - Starting balances are ledger rows but are never counted as income or expenses.
 - The balance is never stored and never resets: a month's opening and closing balance are the same sum taken up to the month's start and end (`TransactionRepository.get_balance(before=...)`; `get_balances` takes several dates, and `None` for now, in one statement).
-- Budgets roll over: `available = carried_in + assigned - spent` per category and `unassigned = closing balance - sum(available)`, so the closing balance always equals the money in envelopes plus the unassigned money.
+- Budgets roll over: `available = carried_in + assigned - spent` per category and `unassigned = closing balance - sum(available)`, so the closing balance always equals the money in envelopes plus the unassigned money. A category with spending but no budget entry is shown with zero carried-in and negative available; spending before the first budget does not carry into later months.
 - Each transaction has an optional `payment_method` (`cash`, `upi`, `bank_transfer`, `card`, `other`).
 - Split child rows are excluded from the balance and from aggregate queries; parent/child persistence is extensible but split creation is not exposed yet.
 - Every financial query includes `user_id` and, where applicable, owned category/payee references.
@@ -56,18 +56,18 @@ Repositories never trust an owner ID from an LLM or request body. Services valid
 
 `POST /api/v1/chat` is orchestrated by `ChatService.send_message`:
 
-1. Verify the Supabase JWT and obtain `CurrentUser.id`.
+1. Verify the Supabase JWT and obtain `CurrentUser.id`. The chat route acquires a process-local capacity slot (`CHAT_MAX_CONCURRENT`, default 4) before calling the service; excess requests return 503 with `Retry-After: 5`, without persisting a message. The slot is released on success, failure or cancellation.
 2. If the idempotency key already exists for this user: replay a completed send, return HTTP 409 while its agent turn is still running, or retry a failed send on the same message and conversation.
 3. Create or load an owner-scoped conversation.
 4. Persist the user message and derive a title when needed.
-5. Build lightweight profile and UTC-date context.
-6. Load the capped recent message history and rebuild LangChain messages.
+5. Build lightweight profile and user-local date/timezone context.
+6. Load the capped recent user/final-assistant dialogue, ignoring legacy tool rows, and rebuild LangChain messages.
 7. Run the ReAct agent inside `request_context(user_id, session, turn_id=<user message id>)`, bounded to 60 s and 12 graph steps. A callback on the model client (`_ReleaseDbConnection`) ends the session's transaction before every model call, so the turn holds a pooled connection only while a tool's queries run, not while the model thinks. A step's tool calls run concurrently in LangGraph, so each tool holds the turn's `tool_lock()` and the session is used by one tool at a time. `add_transaction` keys its write `chat:{user message id}:transaction:{n}`, so a retried failed send does not save the same expense twice.
 8. Parse assistant tool calls, tool results, and final text.
-9. Persist the complete assistant turn in order in one commit.
+9. Persist only the final assistant reply, with changed resource kinds for idempotent replay, in one commit.
 10. On provider failure or timeout, roll the session back (a tool may have left it mid-transaction), persist a failed assistant row, and return the existing apology response contract.
 
-Tool calls are stored structurally in `messages.tool_calls`; tool rows reference `tool_call_id`. `db_messages_to_langchain()` validates pairing before an external model call.
+Tool requests and results are available in the immediate chat response but are not saved on new turns. Older tool rows remain in the database and are excluded from model history.
 
 ## Base Context
 
@@ -75,13 +75,13 @@ Tool calls are stored structurally in `messages.tool_calls`; tool rows reference
 
 ## AI Tools
 
-Registered tools are `get_dashboard`, `get_profile`, `get_recent_transactions`, `add_transaction`, `get_spending_breakdown`, `get_income_summary`, `get_budget_status`, `set_category_budget`, `get_financial_goals`, `add_goal`, `update_goal_progress`, `get_categories`, and `calculator`.
+Registered tools are `get_dashboard`, `get_profile`, `get_recent_transactions`, `add_transaction`, `get_spending_breakdown`, `get_income_summary`, `get_budget_status`, `set_category_budget`, `get_financial_goals`, `add_goal`, `update_goal_progress`, `update_goal_target`, `get_categories`, and `calculator`.
 
-AI-facing display amounts are converted to minor units before service calls. Tool return values remain structured; natural-language explanation belongs to the agent.
+AI-facing display amounts are converted to minor units before service calls. Tool return values remain structured and omit raw minor-unit values whenever a `display_*` counterpart exists, so a stored 6000 paise is read as 60.0 rupees. Natural-language explanation belongs to the agent.
 
 ## Database Connections
 
-`ai_service/db/session.py` builds one async engine per process. Its pool keeps 10 connections and opens up to 5 more for a burst; Home alone fires 5 requests at once. Each request is one session (`get_async_session`), so one checkout.
+`ai_service/db/session.py` builds one async engine per process. Its pool keeps `DB_POOL_SIZE` connections (default 10) and opens up to `DB_MAX_OVERFLOW` more (default 5) for a burst; Home alone fires 5 requests at once. Each request is one session (`get_async_session`), so one checkout.
 
 Unless `DB_POOL_PRE_PING=false`, every checkout pings the connection first with one `SELECT 1` limited to 3 s (a `checkout` listener in `_guard_pool`; SQLAlchemy's `pool_pre_ping` is off, because its ping is three round trips, each allowed the full `command_timeout`, and a ping that times out fails the request instead of reconnecting). A connection the pooler dropped, or one left half-dead, is replaced inside the same checkout.
 
@@ -99,3 +99,7 @@ Run:
 uv run pytest tests/ -v
 uv run python -m compileall ai_service alembic
 ```
+
+## Hosting
+
+See [AWS deployment](AWS_DEPLOYMENT.md) for the $30/month Lightsail starting architecture, Docker/HTTPS setup, database TLS verification, per-process connection and chat limits, timeout budgets, separate migration step, monitoring, and growth path. The current service uses process-local rate limits and synchronous chat responses; horizontal scaling and durable chat recovery require additional work.

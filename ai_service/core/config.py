@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings
+from pydantic import Field
 from functools import lru_cache
 
 
@@ -13,17 +14,22 @@ class Settings(BaseSettings):
     # variable fails closed; set ENVIRONMENT=development locally (.env.example).
     ENVIRONMENT: str = "production"
 
-    # Groq
-    GROQ_API_KEY: str = ""
-    MODEL_NAME: str = "openai/gpt-oss-120b"
+    # Amazon Bedrock
+    BEDROCK_API_KEY: str = ""
+    BEDROCK_REGION: str = "us-east-1"
+    BEDROCK_MODEL_ID: str = "minimax.minimax-m2.5"
     TEMPERATURE: float = 0.3
 
     # Server
     HOST: str = "0.0.0.0"
     PORT: int = 8000
+    # JSON array in the environment; bearer auth does not need CORS credentials.
+    CORS_ALLOW_ORIGINS: list[str] = ["*"]
+    # Per process. Reject excess chats immediately, leaving capacity for CRUD.
+    CHAT_MAX_CONCURRENT: int = Field(default=4, ge=1, le=100)
 
     # Conversation
-    MAX_CONVERSATION_HISTORY: int = 20  # ponytail: last N messages sent to agent, raise if context feels short
+    MAX_CONVERSATION_HISTORY: int = 30  # last N dialogue messages sent to the agent
 
     # Database
     DATABASE_URL: str = ""
@@ -33,6 +39,10 @@ class Settings(BaseSettings):
     # costs one round trip per checkout; keep it on, and turn it off only for local work against a distant
     # database if that round trip matters.
     DB_POOL_PRE_PING: bool = True
+    DB_POOL_SIZE: int = Field(default=10, ge=1, le=100)
+    DB_MAX_OVERFLOW: int = Field(default=5, ge=0, le=100)
+    # Verify both certificate chain and hostname on remote PostgreSQL connections.
+    DB_SSL_VERIFY: bool = False
 
     # Supabase Auth (JWT verification). The Auth module verifies Supabase-issued
     # access tokens via the project's JWKS endpoint (RS256). No shared HS256

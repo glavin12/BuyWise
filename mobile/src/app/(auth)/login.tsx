@@ -2,6 +2,7 @@ import { router } from "expo-router";
 import { useRef, useState } from "react";
 import type { TextInput } from "react-native";
 
+import { GoogleSignIn } from "@/ui/GoogleSignIn";
 import { useAuth } from "@/providers/AuthProvider";
 import { AuthField, AuthLayout, Banner, PrimaryButton } from "@/ui";
 import { Lock, Mail } from "@/ui/icons";
@@ -30,6 +31,7 @@ export default function LoginScreen() {
     <AuthLayout
       title={"Money that\ntalks back."}
       intro="Log a spend in {dark:3 taps}, or just ask where it all went."
+      socialAction={<GoogleSignIn onError={setError} />}
       action={<PrimaryButton label="Log in" onPress={submit} requiresNetwork />}
       footer={{ prompt: "New here?", link: "Create an account", onPress: () => router.push("/signup") }}
     >

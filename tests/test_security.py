@@ -366,7 +366,7 @@ async def test_chat_rejects_oversized_input(api_client, session, monkeypatch):
 def test_llm_client_has_timeout_retry_and_token_caps(monkeypatch):
     captured: dict = {}
     monkeypatch.setattr(agent_service, "_agent", None)
-    monkeypatch.setattr(agent_service, "ChatGroq", lambda **kwargs: captured.update(kwargs) or object())
+    monkeypatch.setattr(agent_service, "ChatOpenAI", lambda **kwargs: captured.update(kwargs) or object())
     monkeypatch.setattr(agent_service, "create_react_agent", lambda **kwargs: object())
 
     agent_service._get_agent()

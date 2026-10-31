@@ -9,7 +9,7 @@ export const FLAGS = {
   /** The first-run coach mark above the centre tab. */
   coach: "coach.centre-tab",
   /** The user agreed to BuyWise AI sending their messages and figures to the AI provider (per device, not per account). */
-  aiConsent: "consent.ai.v1",
+  aiConsent: "consent.ai.v2",
 } as const;
 
 export function readFlag(key: string): boolean {

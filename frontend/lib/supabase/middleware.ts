@@ -2,6 +2,9 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function updateSession(request: NextRequest) {
+  // The OAuth code must reach the callback before a session exists.
+  if (request.nextUrl.pathname === "/auth/callback") return NextResponse.next({ request });
+
   let supabaseResponse = NextResponse.next({
     request,
   });

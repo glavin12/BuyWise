@@ -12,6 +12,9 @@ from ai_service.services.profile_service import ProfileService
 from ai_service.services.transaction_service import TransactionService
 from ai_service.tools.categories import get_categories
 from ai_service.tools.dashboard import get_dashboard
+from ai_service.tools.plans import get_budget_status
+from ai_service.tools.spending import get_spending_breakdown
+from ai_service.tools.transactions import get_recent_transactions
 from tests.factories import create_profile
 
 
@@ -57,5 +60,38 @@ async def test_get_dashboard_flags_budgets_that_exceed_income(session):
     with request_context(user_id, session):
         dashboard = await get_dashboard.ainvoke({})
 
-    assert dashboard["unassigned"] == -246600
     assert dashboard["display_unassigned"] == -2466.0
+    assert "unassigned" not in dashboard
+
+
+@pytest.mark.asyncio
+async def test_ai_tools_show_sixty_rupees_without_paise_values(session):
+    user_id = uuid.uuid4()
+    today = date.today()
+    await ProfileService(session).create_profile(user_id)
+    food = await CategoryRepository(session).find_by_name(user_id, "Food", "expense")
+    await TransactionService(session).add_transaction(
+        user_id,
+        category_id=food.id,
+        payee_name="Corner Shop",
+        amount=6000,
+        transaction_type="expense",
+        transaction_date=today,
+    )
+
+    with request_context(user_id, session, today=today):
+        dashboard = await get_dashboard.ainvoke({})
+        recent = await get_recent_transactions.ainvoke({})
+        spending = await get_spending_breakdown.ainvoke({})
+        budget = await get_budget_status.ainvoke({})
+
+    assert dashboard["display_total_spent"] == 60.0
+    assert "total_spent" not in dashboard
+    assert recent["transactions"][0]["display_amount"] == 60.0
+    assert "amount" not in recent["transactions"][0]
+    assert spending["top_payees"][0]["display_total"] == 60.0
+    assert "total" not in spending["top_payees"][0]
+    assert spending["by_category"][0]["display_amount"] == 60.0
+    assert "amount" not in spending["by_category"][0]
+    assert budget["carried"][0]["display_spent"] == 60.0
+    assert "spent" not in budget["carried"][0]

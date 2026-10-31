@@ -72,7 +72,7 @@ async def test_a_chat_turn_holds_no_pooled_connection_while_the_model_thinks(tmp
         return CurrentUser(id=user_id, role="authenticated")
 
     monkeypatch.setattr(agent_service, "_agent", None)  # build the real agent graph and tools, around the slow model
-    monkeypatch.setattr(agent_service, "ChatGroq", lambda **kwargs: SlowModel(callbacks=kwargs.get("callbacks")))
+    monkeypatch.setattr(agent_service, "ChatOpenAI", lambda **kwargs: SlowModel(callbacks=kwargs.get("callbacks")))
     monkeypatch.setitem(app.dependency_overrides, get_async_session, one_session)
     monkeypatch.setitem(app.dependency_overrides, get_current_user, the_user)
 

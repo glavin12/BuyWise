@@ -17,7 +17,7 @@ from ai_service.core.context import tool_lock
 from ai_service.tools.calculator import calculator
 from ai_service.tools.categories import get_categories
 from ai_service.tools.dashboard import get_dashboard
-from ai_service.tools.goals import add_goal, get_financial_goals, update_goal_progress
+from ai_service.tools.goals import add_goal, get_financial_goals, update_goal_progress, update_goal_target
 from ai_service.tools.plans import get_budget_status, set_category_budget
 from ai_service.tools.profile import get_profile
 from ai_service.tools.spending import get_income_summary, get_spending_breakdown
@@ -35,9 +35,22 @@ all_tools = [
     get_financial_goals,
     add_goal,
     update_goal_progress,
+    update_goal_target,
     get_categories,
     calculator,
 ]
+
+
+def _display_money_only(value):
+    if isinstance(value, dict):
+        return {
+            key: _display_money_only(item)
+            for key, item in value.items()
+            if f"display_{key}" not in value
+        }
+    if isinstance(value, list):
+        return [_display_money_only(item) for item in value]
+    return value
 
 
 def _one_at_a_time(tool: BaseTool) -> BaseTool:
@@ -49,7 +62,7 @@ def _one_at_a_time(tool: BaseTool) -> BaseTool:
     @functools.wraps(run)
     async def serialized(*args, **kwargs):
         async with tool_lock():
-            return await run(*args, **kwargs)
+            return _display_money_only(await run(*args, **kwargs))
 
     tool.coroutine = serialized
     return tool

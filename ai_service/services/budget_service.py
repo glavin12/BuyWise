@@ -54,9 +54,9 @@ class BudgetService:
             available = carried_in + assigned (this month) - spent (this month)
             unassigned = closing balance - sum of every envelope's available
 
-        so ``closing balance = money in envelopes + unassigned`` always holds. Only categories with
-        a budget entry in this month or before count as envelopes; spending elsewhere simply lowers
-        the closing balance, and so the unassigned money.
+        so ``closing balance = money in envelopes + unassigned`` always holds. Categories with a
+        budget entry or spending this month count as envelopes. Spending before a category's first
+        budget is shown in that month but does not carry forward.
         """
         window = month_range(month, year)
         entries = await self.budgets.get_month(user_id, month, year)
@@ -78,16 +78,18 @@ class BudgetService:
             for entry in entries
         ]
         budgeted_now = {entry.category_id for entry in entries}
-        # Categories that carry money in (or were spent from) but have no entry this month. They are named with
-        # one query: a lookup per category made this view's cost grow with how many there are.
+        # Categories with carry-over or spending this month but no entry this month. Name them in one query.
         carried_ids = [
             category_id
-            for category_id, carry in carried_in.items()
-            if category_id not in budgeted_now and (carry != 0 or spent.get(category_id, 0) != 0)
+            for category_id in carried_in.keys() | spent.keys()
+            if category_id not in budgeted_now
+            and (carried_in.get(category_id, 0) != 0 or spent.get(category_id, 0) != 0)
         ]
         names = {category.id: category.name for category in await self.categories.get_many(user_id, carried_ids)}
         carried = [
-            self._carried_row(category_id, names.get(category_id), carried_in[category_id], spent.get(category_id, 0))
+            self._carried_row(
+                category_id, names.get(category_id), carried_in.get(category_id, 0), spent.get(category_id, 0)
+            )
             for category_id in carried_ids
         ]
         carried.sort(key=lambda row: (row["category"] or "", row["category_id"]))

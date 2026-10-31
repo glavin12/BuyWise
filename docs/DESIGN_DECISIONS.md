@@ -50,7 +50,7 @@ The agent receives lightweight profile/time context plus just-in-time tools for 
 
 ## 13. Atomic conversation turns and idempotency
 
-Assistant tool calls, tool results, and final text are persisted in order in one commit. A partial unique index on `(user_id, idempotency_key)` for live rows with a key prevents duplicate chat turns under concurrent retry. The key is scoped per user so one user's key can never collide with another's. A retry that arrives while the first send is still running is refused with HTTP 409 rather than run the agent (and its write tools) a second time; a send whose turn failed can be retried with the same key.
+Only the final assistant text and the kinds of data changed by its tools are persisted in one commit; tool requests and results are transient. A partial unique index on `(user_id, idempotency_key)` for live rows with a key prevents duplicate chat turns under concurrent retry. The key is scoped per user so one user's key can never collide with another's. A retry that arrives while the first send is still running is refused with HTTP 409 rather than run the agent (and its write tools) a second time; a send whose turn failed can be retried with the same key.
 
 ## 14. The balance is one continuous number; budgets roll over
 

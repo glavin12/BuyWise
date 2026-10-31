@@ -12,11 +12,11 @@ const SHEET_BODY = 390; // Main.html's 410-tall sheet without its 20 of bottom p
  * wordmark's row (`lead`) gives way first, then the hero's sky (`height` is cropped from the top),
  * never below `min`: a short phone scrolls instead of losing the pot.
  */
-export function heroFit(windowWidth: number, windowHeight: number, top: number, bottom: number) {
+export function heroFit(windowWidth: number, windowHeight: number, top: number, bottom: number, extraBody = 0) {
   const width = Math.min(windowWidth, MAX_WIDTH);
   const scale = width / HERO.width;
   const natural = HERO.height * scale;
-  const room = windowHeight - top - SHEET_BODY - bottom + OVERLAP;
+  const room = windowHeight - top - SHEET_BODY - extraBody - bottom + OVERLAP;
   const lead = Math.round(Math.min(WORDMARK, Math.max(0, room - natural)));
   const height = Math.round(Math.max(HERO.min * scale, Math.min(natural, room - lead)));
   return { width, lead, height };

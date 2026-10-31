@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
+  changesFromChat,
   changesFromTools,
   clockTime,
   firstSuggestionOverride,
@@ -76,10 +77,14 @@ test("prettyToolName", () => {
 });
 
 test("changesFromTools maps writing tools once each and ignores the rest", () => {
-  const calls = ["get_dashboard", "add_goal", "update_goal_progress", "set_category_budget", "constructor"].map((tool_name) => ({ tool_name }));
+  const calls = ["get_dashboard", "add_goal", "update_goal_progress", "update_goal_target", "set_category_budget", "constructor"].map((tool_name) => ({ tool_name }));
   assert.deepEqual(changesFromTools(calls), [{ kind: "goal" }, { kind: "budget" }]);
   assert.deepEqual(changesFromTools([{ tool_name: "add_transaction" }]), [{ kind: "transaction" }, { kind: "payee" }]);
   assert.deepEqual(changesFromTools([]), []);
+});
+
+test("a replay refreshes changed data without stored tool details", () => {
+  assert.deepEqual(changesFromChat({ changed_resources: ["goal"], tool_calls: [] }), [{ kind: "goal" }]);
 });
 
 test("newIdempotencyKey is unique and within the server's limit", () => {
@@ -129,7 +134,7 @@ test("toolSummary formats the amounts that carry no currency in the profile's cu
   assert.equal(toolSummary(added, "USD"), "Added 12 € to Food"); // de-DE puts a no-break space before the €
 });
 
-test("toolSummary: set_category_budget, add_goal, update_goal_progress", () => {
+test("toolSummary: set_category_budget, add_goal, goal updates", () => {
   assert.equal(
     toolSummary(call("set_category_budget", { category: "Food", month: 9, year: 2026, budgeted_amount: 500000, display_budgeted_amount: 5000 })),
     "Budget for Food set to ₹5,000"
@@ -141,6 +146,10 @@ test("toolSummary: set_category_budget, add_goal, update_goal_progress", () => {
   assert.equal(
     toolSummary(call("update_goal_progress", { title: "Emergency Fund", display_current_amount: 12000, display_target_amount: 50000, progress_percent: 24 })),
     '"Emergency Fund" now at ₹12,000 of ₹50,000 (24%)'
+  );
+  assert.equal(
+    toolSummary(call("update_goal_target", { title: "Emergency Fund", display_current_amount: 12000, display_target_amount: 60000, progress_percent: 20 })),
+    '"Emergency Fund" now at ₹12,000 of ₹60,000 (20%)'
   );
 });
 

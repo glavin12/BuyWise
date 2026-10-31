@@ -1,17 +1,43 @@
-# BuyWise AI Service
+# BuyWise
 
 AI-first personal finance assistant. The AI understands the user's financial situation, uses tools to retrieve real data, and provides accurate financial help — with persistent conversation memory.
 
 **Status:** Manual expense tracker foundation shipped — single-balance ledger with a per-transaction payment method, user-owned categories/payees, integer money, budgets, analytics, goals, persistent AI chat, and user-scoped access control. Two clients use this API: the Expo app in `mobile/` and the Next.js app in `frontend/` (their status is in `AGENTS.md`).
 
-## Stack
+---
 
-- **FastAPI** + **LangChain** (`create_react_agent` via Groq) 
-- **PostgreSQL** (Supabase) with async **SQLAlchemy 2.0**
-- **Alembic** migrations · **Pydantic v2** schemas
-- Dependency management via **uv** (`.venv`)
+## Running the Backend Dev Server
 
-## Quick start
+> **Important:** Always run backend commands from the **repository root directory** (`Buywise/`), **not** from inside the `ai_service/` folder.
+>
+> If you run `uvicorn ai_service.main:app` while inside `ai_service/`, Python will raise:
+> ```text
+> ModuleNotFoundError: No module named 'ai_service'
+> ```
+
+### From Repository Root (Recommended):
+```bash
+uv run uvicorn ai_service.main:app --reload --host 0.0.0.0
+```
+
+### If you are currently inside `ai_service/`:
+Step back to root or pass `--app-dir ..`:
+```bash
+# Option 1: Go back to root
+cd ..
+uv run uvicorn ai_service.main:app --reload --host 0.0.0.0
+
+# Option 2: Run directly from inside ai_service/
+uv run uvicorn ai_service.main:app --reload --app-dir .. --host 0.0.0.0
+```
+
+The API listens on all interfaces at port 8000, so it is reachable from a phone on the same Wi-Fi at the computer's LAN IP (for example, `http://10.0.0.5:8000`). Interactive API documentation is available at **http://127.0.0.1:8000/docs** (enabled when `ENVIRONMENT=development` in your `.env`).
+
+---
+
+## Quick Start (First-time Setup)
+
+All commands must be executed from the **repository root**:
 
 ```bash
 # 1. Install dependencies
@@ -19,68 +45,76 @@ uv sync --dev
 
 # 2. Configure environment
 cp .env.example .env
-#    fill in GROQ_API_KEY and DATABASE_URL (Supabase Postgres)
+# Fill in BEDROCK_API_KEY and DATABASE_URL (Supabase Postgres)
 
-# 3. Apply migrations
+# 3. Apply database migrations
 uv run alembic upgrade head
 
-# 4. Run the API (hot reload)
-uv run uvicorn ai_service.main:app --reload
+# 4. Start the dev server
+uv run uvicorn ai_service.main:app --reload --host 0.0.0.0
 ```
 
-Open http://localhost:8000/docs for the interactive API docs. They (and the `/dev/token` helper) exist only with `ENVIRONMENT=development` in your `.env`; the default is `production`, which serves neither.
+---
 
-## Project layout
+## Stack
 
+- **FastAPI** + **LangChain** (`create_react_agent` via Amazon Bedrock)
+- **PostgreSQL** (Supabase) with async **SQLAlchemy 2.0**
+- **Alembic** migrations · **Pydantic v2** schemas
+- Dependency management via **uv** (`.venv`)
+
+---
+
+## Project Layout
+
+```text
+Buywise/
+├── ai_service/          FastAPI backend application
+│   ├── main.py          FastAPI app + lifespan
+│   ├── core/            Settings & rate limiting
+│   ├── db/              Async engine & session
+│   ├── models/          SQLAlchemy ORM models
+│   ├── schemas/         Pydantic request/response models
+│   ├── routers/         HTTP endpoints for chat & financial CRUD
+│   ├── services/        Financial business rules & agent logic
+│   ├── repositories/    Database access (all user_id-scoped)
+│   ├── tools/           Financial tools exposed to the AI agent
+│   └── utils/           Message formatting & financial helpers
+├── alembic/             Database migrations
+├── docs/                Architecture, database, API, and design decisions
+├── mobile/              Expo / React Native mobile app
+└── frontend/            Next.js web app
 ```
-ai_service/
-├── main.py          FastAPI app + lifespan
-├── core/            settings (env-driven)
-├── db/              async engine/session
-├── models/          SQLAlchemy ORM (chat and financial ledger)
-├── schemas/         Pydantic request/response models
-├── routers/         HTTP endpoints for chat and manual finance CRUD
-├── services/        financial business rules, chat flow, and agent
-├── repositories/    all database access (user_id-scoped)
-├── tools/           database-backed financial tools (AI-accessible)
-└── utils/           DB rows → LangChain messages, month/period helpers
-alembic/             reversible migrations
-docs/                architecture, database, API, design decisions
-mobile/              Expo / React Native client
-frontend/            Next.js web client
-```
 
-## Documentation
-
-- `AGENTS.md` and `CLAUDE.md` — the operating manual, identical copies (entry point for AI coding agents)
-- `docs/ARCHITECTURE.md` — layers, chat lifecycle, repository contracts
-- `docs/DATABASE.md` — schema, indexes, enums, migrations
-- `docs/API.md` — endpoint + schema reference, idempotency semantics
-- `docs/DESIGN_DECISIONS.md` — why key choices were made
-
-## Core behavior
-
-- **Persistent memory** — prior messages reload into the agent every request and survive restarts.
-- **Tool calling** — assistant `tool_calls` + tool results persist and round-trip on reload. Tools read the authenticated user + DB session from request context and return structured JSON only.
-- **Exactly-once sends** — the same `idempotency_key` replays the prior result, never duplicates.
-- **Access control** — every repository read/write filters by `user_id` (RLS is not relied on).
-- **Context cap** — the last `MAX_CONVERSATION_HISTORY` (20) messages feed the agent.
+---
 
 ## Migrations
 
+Run from repository root:
+
 ```bash
-uv run alembic upgrade head     # apply all pending
-uv run alembic downgrade -1     # roll back one
-uv run alembic current          # current DB revision
+uv run alembic upgrade head     # Apply all pending migrations
+uv run alembic downgrade -1     # Roll back one migration
+uv run alembic current          # View current DB revision
 ```
+
+---
 
 ## Testing
 
-The automated suite uses pytest, pytest-asyncio, httpx, and aiosqlite:
+Run from repository root:
 
 ```bash
 uv run pytest tests/ -v
 uv run python -m compileall ai_service alembic
 ```
 
-The migration baseline is a clean rebuild. Apply it only to a fresh or disposable database when existing application rows do not need preservation.
+---
+
+## Documentation
+
+- `AGENTS.md` & `CLAUDE.md` — The operating manual and architecture specifications for agents & devs
+- `docs/ARCHITECTURE.md` — Layers, chat lifecycle, repository contracts
+- `docs/DATABASE.md` — Schema, indexes, enums, migrations
+- `docs/API.md` — Endpoint + schema reference, idempotency semantics
+- `docs/DESIGN_DECISIONS.md` — Rationale for core technical decisions

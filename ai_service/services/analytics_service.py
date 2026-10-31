@@ -113,7 +113,10 @@ class AnalyticsService:
             "display_total_spent": minor_to_amount(total),
             "transaction_count": sum(row.transaction_count for row in rows),
             "daily_average": minor_to_amount(round(total / elapsed)) if elapsed else 0,
-            "top_payees": top_payees,
+            "top_payees": [
+                {**payee, "display_total": minor_to_amount(payee["total"])}
+                for payee in top_payees
+            ],
             "by_category": [
                 {
                     "category": row.category.name,

@@ -22,6 +22,8 @@ Errors use FastAPI's `{"detail": "..."}` shape. Authentication errors are HTTP 4
 | 429 | rate limit exceeded |
 | 503 | the database did not answer in time or dropped the connection: `{"detail": "The service is temporarily unavailable. Please try again."}` with `Retry-After: 2`; a retry normally succeeds (a `POST /transactions` retry should reuse its `idempotency_key`) |
 
+`POST /api/v1/chat` also returns 503 with `Retry-After: 5` and `{"detail":"The assistant is busy. Please try again shortly."}` when all process-local chat slots are occupied (`CHAT_MAX_CONCURRENT`, default 4). This rejection happens before message persistence or model execution. Clients can retry the same intent/key later. The HTTP response shapes are unchanged.
+
 ## Input Limits
 
 | field | rule |
@@ -111,8 +113,8 @@ Example create request:
 Budgets roll over, and nothing is stored for it: every request works it out from the budget entries and the ledger.
 
 - Each row of `budgets` has `carried_in` (everything assigned in earlier months minus what was spent in the category since it was first budgeted; negative when overspent) and `available = carried_in + budgeted_amount - spent`. `remaining` (`budgeted_amount - spent`) and `percent_used` stay this month's alone, so a large carry-over does not make heavy spending look small. Spending from before a category's first budget is not counted against it. On single-budget responses (`POST`, `GET /id/{id}`, `PATCH`) these fields are null.
-- `carried` lists categories that have money carried in (or spending this month) but no entry this month, each with `category_id`, `category`, `carried_in`, `spent` and `available`. A category with nothing carried and nothing spent has no row.
-- `unassigned = closing_balance - (sum of available over `budgets` and `carried`)`, so `closing_balance = money in envelopes + unassigned`. It is negative when the envelopes hold more than the balance. Spending in a category with no budget history lowers the closing balance, and so `unassigned`.
+- `carried` lists categories with money carried in or spending this month but no entry this month, each with `category_id`, `category`, `carried_in`, `spent` and `available`. Spending in a category with no budget history has `carried_in = 0` and `available = -spent`; spending before the first budget does not carry into later months. A category with nothing carried and nothing spent has no row.
+- `unassigned = closing_balance - (sum of available over `budgets` and `carried`)`, so `closing_balance = money in envelopes + unassigned`. It is negative when the envelopes hold more than the balance.
 - `closing_balance` counts every transaction dated before the first day of the next month, including ones dated later in the same month.
 
 ## Analytics
@@ -135,11 +137,13 @@ Analytics returns integer minor units. Expense and income totals exclude startin
 
 `today` is the caller's local calendar date. "This month" and "last month", the month name and `days_remaining_in_month` are worked out from it, because near a month boundary the server's UTC date can be a day ahead of or behind the phone. Without it the server's UTC date is used (older clients keep working). A date whose year is outside 2020 to 2100 returns 400 and a malformed one 422.
 
-Goals support optional category linkage and manual progress. Reaching `target_amount` marks the goal completed, and dropping below it reactivates it. An explicit `status` is respected (so a completed goal can be archived), and an archived goal is never changed by progress updates.
+Goals support optional category linkage and manual progress. Reaching `target_amount` marks the goal completed, and dropping below it reactivates it. An explicit `status` is respected (so a completed goal can be archived), and an archived goal is never changed by progress updates. The AI can list completed goals and correct either the saved amount or the target amount; the same status rule reopens a mistakenly achieved goal.
 
 ## Chat And Development Token
 
 `POST /api/v1/chat` sends a message. With an `idempotency_key` the send is exactly-once per user: a completed send is replayed, a retry that arrives while the first is still running gets `409 Still processing this message` (the agent and its write tools run once), and a send that failed can be retried with the same key. The retry re-runs the agent on the same message, and an expense the failed run already logged through `add_transaction` is returned, not logged again. Without an `idempotency_key` the server generates one, so every send is new. "Still running" is inferred from an unanswered user message, so a turn whose process died leaves its key answering 409; clients should send a fresh key per send. One agent turn is limited to 60 seconds. Its AI tools use the same category, transaction, budget, analytics, and goal services as the HTTP API.
+
+The chat response includes `changed_resources` (`transaction`, `payee`, `budget`, or `goal`) so clients can refresh data after a live send or replay. Tool requests and results appear in `tool_calls` for a live send only. New turns save just the user message and final assistant reply; a replay returns the final text and changed resource kinds with an empty `tool_calls` list. Older stored tool rows are ignored when building model history.
 
 `POST /api/v1/dev/token` is available only under `ENVIRONMENT=development`; it relays a password grant to Supabase Auth and is not registered in other environments.
 

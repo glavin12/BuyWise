@@ -83,8 +83,8 @@ async def test_this_month_is_the_users_month_in_every_tool(api_client, session, 
     assert seen["spending"]["month"] == local["month"]
     assert seen["income"]["month"] == local["month"]
     # The expense dated today is this month's, whichever month that is, and not last month's.
-    assert seen["dashboard"]["total_spent"] == 10000
-    assert seen["spending"]["total_spent"] == 10000
+    assert seen["dashboard"]["display_total_spent"] == 100.0
+    assert seen["spending"]["display_total_spent"] == 100.0
     assert seen["recent_this_month"]["count"] == 1
     assert seen["recent_last_month"]["count"] == 0
 

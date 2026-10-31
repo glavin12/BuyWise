@@ -182,7 +182,7 @@ export interface Budget {
   display_available?: number | null;
 }
 
-/** A category with money carried in from earlier months but no budget entry this month. */
+/** A category with carry-over or spending this month but no budget entry this month. */
 export interface BudgetCarried {
   category_id: string;
   category: string | null;
@@ -387,6 +387,7 @@ export interface ChatResponse {
   response: string;
   conversation_id: string;
   tool_calls: ToolCall[];
+  changed_resources: ("transaction" | "payee" | "budget" | "goal")[];
   reasoning?: string | null;
 }
 

@@ -1,5 +1,5 @@
 import type { ChipKind } from "./richText.ts";
-import type { Conversation, Message, ToolCall } from "./types.ts";
+import type { ChatResponse, Conversation, Message, ToolCall } from "./types.ts";
 
 // Pure chat helpers: grouping the History list, which rows become bubbles, which
 // caches an AI reply made stale, the greeting and the figure chips in a reply.
@@ -45,6 +45,7 @@ const TOOL_CHANGES = new Map<string, ToolChange[]>([
   ["set_category_budget", [{ kind: "budget" }]],
   ["add_goal", [{ kind: "goal" }]],
   ["update_goal_progress", [{ kind: "goal" }]],
+  ["update_goal_target", [{ kind: "goal" }]],
 ]);
 
 /** What a reply's tool calls made stale, each change once. */
@@ -54,6 +55,11 @@ export function changesFromTools(toolCalls: readonly Pick<ToolCall, "tool_name">
     for (const change of TOOL_CHANGES.get(call.tool_name) ?? []) changes.set(JSON.stringify(change), change);
   }
   return [...changes.values()];
+}
+
+/** Retry replays have no tool trace; the server keeps only these small effects with the final reply. */
+export function changesFromChat(reply: Pick<ChatResponse, "changed_resources" | "tool_calls">): ToolChange[] {
+  return reply.changed_resources?.map((kind) => ({ kind })) ?? changesFromTools(reply.tool_calls);
 }
 
 /** One per new send (a retry reuses it). The server accepts any string up to 128 characters. */
@@ -147,7 +153,8 @@ export function toolSummary(call: Pick<ToolCall, "tool_name" | "tool_output">, c
       if (title && target) return `Created goal "${title}" · target ${target}`;
       break;
     }
-    case "update_goal_progress": {
+    case "update_goal_progress":
+    case "update_goal_target": {
       const title = asString(o.title);
       const current = money(o.display_current_amount);
       const target = money(o.display_target_amount);

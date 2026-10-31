@@ -1,5 +1,5 @@
-import { useNavigation } from "expo-router";
-import { useEffect, useRef } from "react";
+import { usePreventRemove } from "expo-router";
+import { useRef, useState } from "react";
 
 import { confirm } from "./confirm";
 
@@ -10,25 +10,25 @@ import { confirm } from "./confirm";
  * be too late, because the exit happens in the same tick.
  */
 export function useDiscardGuard(dirty: boolean) {
-  const navigation = useNavigation();
-  const allowed = useRef(false);
+  const [allowed, setAllowed] = useState(false);
+  // A save can navigate before React applies the state change; avoid a stale discard prompt.
+  const allowedRef = useRef(false);
 
-  useEffect(() => {
-    if (!dirty) return;
-    return navigation.addListener("beforeRemove", (event) => {
-      if (allowed.current) return;
-      event.preventDefault();
-      void confirm("Discard changes?", "Your changes haven't been saved.", "Discard", true).then((discard) => {
-        if (!discard) return;
-        allowed.current = true;
-        navigation.dispatch(event.data.action);
-      });
+  const disablePrevention = usePreventRemove(dirty && !allowed, ({ repeat }) => {
+    if (allowedRef.current) return repeat();
+    void confirm("Discard changes?", "Your changes haven't been saved.", "Discard", true).then((discard) => {
+      if (!discard) return;
+      allowedRef.current = true;
+      setAllowed(true);
+      repeat();
     });
-  }, [dirty, navigation]);
+  });
 
   return {
     allowLeave: () => {
-      allowed.current = true;
+      allowedRef.current = true;
+      setAllowed(true);
+      disablePrevention();
     },
   };
 }

@@ -60,7 +60,7 @@ const readCoachSeen = () => readFlag(FLAGS.coach);
 const fadeAt = (rgb: string, alpha: number) => rgb.replace("rgb(", "rgba(").replace(")", `,${alpha})`);
 
 /** Pass as `<Tabs tabBar>`. `coachOn` is the route that shows the first-run coach mark above the centre button. */
-export function TabBar({ state, descriptors, navigation, coachOn }: BottomTabBarProps & { coachOn?: string }) {
+export function TabBar({ state, descriptors, emitter, navigateToTab, coachOn }: BottomTabBarProps & { coachOn?: string }) {
   const insets = useSafeAreaInsets();
   const keyboard = useKeyboardVisible();
   const focused = state.routes[state.index];
@@ -88,8 +88,8 @@ export function TabBar({ state, descriptors, navigation, coachOn }: BottomTabBar
           {state.routes.map((route, i) => {
             const isFocused = i === state.index;
             const open = () => {
-              const event = navigation.emit({ type: "tabPress", target: route.key, canPreventDefault: true });
-              if (!isFocused && !event.defaultPrevented) navigation.navigate(route.name, route.params);
+              const event = emitter.emit({ type: "tabPress", target: route.key, canPreventDefault: true });
+              if (!isFocused && !event.defaultPrevented) navigateToTab(route.key);
             };
             if (route.name === "chat") {
               return <CentreButton key={route.key} onPress={open} onUse={dismissCoach} chatOpen={isFocused} surface={surface} />;

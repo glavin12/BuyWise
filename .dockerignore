@@ -1,0 +1,13 @@
+# Allow only backend sources and locked build inputs into the build context.
+**
+!Dockerfile
+!pyproject.toml
+!uv.lock
+!ai_service/
+!ai_service/**
+!alembic/
+!alembic/**
+!alembic.ini
+**/__pycache__
+**/*.pyc
+**/.env*

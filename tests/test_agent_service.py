@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from langchain_core.messages import AIMessage
 
-from ai_service.services.agent_service import extract_agent_output
+from ai_service.services.agent_service import changed_resources, extract_agent_output
 
 
 def test_extract_agent_output_separates_reasoning_from_response():
-    """Groq's gpt-oss reasoning trace must be split out, not left for the user
+    """A model reasoning trace must be split out, not left for the user
     to read inline with the answer."""
     final = AIMessage(
         content="Here's your answer.",
@@ -29,3 +29,9 @@ def test_extract_agent_output_reasoning_is_none_when_absent():
     _, _, _, reasoning = extract_agent_output({"messages": [final]}, input_count=0)
 
     assert reasoning is None
+
+
+def test_changed_resources_keeps_only_distinct_write_effects():
+    assert changed_resources(["get_dashboard", "add_transaction", "add_goal", "add_goal"]) == [
+        "transaction", "payee", "goal"
+    ]

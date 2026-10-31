@@ -23,7 +23,7 @@ Stores authenticated chat conversations with `user_id`, optional title, message 
 
 ### `messages`
 
-Stores conversation messages with `conversation_id`, `user_id`, enum `role` (`user`, `assistant`, `system`, `tool`), content, JSONB tool calls, tool-call ID, enum `status`, idempotency key, metadata, token counts, timestamps, and soft-delete timestamp. A partial unique index `ix_messages_user_idempotency_key` on `(user_id, idempotency_key)`, limited to rows where the key is non-null and `deleted_at` is null, enforces exactly-once sends per user (a key is never shared across users). The conversation FK is `ON DELETE RESTRICT`.
+Stores conversation messages with `conversation_id`, `user_id`, enum `role` (`user`, `assistant`, `system`, `tool`), content, JSONB tool calls, tool-call ID, enum `status`, idempotency key, metadata, token counts, timestamps, and soft-delete timestamp. A partial unique index `ix_messages_user_idempotency_key` on `(user_id, idempotency_key)`, limited to rows where the key is non-null and `deleted_at` is null, enforces exactly-once sends per user (a key is never shared across users). The conversation FK is `ON DELETE RESTRICT`. New turns save user and final assistant rows only; the final row’s metadata records changed resource kinds for replay. Tool-call columns and older tool rows remain for compatibility, but new model context excludes them.
 
 ### `categories`
 

@@ -215,7 +215,7 @@ class BudgetResponse(BaseModel):
 
 
 class BudgetCarriedResponse(BaseModel):
-    """A category with money carried in from earlier months but no budget entry this month."""
+    """A category with carry-over or spending this month but no budget entry this month."""
 
     category_id: UUID
     category: str | None = None

@@ -11,7 +11,7 @@ from ai_service.core.config import get_settings
 from ai_service.core.context import request_context
 from ai_service.models import generate_uuid7
 from ai_service.schemas.chat import ChatResponse
-from ai_service.services.agent_service import extract_agent_output, invoke_agent
+from ai_service.services.agent_service import changed_resources, extract_agent_output, invoke_agent
 from ai_service.services.conversation_service import (
     ConversationNotFoundError,
     ConversationService,
@@ -96,14 +96,15 @@ class ChatService:
                 user_id, self.session, turn_id=str(user_message.id), today=ctx.today
             ):
                 result = await invoke_agent(all_messages)
-            final_ai, tool_exchanges, tool_calls, reasoning = extract_agent_output(
+            final_ai, _, tool_calls, reasoning = extract_agent_output(
                 result, input_count=len(all_messages)
             )
+            changes = changed_resources(call.tool_name for call in tool_calls)
             await self.conversations.save_assistant_turn(
                 conversation_id=conversation_id,
                 user_id=user_id,
                 ai_message=final_ai,
-                tool_exchanges=tool_exchanges,
+                changed_resources=changes,
             )
             response = (
                 final_ai.content if isinstance(final_ai.content, str) else str(final_ai.content)
@@ -124,11 +125,13 @@ class ChatService:
                 error={"message": "agent execution failed"},
             )
             tool_calls = []
+            changes = []
             reasoning = None
 
         return ChatResponse(
             response=response,
             conversation_id=conversation_id,
             tool_calls=tool_calls,
+            changed_resources=changes,
             reasoning=reasoning,
         )

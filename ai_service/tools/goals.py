@@ -1,4 +1,5 @@
 from datetime import date
+from typing import Literal
 from uuid import UUID
 
 from langchain_core.tools import tool
@@ -10,8 +11,8 @@ from ai_service.utils.financial import amount_to_minor
 
 
 @tool
-async def get_financial_goals(status: str = "active") -> dict:
-    """List financial goals with integer and display progress values."""
+async def get_financial_goals(status: Literal["active", "completed", "archived"] = "active") -> dict:
+    """List goals by status. Use completed for achieved goals; amounts are display currency."""
     return await GoalService(get_db_session()).list_goals(get_current_user_id(), status=status)
 
 
@@ -54,12 +55,25 @@ async def add_goal(
 
 @tool
 async def update_goal_progress(goal_id: str, current_amount: float) -> dict:
-    """Update the manually tracked amount saved toward a goal."""
+    """Set the total saved toward a goal, including a completed goal. Lowering it below the target reopens the goal."""
     try:
         return await GoalService(get_db_session()).update_progress(
             get_current_user_id(),
             goal_id=UUID(goal_id),
             current_amount=amount_to_minor(current_amount),
+        )
+    except (GoalNotFoundError, ValueError) as exc:
+        return {"status": "error", "message": str(exc)}
+
+
+@tool
+async def update_goal_target(goal_id: str, target_amount: float) -> dict:
+    """Correct a goal's total target, including a completed goal. Raising it above the saved amount reopens the goal."""
+    try:
+        return await GoalService(get_db_session()).update_goal(
+            get_current_user_id(),
+            UUID(goal_id),
+            target_amount=amount_to_minor(target_amount),
         )
     except (GoalNotFoundError, ValueError) as exc:
         return {"status": "error", "message": str(exc)}

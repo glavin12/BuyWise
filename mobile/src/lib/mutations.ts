@@ -2,7 +2,7 @@ import { useMutation, useMutationState, useQueryClient, type InfiniteData, type 
 
 import { api, isNotFound, stopsBatch } from "./api";
 import { copyBudgets } from "./budget";
-import { changesFromTools } from "./chat";
+import { changesFromChat } from "./chat";
 import type { MonthYear } from "./dates";
 import { placeGoal } from "./goals";
 import { mapPages, type BudgetCopyPlan } from "./ledger";
@@ -359,7 +359,7 @@ export function useSendMessage() {
       appendMessage(queryClient, id, localMessage(`sent-${idempotencyKey}`, "user", message)); // a new conversation had no cache yet
       appendMessage(queryClient, id, localMessage(`reply-${idempotencyKey}`, "assistant", response.response));
       void invalidateAfter(queryClient, { kind: "conversation" });
-      for (const change of changesFromTools(response.tool_calls)) void invalidateAfter(queryClient, change);
+      for (const change of changesFromChat(response)) void invalidateAfter(queryClient, change);
     },
   });
 }

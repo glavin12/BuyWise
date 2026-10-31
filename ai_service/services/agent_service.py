@@ -6,13 +6,13 @@ repository/service layers.
 """
 
 import asyncio
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
 from langchain_core.callbacks import AsyncCallbackHandler
 from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
-from langchain_groq import ChatGroq
+from langchain_openai import ChatOpenAI
 from langgraph.prebuilt import create_react_agent
 
 from ai_service.core.config import get_settings
@@ -49,6 +49,9 @@ reasoned assessment of the numbers available right now.
 - Use the current date from the separate [CONTEXT] message to resolve relative dates.
   Format money in the currency shown in [CONTEXT], with proper thousands separators;
   fall back to INR only when no currency context is available.
+- Money in tool results appears in display_* fields, already in the user's main
+  currency unit. daily_average uses that unit too. Use those values directly;
+  do not multiply by 100.
 
 ## Grounding and calculations
 
@@ -73,17 +76,19 @@ reasoned assessment of the numbers available right now.
   income and expense analytics.
 - Do not claim that a logged transaction list is complete unless the tool data says
   so. Unlogged bills and existing balances may matter.
-- Budgets roll over. A category's "remaining" (budgeted minus spent) is this
-  month's room alone; "available" is carried_in (what earlier months left over, or
-  overspent when negative) plus remaining. Categories that carry money but have no
-  budget this month are listed under "carried". Available is room left in the plan,
-  not spendable cash. get_dashboard's and get_budget_status's unassigned is the
+- Budgets roll over. A category's "display_remaining" (budgeted minus spent)
+  is this month's room alone; "display_available" includes what earlier months
+  left over (or overspent when negative) plus this month's remaining. Categories
+  that carry money but have no budget this month are listed under "carried".
+  Available is room left in the plan,
+  not spendable cash. get_dashboard's and get_budget_status's display_unassigned is the
   closing balance minus the money held in every envelope, so money not yet given a
   job. Before treating several categories' available amounts as money still free to
-  spend, check unassigned: if it is negative, the envelopes hold more than the
+  spend, check display_unassigned: if it is negative, the envelopes hold more than the
   balance and that combined "available" overstates what is actually there.
-- opening_balance and closing_balance are the one running balance at the start and
-  end of the month; current_balance is the balance across all transactions. The
+- display_opening_balance and display_closing_balance are the one running balance
+  at the start and end of the month; display_current_balance is the balance across
+  all transactions. The
   balance never resets at month end.
 
 ## No guilt scripts
@@ -143,11 +148,11 @@ briefly flag at most the clearest relevant issue in one plain sentence. Only fla
 when the data supports it without an arbitrary threshold or an unsupported inference:
 
 - Spending is above recorded category budgets, when budgets exist.
-- get_dashboard's unassigned is negative: the user has assigned more to category
+- get_dashboard's display_unassigned is negative: the user has assigned more to category
   budgets than the money they have. State the exact shortfall
-  (display_unassigned) plainly. This applies even when total_spent is low, since
+  (display_unassigned) plainly. This applies even when display_total_spent is low, since
   low spending so far does not mean the plan is fully funded.
-- A category's available is negative: it is overspent and the amount carries into the
+- A category's display_available is negative: it is overspent and the amount carries into the
   next month until covered.
 - One category or merchant is clearly dominant or exceptional in the returned data.
 - get_budget_status reports spending above a category budget.
@@ -163,7 +168,7 @@ Do not turn an insight into a lecture or repeat it throughout the answer.
 ## Write-tool protocol
 
 The write tools change the user's real data: add_transaction, set_category_budget,
-add_goal, and update_goal_progress.
+add_goal, update_goal_progress, and update_goal_target.
 
 - Before a write, restate the key details in one line and get a clear go-ahead,
   unless the user already supplied every required detail unambiguously in the same
@@ -171,8 +176,15 @@ add_goal, and update_goal_progress.
 - If a required detail is missing or unclear, ask one short, specific question. Do
   not assume an amount, date, category, goal, or type.
 - After a successful write, confirm exactly what was saved in plain language.
-- update_goal_progress requires a goal_id the user may not know. Call
-  get_financial_goals first, match the goal by name, and use the matching id.
+- To edit a goal, call get_financial_goals first, match it by name, and use its id.
+  Use status="completed" for an achieved goal; status="active" for an active one.
+  If more than one goal matches, ask which one. Never guess a goal id.
+- update_goal_progress sets the total saved amount, not an additional contribution.
+  Use it to correct a mistaken saved amount, including on an achieved goal.
+  Use update_goal_target to correct a mistaken target amount. If the saved
+  amount is below the corrected target, the goal becomes active again. If the user
+  asks to undo a mistaken achievement without giving the correct amount, ask
+  for that amount before writing.
 - add_transaction requires a category for expenses/income. Call get_categories first
   when the category is uncertain. Never invent one. Optionally set payment_method to
   one of cash, upi, bank_transfer, card, or other.
@@ -201,10 +213,10 @@ Tools understand only this_month and last_month.
 - Log an expense, income, or starting balance: add_transaction
 - Budget status or category remaining amounts: get_budget_status
 - Set a category budget: set_category_budget
-- Savings goals and progress: get_financial_goals
+- Savings goals and progress: get_financial_goals (status="completed" for achieved)
 - Create a goal: add_goal
-- Update saved money toward a goal: get_financial_goals first, then
-  update_goal_progress
+- Correct saved money or the target of an active or achieved goal:
+  get_financial_goals first, then update_goal_progress or update_goal_target
 - Profile, preferences, salary day, timezone, and currency: get_profile
 - Valid transaction categories: get_categories
 - Arithmetic, percentages, or multi-step calculations: calculator
@@ -246,15 +258,26 @@ class ToolExchange:
     tool_messages: list[ToolMessage] = field(default_factory=list)
 
 
+def changed_resources(tool_names: Iterable[str]) -> list[str]:
+    writes = {
+        "add_transaction": ("transaction", "payee"),
+        "set_category_budget": ("budget",),
+        "add_goal": ("goal",),
+        "update_goal_progress": ("goal",),
+        "update_goal_target": ("goal",),
+    }
+    return list(dict.fromkeys(resource for name in tool_names for resource in writes.get(name, ())))
+
+
 def _get_agent():
     global _agent
     if _agent is None:
         settings = get_settings()
-        llm = ChatGroq(
-            model=settings.MODEL_NAME,
-            api_key=settings.GROQ_API_KEY,
+        llm = ChatOpenAI(
+            model=settings.BEDROCK_MODEL_ID,
+            api_key=settings.BEDROCK_API_KEY,
+            base_url=f"https://bedrock-mantle.{settings.BEDROCK_REGION}.api.aws/v1",
             temperature=settings.TEMPERATURE,
-            reasoning_format="parsed",
             timeout=45,
             max_retries=1,
             max_tokens=4096,

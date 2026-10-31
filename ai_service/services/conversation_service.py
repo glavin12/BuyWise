@@ -9,8 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ai_service.models import Conversation, Message, MessageRole, MessageStatus
 from ai_service.repositories import ConversationRepository, MessageRepository
 from ai_service.repositories.messages import MessageCreate
-from ai_service.schemas.chat import ChatResponse, ToolCallInfo
-from ai_service.services.agent_service import ToolExchange
+from ai_service.schemas.chat import ChatResponse
+from ai_service.services.agent_service import changed_resources
 from ai_service.utils.langchain_messages import db_messages_to_langchain
 
 
@@ -110,14 +110,13 @@ class ConversationService:
         conversation_id: uuid.UUID,
         user_id: uuid.UUID,
         ai_message: AIMessage | None = None,
-        tool_exchanges: list[ToolExchange] | None = None,
+        changed_resources: list[str] | None = None,
         error: dict | None = None,
     ) -> list[Message]:
         """Persist one agent turn, atomically.
 
-        On success: each intermediate assistant(tool_calls) row followed by its
-        tool result rows, then the final assistant text row — in order, so a
-        reload reconstructs the exact sequence the model produced.
+        On success: the final assistant text row, with only changed resource
+        kinds for idempotent replay. Tool requests and results are transient.
         On failure (``error`` set): a single ``status=failed`` assistant row.
         """
         saved: list[Message] = []
@@ -138,39 +137,6 @@ class ConversationService:
             )
             saved.append(row)
         else:
-            for exchange in tool_exchanges or []:
-                tool_ai = exchange.ai_message
-                row, _ = await self.messages.create(
-                    MessageCreate(
-                        conversation_id=conversation_id,
-                        user_id=user_id,
-                        role=MessageRole.ASSISTANT,
-                        content=_as_text(tool_ai.content) if tool_ai.content else "",
-                        tool_calls=[
-                            {
-                                "name": tc.get("name"),
-                                "args": tc.get("args", {}),
-                                "id": tc.get("id"),
-                            }
-                            for tc in tool_ai.tool_calls
-                        ],
-                        status=MessageStatus.COMPLETED,
-                    )
-                )
-                saved.append(row)
-                for tool_message in exchange.tool_messages:
-                    row, _ = await self.messages.create(
-                        MessageCreate(
-                            conversation_id=conversation_id,
-                            user_id=user_id,
-                            role=MessageRole.TOOL,
-                            content=str(tool_message.content),
-                            tool_call_id=tool_message.tool_call_id,
-                            status=MessageStatus.COMPLETED,
-                        )
-                    )
-                    saved.append(row)
-
             content = _as_text(ai_message.content) if ai_message is not None else ""
             usage: dict = {}
             if ai_message is not None:
@@ -182,6 +148,7 @@ class ConversationService:
                     role=MessageRole.ASSISTANT,
                     content=content,
                     status=MessageStatus.COMPLETED,
+                    message_metadata={"changed_resources": changed_resources or []},
                     prompt_tokens=usage.get("input_tokens"),
                     completion_tokens=usage.get("output_tokens"),
                     total_tokens=usage.get("total_tokens"),
@@ -244,27 +211,17 @@ class ConversationService:
         if final is None or final.status != MessageStatus.COMPLETED:
             return None
 
-        tool_calls: list[ToolCallInfo] = []
-        for row in turn:
-            if row.role == MessageRole.ASSISTANT and row.tool_calls:
-                for tc in row.tool_calls:
-                    tool_calls.append(
-                        ToolCallInfo(
-                            tool_name=tc.get("name", ""),
-                            tool_input=tc.get("args", {}),
-                            tool_output="",
-                        )
-                    )
-            elif row.role == MessageRole.TOOL:
-                for info in reversed(tool_calls):
-                    if not info.tool_output:
-                        info.tool_output = str(row.content)
-                        break
+        metadata = final.message_metadata or {}
+        changes = metadata.get("changed_resources")
+        if changes is None:  # old turns stored tool calls; new ones store only effects
+            changes = changed_resources(
+                tc.get("name", "") for row in turn for tc in (row.tool_calls or [])
+            )
 
         return ChatResponse(
             response=final.content,
             conversation_id=final.conversation_id,
-            tool_calls=tool_calls,
+            changed_resources=changes,
         )
 
 

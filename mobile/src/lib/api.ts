@@ -47,7 +47,7 @@ if (!API_BASE) {
 export { ApiError, isNotFound, stopsBatch, userMessage };
 
 const CRUD_TIMEOUT_MS = 15_000; // C4
-const CHAT_TIMEOUT_MS = 60_000; // AI1: Groq tool chains can legitimately take 30s+
+const CHAT_TIMEOUT_MS = 90_000; // AI1: allow the 60 s agent turn plus DB work and network time
 
 const TOKEN_TIMEOUT_MS = 10_000; // a stalled refresh must not hang every request behind it
 

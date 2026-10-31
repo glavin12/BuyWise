@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from logging.config import fileConfig
+import ssl
 
 from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from ai_service.db.base import Base
+from ai_service.core.config import get_settings
 from ai_service.db.session import get_database_url
 from ai_service import models  # noqa: F401
 
@@ -51,6 +53,7 @@ async def run_migrations_online() -> None:
         configuration,
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
+        connect_args={"ssl": ssl.create_default_context()} if get_settings().DB_SSL_VERIFY else {},
     )
 
     async with connectable.connect() as connection:

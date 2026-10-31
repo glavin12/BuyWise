@@ -34,6 +34,7 @@ export function AuthLayout({
   title,
   intro,
   action,
+  socialAction,
   footer,
   children,
 }: {
@@ -43,6 +44,8 @@ export function AuthLayout({
   intro: string;
   /** The button (a `PrimaryButton`). */
   action: ReactNode;
+  /** Optional social sign-in control above the email fields. */
+  socialAction?: ReactNode;
   /** "New here? Create an account": the prompt and the underlined link. */
   footer?: { prompt: string; link: string; onPress: () => void };
   /** Banners and `AuthField`s, between the intro and the button. */
@@ -71,7 +74,7 @@ export function AuthLayout({
   const top = online ? Math.max(insets.top, 20) : 12;
   const bottom = Math.max(20, insets.bottom + 8);
   // The wordmark's row gives way first (it then sits over the hero's empty top-left corner), then the hero's sky.
-  const { width, lead, height: heroHeight } = heroFit(size.width, size.height, top, bottom);
+  const { width, lead, height: heroHeight } = heroFit(size.width, size.height, top, bottom, socialAction ? 92 : 0);
 
   return (
     // F1: on Android with edge-to-edge, "padding" is the behaviour that works (as in Screen).
@@ -108,7 +111,7 @@ export function AuthLayout({
             <View style={styles.intro}>
               <RichText tone="muted">{intro}</RichText>
             </View>
-            {children ? <View style={styles.fields}>{children}</View> : null}
+            {children || socialAction ? <View style={styles.fields}>{socialAction}{children}</View> : null}
             <View style={styles.action}>{action}</View>
             {footer ? (
               <View style={styles.footer}>

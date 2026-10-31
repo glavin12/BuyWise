@@ -2,7 +2,7 @@ fastapi
 uvicorn[standard]
 langchain
 langchain-google-genai
-langchain-groq
+langchain-openai
 langgraph
 pydantic-settings
 python-dotenv

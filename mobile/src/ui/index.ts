@@ -43,7 +43,7 @@ export { CategoryRow, ChartBlock, ChartNote, MethodBar, ReportCard, SavingsCard,
 export { FieldButton, FieldInput } from "./Field";
 export { Illustration } from "./Illustration";
 export { LegalLinks } from "./LegalLinks";
-export { OptionSheet, Sheet, SheetHandle, type OptionGroup } from "./OptionSheet";
+export { OptionSheet, Sheet, SheetHandle, type OptionGroup, type OptionItem } from "./OptionSheet";
 export { PressableScale } from "./PressableScale";
 export { SearchField } from "./SearchField";
 export { SheetLoading, SheetNotFound, SheetScreen } from "./SheetScreen";

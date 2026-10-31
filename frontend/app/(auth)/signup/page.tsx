@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { GoogleSignIn } from "@/components/google-sign-in";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -101,6 +102,8 @@ export default function SignupPage() {
             Start your smart finance journey with BuyWise
           </p>
         </div>
+
+        <GoogleSignIn disabled={loading} />
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input

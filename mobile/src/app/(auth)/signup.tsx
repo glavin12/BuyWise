@@ -3,6 +3,7 @@ import { useRef, useState } from "react";
 import type { TextInput } from "react-native";
 
 import { escapeRich } from "@/lib/richText";
+import { GoogleSignIn } from "@/ui/GoogleSignIn";
 import { useAuth } from "@/providers/AuthProvider";
 import { AuthField, AuthLayout, Banner, PrimaryButton } from "@/ui";
 import { ArrowLeft, Lock, Mail } from "@/ui/icons";
@@ -57,6 +58,7 @@ export default function SignupScreen() {
     <AuthLayout
       title={"Let's get\ntalking."}
       intro="Start your smart finance journey with BuyWise."
+      socialAction={<GoogleSignIn onError={setError} />}
       action={<PrimaryButton label="Create account" onPress={submit} requiresNetwork />}
       footer={{
         prompt: "Already have an account?",
